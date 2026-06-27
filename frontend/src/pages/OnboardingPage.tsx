@@ -46,7 +46,7 @@ export function OnboardingPage() {
         value,
       })
       if (currentIdx + 1 >= questions.length) {
-        navigate('/chat')
+        navigate('/numerology')
       } else {
         setCurrentIdx(currentIdx + 1)
       }
