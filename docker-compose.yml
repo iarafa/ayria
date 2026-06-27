@@ -71,23 +71,6 @@ services:
     networks:
       - ayria-net
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: ayria-frontend
-    restart: unless-stopped
-    environment:
-      VITE_API_URL: http://localhost:8000
-    depends_on:
-      - backend
-    ports:
-      - "${FRONTEND_PORT:-5173}:5173"
-    volumes:
-      - ./frontend/src:/app/src
-    command: npm run dev -- --host 0.0.0.0
-    networks:
-      - ayria-net
 
 volumes:
   postgres_data:
