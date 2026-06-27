@@ -83,6 +83,10 @@ export const chatApi = {
 
 export const adminApi = {
   listUsers: () => api.get('/api/admin/users'),
+  createUser: (data: { email: string; password: string; full_name?: string }) =>
+    api.post('/api/admin/users', data),
+  updateUserRole: (userId: string, role: string) =>
+    api.put(`/api/admin/users/${userId}/role`, { role }),
   listAttributes: () => api.get('/api/admin/attributes'),
   createAttribute: (data: any) => api.post('/api/admin/attributes', data),
   getOnboardingConfig: () => api.get('/api/admin/onboarding/config'),

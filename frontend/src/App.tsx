@@ -1,7 +1,7 @@
 /**
  * AYRIA - App Router Principal
  */
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './store/auth'
 import { LoginPage } from './pages/LoginPage'
@@ -12,10 +12,26 @@ import { AdminPage } from './pages/AdminPage'
 
 function PrivateRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
   const { user, token, loadUser } = useAuth()
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (token && !user) loadUser()
+    if (token && !user) {
+      loadUser().finally(() => setLoading(false))
+    } else {
+      setLoading(false)
+    }
   }, [token, user])
+
+  if (loading) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: '#050505' }}
+      >
+        <div className="text-ayria-muted">Carregando...</div>
+      </div>
+    )
+  }
 
   if (!token) return <Navigate to="/login" replace />
   if (adminOnly && user?.role !== 'admin' && user?.role !== 'SUPER_ADMIN') {

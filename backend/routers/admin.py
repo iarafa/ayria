@@ -17,7 +17,7 @@ import uuid
 import logging
 
 from database import get_db
-from utils.security import require_admin
+from utils.security import require_admin, hash_password
 from services.storage_service import storage_service
 import models
 import schemas
@@ -69,6 +69,42 @@ async def update_user_role(
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     
     user.role = payload.role
+    await db.commit()
+    await db.refresh(user)
+    
+    return schemas.AdminUserResponse(
+        id=user.id, email=user.email, full_name=user.full_name,
+        role=user.role, is_active=user.is_active,
+        onboarding_status=user.onboarding_status or "pending",
+        created_at=user.created_at, last_login_at=user.last_login_at,
+        message_count=0,
+    )
+
+
+@router.post("/users", response_model=schemas.AdminUserResponse, status_code=201)
+async def create_user(
+    payload: schemas.UserRegister,
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin cria novo usuário"""
+    existing = await db.execute(
+        select(models.User).where(models.User.email == payload.email)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Email já cadastrado")
+    
+    user = models.User(
+        id=uuid.uuid4(),
+        email=payload.email,
+        password_hash=hash_password(payload.password),
+        full_name=payload.full_name,
+        role="user",  # Admin SEMPRE cria como user (não pode promover via esse endpoint)
+        is_active=True,
+        is_verified=True,  # Admin cria já verificado
+        onboarding_status="pending",
+    )
+    db.add(user)
     await db.commit()
     await db.refresh(user)
     
