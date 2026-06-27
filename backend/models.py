@@ -28,9 +28,11 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(255))
-    role = Column(String(20), default="user", index=True)  # user | admin
+    role = Column(String(20), default="user", index=True)  # user | admin | SUPER_ADMIN
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
+    numerology_data = Column(JSONB)  # mapa numerológico calculado
+    onboarding_status = Column(String(50), default="pending")  # pending|in_progress|completed|skipped
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     last_login_at = Column(DateTime(timezone=True))
@@ -59,10 +61,11 @@ class UserProfile(Base):
 
 
 # ============================================================
-# 3. USER_ATTRIBUTES (catálogo - configurável pelo admin)
+# 3. ATTRIBUTE_DEFINITIONS (catálogo - configurável pelo admin)
 # ============================================================
-class UserAttribute(Base):
-    __tablename__ = "user_attributes"
+class AttributeDefinition(Base):
+    """Catálogo de definições de atributos (configurado pelo admin)"""
+    __tablename__ = "attribute_definitions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
     code = Column(String(100), unique=True, nullable=False, index=True)
@@ -80,10 +83,26 @@ class UserAttribute(Base):
 
 
 # ============================================================
-# 4. ONBOARDING_QUESTIONS (fluxo dinâmico)
+# 3b. USER_ATTRIBUTES (valores por usuário)
 # ============================================================
-class OnboardingQuestion(Base):
-    __tablename__ = "onboarding_questions"
+class UserAttribute(Base):
+    """Valores dos atributos preenchidos por cada usuário"""
+    __tablename__ = "user_attributes"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    attribute_definition_id = Column(UUID(as_uuid=True), ForeignKey("attribute_definitions.id", ondelete="CASCADE"), nullable=False, index=True)
+    value = Column(JSONB, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+# ============================================================
+# 4. ONBOARDING_CONFIG (fluxo dinâmico)
+# ============================================================
+class OnboardingConfig(Base):
+    """Configuração dinâmica do onboarding"""
+    __tablename__ = "onboarding_config"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
     step = Column(Integer, nullable=False)

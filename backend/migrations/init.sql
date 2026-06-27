@@ -17,7 +17,9 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     full_name VARCHAR(255),
-    role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'admin')),
+    role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'admin', 'SUPER_ADMIN')),
+    numerology_data JSONB,
+    onboarding_status VARCHAR(50) DEFAULT 'pending' CHECK (onboarding_status IN ('pending', 'in_progress', 'completed', 'skipped')),
     is_active BOOLEAN DEFAULT TRUE,
     is_verified BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -71,7 +73,7 @@ CREATE INDEX idx_user_profiles_onboarding ON user_profiles(onboarding_completed)
 -- 3. USER_ATTRIBUTES (Catálogo de atributos - configurável pelo admin)
 -- ============================================================
 -- Admin define quais campos existem no perfil. Usado no onboarding.
-CREATE TABLE IF NOT EXISTS user_attributes (
+CREATE TABLE IF NOT EXISTS attribute_definitions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     code VARCHAR(100) UNIQUE NOT NULL,
     label VARCHAR(255) NOT NULL,
@@ -90,13 +92,13 @@ CREATE TABLE IF NOT EXISTS user_attributes (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_user_attributes_code ON user_attributes(code);
-CREATE INDEX idx_user_attributes_active ON user_attributes(is_active, order_index);
+CREATE INDEX idx_user_attributes_code ON attribute_definitions(code);
+CREATE INDEX idx_user_attributes_active ON attribute_definitions(is_active, order_index);
 
 -- ============================================================
 -- 4. ONBOARDING_QUESTIONS (Fluxo dinâmico de perguntas)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS onboarding_questions (
+CREATE TABLE IF NOT EXISTS onboarding_config (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     step INT NOT NULL,
     attribute_code VARCHAR(100), -- referência opcional a user_attributes
@@ -217,7 +219,7 @@ CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
 CREATE TRIGGER update_user_profiles_updated_at BEFORE UPDATE ON user_profiles
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_user_attributes_updated_at BEFORE UPDATE ON user_attributes
+CREATE TRIGGER update_user_attributes_updated_at BEFORE UPDATE ON attribute_definitions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_chats_updated_at BEFORE UPDATE ON chats
@@ -236,7 +238,7 @@ VALUES (
     'admin@ayria.local',
     '$2b$12$KIXQzVxzF3GqBkC4FvDjmeqJWk8yHN8VK2.2U8YxVZmL8xKQxbPYu',
     'Administrador',
-    'admin',
+    'SUPER_ADMIN',
     TRUE,
     TRUE
 ) ON CONFLICT (email) DO NOTHING;
@@ -255,7 +257,7 @@ INSERT INTO user_attributes (code, label, attribute_type, is_required, is_onboar
 ON CONFLICT (code) DO NOTHING;
 
 -- Onboarding padrão
-INSERT INTO onboarding_questions (step, question_text, helper_text, question_type, attribute_code) VALUES
+INSERT INTO onboarding_config (step, question_text, helper_text, question_type, attribute_code) VALUES
     (1, 'Bem-vindo(a) à AYRIA! 🌙', 'Vou te conhecer um pouco melhor para oferecer uma experiência personalizada. Pode levar 2 minutinhos.', 'multi_step_intro', NULL),
     (2, 'Como você se chama?', 'Seu nome completo, por favor.', 'text', 'nome_completo'),
     (3, 'Quando você nasceu?', 'Preciso da data para cálculos numerológicos.', 'date', 'data_nascimento'),
@@ -274,3 +276,22 @@ ON CONFLICT DO NOTHING;
 -- Total: 8 tabelas principais + 1 audit
 -- Próximas migrations via Alembic (backend/migrations/versions/)
 -- ============================================================
+
+-- ============================================================
+-- 11. USER_ATTRIBUTES (Valores dos atributos por usuário)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS user_attributes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    attribute_definition_id UUID NOT NULL REFERENCES attribute_definitions(id) ON DELETE CASCADE,
+    value JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, attribute_definition_id)
+);
+
+CREATE INDEX idx_user_attributes_user_id ON user_attributes(user_id);
+CREATE INDEX idx_user_attributes_definition ON user_attributes(attribute_definition_id);
+
+CREATE TRIGGER update_user_attributes_updated_at BEFORE UPDATE ON user_attributes
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
