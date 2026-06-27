@@ -8,9 +8,9 @@ python-multipart==0.0.12
 
 # Database
 sqlalchemy==2.0.36
-psycopg2-binary==2.9.10
 alembic==1.13.3
-asyncpg==0.30.0
+asyncpg==0.30.0   # async, não precisa compilar
+psycopg[binary]>=3.2   # só pra Alembic (síncrono)
 
 # Auth
 python-jose[cryptography]==3.3.0

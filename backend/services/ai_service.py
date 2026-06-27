@@ -1,9 +1,9 @@
 """
 AYRIA - AI Service
-Integração com Minimax (default) ou OpenAI (fallback).
-OpenAI-compatible API.
+Integração com IA via API OpenAI-compatible.
+Configurável pra usar MiniMax, OpenAI ou qualquer provider compatível.
 """
-from typing import List, Dict, Optional, AsyncIterator
+from typing import List, Dict, Optional
 from openai import AsyncOpenAI
 import logging
 
@@ -13,86 +13,71 @@ logger = logging.getLogger(__name__)
 
 
 class AIService:
-    """Cliente IA com fallback Minimax → OpenAI"""
-    
+    """Cliente IA com provider configurável via env"""
+
     def __init__(self):
-        self.minimax_client = None
-        self.openai_client = None
-        
-        if settings.MINIMAX_API_KEY:
-            self.minimax_client = AsyncOpenAI(
-                api_key=settings.MINIMAX_API_KEY,
-                base_url=settings.MINIMAX_BASE_URL,
+        self.primary_client = None
+        self.fallback_client = None
+        self.primary_model = settings.AI_MODEL
+        self.fallback_model = settings.OPENAI_MODEL
+
+        # Cliente principal (AI_API_KEY + AI_BASE_URL)
+        if settings.AI_API_KEY:
+            self.primary_client = AsyncOpenAI(
+                api_key=settings.AI_API_KEY,
+                base_url=settings.AI_BASE_URL,
             )
-            logger.info(f"Minimax client configured (model={settings.MINIMAX_MODEL})")
-        
-        if settings.OPENAI_API_KEY:
-            self.openai_client = AsyncOpenAI(
+            logger.info(f"AI client (primary): {settings.AI_BASE_URL} | model={self.primary_model}")
+
+        # Fallback OpenAI oficial
+        if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != settings.AI_API_KEY:
+            self.fallback_client = AsyncOpenAI(
                 api_key=settings.OPENAI_API_KEY,
                 base_url="https://api.openai.com/v1",
             )
-            logger.info(f"OpenAI fallback configured (model={settings.OPENAI_MODEL})")
-    
+            logger.info(f"AI client (fallback): OpenAI | model={self.fallback_model}")
+
     async def chat(
         self,
         messages: List[Dict[str, str]],
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: int = 2000,
-        stream: bool = False,
     ):
-        """
-        Envia mensagem pra IA.
-        Tenta Minimax primeiro, fallback OpenAI.
-        """
-        # Insere system prompt se fornecido
+        """Envia mensagem pra IA. Tenta primary, fallback OpenAI."""
         if system_prompt:
             messages = [{"role": "system", "content": system_prompt}] + messages
-        
-        # Tenta Minimax primeiro
-        if self.minimax_client:
+
+        # Tenta primary primeiro
+        if self.primary_client:
             try:
-                if stream:
-                    return self.minimax_client.chat.completions.create(
-                        model=settings.MINIMAX_MODEL,
-                        messages=messages,
-                        temperature=temperature,
-                        max_tokens=max_tokens,
-                        stream=True,
-                    )
-                else:
-                    return await self.minimax_client.chat.completions.create(
-                        model=settings.MINIMAX_MODEL,
-                        messages=messages,
-                        temperature=temperature,
-                        max_tokens=max_tokens,
-                    )
+                resp = await self.primary_client.chat.completions.create(
+                    model=self.primary_model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                return resp
             except Exception as e:
-                logger.warning(f"Minimax falhou, tentando OpenAI: {e}")
-        
+                logger.warning(f"Primary AI failed ({settings.AI_BASE_URL}): {e}")
+
         # Fallback OpenAI
-        if self.openai_client:
+        if self.fallback_client:
             try:
-                if stream:
-                    return self.openai_client.chat.completions.create(
-                        model=settings.OPENAI_MODEL,
-                        messages=messages,
-                        temperature=temperature,
-                        max_tokens=max_tokens,
-                        stream=True,
-                    )
-                else:
-                    return await self.openai_client.chat.completions.create(
-                        model=settings.OPENAI_MODEL,
-                        messages=messages,
-                        temperature=temperature,
-                        max_tokens=max_tokens,
-                    )
+                resp = await self.fallback_client.chat.completions.create(
+                    model=self.fallback_model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+                return resp
             except Exception as e:
-                logger.error(f"OpenAI também falhou: {e}")
+                logger.error(f"Fallback AI failed too: {e}")
                 raise
-        
-        raise RuntimeError("Nenhum cliente IA configurado (MINIMAX_API_KEY ou OPENAI_API_KEY)")
+
+        raise RuntimeError(
+            "Nenhum cliente IA configurado. Defina AI_API_KEY ou OPENAI_API_KEY no .env"
+        )
 
 
 # Singleton

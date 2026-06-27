@@ -17,15 +17,14 @@ class Settings(BaseSettings):
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_API_KEY: str = ""
     
-    MINIMAX_API_KEY: str = ""
-    MINIMAX_BASE_URL: str = "https://api.minimax.io/v1"
-    MINIMAX_MODEL: str = "MiniMax-M2.7"
+    # IA (OpenAI-compatible: serve pra MiniMax, OpenAI, qualquer um)
+    AI_API_KEY: str = ""
+    AI_BASE_URL: str = "https://api.minimax.io/v1"
+    AI_MODEL: str = "MiniMax-M2.7"
     
+    # Fallback OpenAI
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
-    
-    AZURE_STORAGE_CONNECTION_STRING: str = ""
-    AZURE_STORAGE_CONTAINER: str = "ayria-docs"
     
     JWT_SECRET: str = "CHANGE_ME_AYRIA_DEV_ONLY"
     JWT_ALGORITHM: str = "HS256"
@@ -33,7 +32,7 @@ class Settings(BaseSettings):
     
     ENVIRONMENT: str = "development"
     CORS_ORIGINS: str = "http://localhost:5173,http://192.168.3.37:5173"
-    
+
     class Config:
         env_file = ".env"
         case_sensitive = True

@@ -107,13 +107,13 @@ async def info():
     }
 
 
-# Routers (vou adicionar nas próximas fases)
-# from routers import auth, users, chats, admin, onboarding
-# app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
-# app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
-# app.include_router(onboarding.router, prefix="/api/v1/onboarding", tags=["onboarding"])
-# app.include_router(chats.router, prefix="/api/v1/chats", tags=["chats"])
-# app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
+# Routers
+from routers import auth, onboarding, chats, chat, admin
+app.include_router(auth.router)
+app.include_router(onboarding.router)
+app.include_router(chats.router)
+app.include_router(chat.router)
+app.include_router(admin.router)
 
 
 if __name__ == "__main__":

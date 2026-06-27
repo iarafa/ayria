@@ -53,13 +53,11 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-ayria}:${POSTGRES_PASSWORD:-ayria_secret_change_me}@postgres:5432/${POSTGRES_DB:-ayria}
       QDRANT_URL: http://qdrant:6333
       QDRANT_API_KEY: ${QDRANT_API_KEY:-}
-      MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
-      MINIMAX_BASE_URL: ${MINIMAX_BASE_URL:-https://api.minimax.io/v1}
-      MINIMAX_MODEL: ${MINIMAX_MODEL:-MiniMax-M2.7}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.minimax.io/v1}
+      AI_MODEL: ${AI_MODEL:-MiniMax-M2.7}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
-      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
-      AZURE_STORAGE_CONTAINER: ${AZURE_STORAGE_CONTAINER:-ayria-docs}
       JWT_SECRET: ${JWT_SECRET:-change_me_in_production_please_use_32_random_chars}
       JWT_ALGORITHM: HS256
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-1440}
