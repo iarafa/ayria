@@ -2,7 +2,7 @@
 
 > Documento de auto-validação contínua. Cada item ✅ significa que está implementado e testado.
 
-## Fase 1 — Estrutura ✅ (em progresso)
+## Fase 1 — Estrutura ✅ CONCLUÍDA
 
 - [x] Estrutura de pastas backend/frontend criada
 - [x] docker-compose.yml orquestra 4 serviços
