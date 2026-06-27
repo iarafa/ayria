@@ -24,6 +24,7 @@ from database import get_db, settings
 from utils.security import get_current_user
 from services.ai_service import ai_service
 from services.vector_service import vector_service
+from services.numerology_service import gerar_relatorio_numerologico
 import models
 import schemas
 
@@ -120,9 +121,11 @@ async def send_message(
         for k, v in attrs.items():
             profile_parts.append(f"- {k}: {v}")
         profile_text = "\n".join(profile_parts)
-    
+
     if user.numerology_data:
-        profile_text += f"\n\nNUMEROLOGIA:\n{json.dumps(user.numerology_data, ensure_ascii=False, indent=2)}"
+        # Usa relatório narrativo ao invés de JSON cru (mais legível pra IA)
+        relatorio = gerar_relatorio_numerologico(user.numerology_data)
+        profile_text += f"\n\nMAPA NUMEROLÓGICO CALCULADO:\n{relatorio}"
     
     # RAG: busca conhecimento relevante
     rag_context = "(nenhum conhecimento específico encontrado)"

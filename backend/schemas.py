@@ -78,6 +78,21 @@ class OnboardingStatus(BaseModel):
     current_step: int
     total_steps: int
     questions: List[Dict[str, Any]]
+    numerology_data: Optional[Dict[str, Any]] = None
+    answered: Optional[Dict[str, Any]] = None
+
+
+class OnboardingAnswerResponse(BaseModel):
+    status: str
+    completed: bool
+    numerology_data: Optional[Dict[str, Any]] = None
+    numerology_calculated: bool = False
+    progress: str  # ex: "3/9"
+
+
+class NumerologyResponse(BaseModel):
+    mapa: Dict[str, Any]
+    relatorio: str
 
 
 # ============================================================
