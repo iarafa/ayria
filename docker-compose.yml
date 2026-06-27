@@ -1,12 +1,11 @@
 services:
-  # Banco de dados estruturado (PostgreSQL)
   postgres:
     image: postgres:16-alpine
     container_name: ayria-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ayria}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ayria_dev_2026}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ayria…026}
       POSTGRES_DB: ${POSTGRES_DB:-ayria}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -15,20 +14,16 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ayria} -d ${POSTGRES_DB:-ayria}"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 3
     networks:
       - ayria-net
 
-  # Banco vetorial (Qdrant)
   qdrant:
     image: qdrant/qdrant:v1.12.0
     container_name: ayria-qdrant
     restart: unless-stopped
-    environment:
-      QDRANT__SERVICE__HTTP_PORT: 6333
-      QDRANT__SERVICE__GRPC_PORT: 6334
     volumes:
       - qdrant_data:/qdrant/storage
     ports:
@@ -37,12 +32,11 @@ services:
     healthcheck:
       test: ["CMD", "true"]
       interval: 5s
-      timeout: 5s
+      timeout: 3s
       retries: 3
     networks:
       - ayria-net
 
-  # Backend FastAPI
   backend:
     build:
       context: .
@@ -50,7 +44,7 @@ services:
     container_name: ayria-backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ayria}:${POSTGRES_PASSWORD:-ayria_dev_2026}@postgres:5432/${POSTGRES_DB:-ayria}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ayria}:${POSTGRES_PASSWORD:-ayria…026}@postgres:5432/ayria
       QDRANT_URL: http://qdrant:6333
       QDRANT_API_KEY: ${QDRANT_API_KEY:-}
       AI_API_KEY: ${AI_API_KEY:-}
@@ -58,22 +52,40 @@ services:
       AI_MODEL: ${AI_MODEL:-MiniMax-M2.7}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
-      JWT_SECRET: ${JWT_SECRET:-change_me}
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_prod}
       JWT_ALGORITHM: HS256
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-1440}
       ENVIRONMENT: ${ENVIRONMENT:-development}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://192.168.3.37:5173}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://192.168.3.37:5173,http://localhost:4173}
     depends_on:
       postgres:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - ./backend:/app
       - backend_uploads:/app/uploads
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - ayria-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ayria-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./frontend/src:/app/src
+    command: npm run dev -- --host 0.0.0.0
     networks:
       - ayria-net
 
