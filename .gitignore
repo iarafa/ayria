@@ -8,6 +8,10 @@ data/*
 !data/.gitkeep
 logs/*
 !logs/.gitkeep
+uploads/*
 .DS_Store
 *.bak
+backend/uploads/*
 spec/
+*.sqlite
+*.db
