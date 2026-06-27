@@ -10,6 +10,7 @@ from sqlalchemy import select, func
 from datetime import datetime, timedelta
 import uuid
 
+from pydantic import BaseModel, EmailStr, Field
 from database import get_db, settings
 from utils.security import (
     hash_password, verify_password,

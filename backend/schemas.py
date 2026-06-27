@@ -12,13 +12,13 @@ import uuid
 # AUTH
 # ============================================================
 class UserRegister(BaseModel):
-    email: EmailStr
+    email: str
     password: str = Field(min_length=6, max_length=128)
     full_name: Optional[str] = None
 
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 

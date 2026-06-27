@@ -236,7 +236,7 @@ CREATE TRIGGER update_knowledge_documents_updated_at BEFORE UPDATE ON knowledge_
 INSERT INTO users (email, password_hash, full_name, role, is_active, is_verified)
 VALUES (
     'admin@ayria.local',
-    '$2b$12$KIXQzVxzF3GqBkC4FvDjmeqJWk8yHN8VK2.2U8YxVZmL8xKQxbPYu',
+    '$2b$12$lA09Lc3NKx14gc9i0QpU9ecvMn6mjlYLHe3v2iD4L9DY3qBJSZhZu',
     'Administrador',
     'SUPER_ADMIN',
     TRUE,

@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
     print(f"   Environment: {settings.ENVIRONMENT}")
     print(f"   Database: {settings.DATABASE_URL.split('@')[-1]}")
     print(f"   Qdrant: {settings.QDRANT_URL}")
-    print(f"   IA: {settings.MINIMAX_MODEL}")
+    print(f"   IA: {settings.AI_MODEL} via {settings.AI_BASE_URL}")
     
     # Em dev, cria tabelas se não existirem (Alembic em prod)
     if settings.ENVIRONMENT == "development":
