@@ -118,3 +118,11 @@ Items ❌ viram pendência da próxima sessão.
 | Frontend state | Zustand | Mais simples que Redux |
 | Styling | Tailwind + Inter | Spec pediu |
 | Estilo | Glassmorphism | Spec pediu |
+
+## Identidade Visual
+
+- [x] Logo original salvo em `frontend/public/ayria-logo.jpg`
+- [x] Versão transparente (fundo removido) → `ayria-logo-transparent.png`
+- [x] Versão dark com glow indigo (#6366F1) → `ayria-logo-dark.png`
+- [x] Cores do logo extraídas e mapeadas no design system
+- [x] Regras de uso definidas (tamanho, posição por tela)
