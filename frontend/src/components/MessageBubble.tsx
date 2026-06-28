@@ -1,18 +1,23 @@
 /**
  * AYRIA - Message Bubble
+ *
+ * Mostra APENAS o conteúdo da mensagem para usuários comuns.
+ * Para ADMIN/SUPER_ADMIN, mostra também: modelo IA, tokens, e thinking
+ * (raciocínio vazado pelo modelo) — info útil pra debug.
  */
 import { useEffect, useRef } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Brain } from 'lucide-react'
+import { useAuth } from '../store/auth'
 
 interface MessageBubbleProps {
   role: 'user' | 'assistant' | 'system'
   content: string
   model?: string
   tokens?: number
+  thinking?: string | null
 }
 
 function renderMarkdown(text: string): string {
-  // Markdown minimalista - bold, italic, code, listas
   return text
     .replace(/### (.*)/g, '<h3>$1</h3>')
     .replace(/## (.*)/g, '<h2>$1</h2>')
@@ -27,9 +32,13 @@ function renderMarkdown(text: string): string {
     .replace(/\n/g, '<br/>')
 }
 
-export function MessageBubble({ role, content, model, tokens }: MessageBubbleProps) {
+export function MessageBubble({ role, content, model, tokens, thinking }: MessageBubbleProps) {
   const isUser = role === 'user'
   const ref = useRef<HTMLDivElement>(null)
+
+  // Quem pode ver metadata técnica: só admin
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin' || user?.role === 'SUPER_ADMIN'
 
   useEffect(() => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
@@ -53,7 +62,8 @@ export function MessageBubble({ role, content, model, tokens }: MessageBubblePro
               }
         }
       >
-        {!isUser && (
+        {/* Header: só pra admin */}
+        {!isUser && isAdmin && (
           <div className="flex items-center gap-2 mb-2 text-xs text-ayria-muted">
             <Sparkles size={12} className="text-ayria-primary" />
             <span>AYRIA</span>
@@ -61,6 +71,20 @@ export function MessageBubble({ role, content, model, tokens }: MessageBubblePro
             {tokens && <span className="opacity-60">· {tokens} tokens</span>}
           </div>
         )}
+
+        {/* Thinking: só pra admin (raciocínio vazado pelo modelo) */}
+        {!isUser && isAdmin && thinking && (
+          <details className="mb-3 text-xs">
+            <summary className="cursor-pointer text-ayria-muted hover:text-ayria-primary flex items-center gap-1 select-none">
+              <Brain size={11} />
+              <span>Raciocínio interno (vazado pelo modelo)</span>
+            </summary>
+            <pre className="mt-2 p-2 rounded bg-black/40 text-ayria-muted whitespace-pre-wrap text-[11px] leading-relaxed border border-ayria-primary/10">
+              {thinking}
+            </pre>
+          </details>
+        )}
+
         <div
           className="markdown text-[15px]"
           dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}

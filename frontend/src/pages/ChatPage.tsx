@@ -66,6 +66,7 @@ export function ChatPage() {
                 content={m.content}
                 model={m.ai_model}
                 tokens={m.tokens_used}
+                thinking={m.metadata?.thinking ?? null}
               />
             ))}
 

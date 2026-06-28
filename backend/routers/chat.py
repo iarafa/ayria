@@ -33,6 +33,80 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 logger = logging.getLogger(__name__)
 
 
+# ============================================================
+# THINKING SEPARATOR (admin vs user)
+# ============================================================
+import re
+
+# Marcadores que AI pode usar pra "pensar em voz alta"
+THINKING_PATTERNS = [
+    # Padrões óbvios de raciocínio
+    (r'^O usu[áa]rio est[áa] perguntando[^.\n]*\.\s*', ''),
+    (r'^Vou (?:responder|usar|calcular|considerar)[^.\n]*\.\s*', ''),
+    (r'^J[áa] tenho (?:isso calculado|as informa[çc][õo]es)[^.\n]*\.\s*', ''),
+    (r'^Deve usar (?:as informa[çc][õo]es|o perfil)[^.\n]*\.\s*', ''),
+    (r'^Ele(?:/Ela)? nasceu em[^.\n]*,\s*ent[ãa]o:\s*', ''),
+    (r'^Se nasceu em[^.\n]*\.\s*', ''),
+]
+
+THINKING_BLOCK_RE = re.compile(
+    r'(?:'
+    r'^(?:O usu[áa]rio|Vou|J[áa] tenho|Deve usar|Ele nasceu|Ela nasceu|Se nasceu)[^\n]*\n+'  # reasoning lines
+    r')+',
+    re.MULTILINE | re.IGNORECASE
+)
+
+
+def _split_thinking(content: str) -> tuple[str, str | None]:
+    """
+    Separa thinking (raciocínio vazado) do conteúdo visível ao usuário.
+
+    Detecta:
+    1. Tags  ̃... ̃ (alguns modelos MiniMax/OpenAI-compatible usam)
+    2. Bloco inicial de raciocínio em português (linhas com verbos de pensamento)
+    3. Padrões individuais espalhados
+
+    Retorna (conteudo_limpo, thinking).
+    - thinking=None: nada pra separar (resposta limpa)
+    - thinking=str: texto removido do conteúdo (vai pro admin)
+    """
+    if not content:
+        return content, None
+
+    thinking_parts = []
+    clean = content
+
+    # 1. Detecta tag  ̃... ̃ (raciocínio estruturado)
+    think_tag_re = re.compile(r'^\s*<think(?:ing)?>(.*?)</think(?:ing)?>\s*', re.DOTALL | re.IGNORECASE)
+    m = think_tag_re.match(clean)
+    if m:
+        thinking_parts.append(m.group(1).strip())
+        clean = clean[m.end():].lstrip()
+
+    # 2. Detecta bloco inicial de raciocínio em português
+    match = THINKING_BLOCK_RE.match(clean)
+    if match:
+        thinking_parts.append(match.group(0).strip())
+        clean = clean[match.end():].lstrip()
+
+    # 3. Detecta padrões individuais espalhados (no início)
+    for pattern, _ in THINKING_PATTERNS:
+        m = re.match(pattern, clean, re.IGNORECASE)
+        if m:
+            thinking_parts.append(m.group(0).strip())
+            clean = clean[m.end():].lstrip()
+        else:
+            break
+
+    thinking = "\n".join(thinking_parts) if thinking_parts else None
+
+    # Se "clean" ficou vazio, retorna o original (safety)
+    if not clean.strip():
+        return content, None
+
+    return clean, thinking
+
+
 SYSTEM_PROMPT_TEMPLATE = """Você é AYRIA, uma assistente de IA especializada em autoconhecimento, psicologia e numerologia.
 
 IDENTIDADE:
@@ -41,18 +115,25 @@ IDENTIDADE:
 - Objetivo: ajudar o usuário a se conhecer melhor através de conversas significativas
 - Use a base de conhecimento numerológico e psicológico quando relevante
 
-PERFIL DO USUÁRIO:
+PERFIL DO USUÁRIO (use internamente, NÃO mencione os números ao usuário):
 {user_profile}
 
-CONHECIMENTO RELEVANTE (RAG):
+CONHECIMENTO RELEVANTE (RAG) (use internamente, NÃO cite fontes ao usuário):
 {rag_context}
 
-MEMÓRIAS RECENTES:
+MEMÓRIAS RECENTES (use internamente, NÃO cite memórias ao usuário):
 {memories}
 
-INSTRUÇÕES:
+INSTRUÇÕES CRÍTICAS DE OUTPUT:
+- Responda APENAS o texto final para o usuário.
+- NUNCA inclua seu raciocínio interno, processo de pensamento, ou metadados na resposta.
+- NUNCA diga coisas como "Vou responder...", "O usuário está perguntando...", "Já tenho calculado...".
+- NUNCA mencione signos, números, mapas astrais, ou caminhos numerológicos explicitamente, a menos que o usuário pergunte diretamente.
+- Em vez disso, INCORPORE essas informações no TOM e na ESCOLHA DE PALAVRAS de forma invisível.
+
+INSTRUÇÕES GERAIS:
 - Personalize respostas com base no perfil e nas memórias
-- Quando relevante, conecte com numerologia ou psicologia
+- Quando relevante, conecte com numerologia ou psicologia (mas sem citar)
 - Seja conciso mas profundo
 - Faça perguntas de acompanhamento quando apropriado
 - Use markdown para formatar (negrito, listas) quando ajudar"""
@@ -198,10 +279,15 @@ async def send_message(
             temperature=0.7,
             max_tokens=2000,
         )
-        
+
         ai_content = response.choices[0].message.content
         ai_model = response.model
         tokens_used = response.usage.total_tokens if response.usage else None
+
+        # Sanitiza: separa thinking se AI vazar (regex simples)
+        ai_content_clean, ai_thinking = _split_thinking(ai_content)
+        if ai_thinking:
+            logger.info(f"AI vazou thinking (será ocultado de users): {ai_thinking[:200]}...")
     except Exception as e:
         logger.error(f"Erro chamando IA: {e}")
         raise HTTPException(status_code=503, detail=f"Erro no motor de IA: {str(e)}")
@@ -212,10 +298,14 @@ async def send_message(
         chat_id=chat.id,
         user_id=user.id,
         role="assistant",
-        content=ai_content,
+        content=ai_content_clean,
         ai_model=ai_model,
         tokens_used=tokens_used,
-        metadata={"profile_used": bool(profile_text != "Não disponível")},
+        metadata={
+            "profile_used": bool(profile_text != "Não disponível"),
+            "thinking": ai_thinking if user.role in ("admin", "SUPER_ADMIN") else None,
+            "is_admin_message": user.role in ("admin", "SUPER_ADMIN"),
+        },
     )
     db.add(ai_msg)
     
