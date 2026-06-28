@@ -46,7 +46,7 @@ export function Sidebar() {
           }}
         >
           <Plus size={14} />
-          Nova Conversa
+          Novo Tema
         </button>
       </div>
 
