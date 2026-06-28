@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../store/auth'
 import { adminApi } from '../lib/api'
-import { Logo } from '../components/Logo'
+import { Logo, LogoIcon } from '../components/Logo'
 import { Users, FileText, Settings, ListChecks, LogOut, UserPlus, X, Shield } from 'lucide-react'
 
 type Tab = 'users' | 'knowledge' | 'onboarding' | 'attributes'
@@ -125,7 +125,7 @@ export function AdminPage() {
       {/* Header */}
       <header className="glass px-6 py-4 flex items-center justify-between border-b border-ayria-border">
         <div className="flex items-center gap-3">
-          <Logo size={32} />
+          <LogoIcon size={32} variant="circular" />
           <span
             className="px-2 py-1 rounded text-xs font-semibold"
             style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B' }}

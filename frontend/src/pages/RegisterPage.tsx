@@ -4,7 +4,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../store/auth'
-import { Logo } from '../components/Logo'
+import { LogoIcon } from '../components/Logo'
 
 export function RegisterPage() {
   const { register, loading, error } = useAuth()
@@ -26,7 +26,7 @@ export function RegisterPage() {
     >
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
-          <Logo size={80} showText={false} />
+          <LogoIcon size={80} variant="circular" />
         </div>
 
         <h1 className="text-3xl font-bold text-center mb-2 gradient-text">

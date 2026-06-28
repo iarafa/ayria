@@ -6,7 +6,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Logo } from '../components/Logo'
+import { LogoIcon } from '../components/Logo'
 import { Sparkles, ArrowRight } from 'lucide-react'
 
 interface NumerologyData {
@@ -141,7 +141,7 @@ export function NumerologyReveal() {
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#050505' }}>
         <div className="text-center">
-          <Logo size={80} showText={false} className="justify-center mb-4" />
+          <LogoIcon size={80} variant="circular" className="justify-center mb-4" />
           <p className="text-ayria-muted">Mapa não encontrado. Continuando...</p>
           <button
             onClick={() => navigate('/chat')}
@@ -163,7 +163,7 @@ export function NumerologyReveal() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
-          <Logo size={100} showText={false} className="justify-center mb-6" />
+          <LogoIcon size={100} variant="circular" className="justify-center mb-6" />
           <div className="flex items-center justify-center gap-2 mb-3">
             <Sparkles size={16} className="text-ayria-accent" />
             <span className="text-xs uppercase tracking-[0.3em] text-ayria-accent">

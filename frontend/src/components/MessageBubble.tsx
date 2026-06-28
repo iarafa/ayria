@@ -66,7 +66,7 @@ export function MessageBubble({ role, content, model, tokens, thinking }: Messag
         {/* Header: só pra admin */}
         {!isUser && isAdmin && (
           <div className="flex items-center gap-2 mb-2 text-xs text-ayria-muted">
-            <img src="/ayria-logo-dark.png" alt="AYRIA" width={12} height={12} />
+            <LogoIcon size={12} variant="circular" />
             <span>AYRIA</span>
             {model && <span className="opacity-60">· {model}</span>}
             {tokens && <span className="opacity-60">· {tokens} tokens</span>}

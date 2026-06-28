@@ -100,7 +100,7 @@ export function OnboardingPage() {
     >
       <div className="w-full max-w-2xl">
         <div className="flex justify-center mb-8">
-          <Logo size={64} showText={false} />
+          <LogoIcon size={64} variant="circular" />
         </div>
 
         {/* Progress bar */}

@@ -4,7 +4,7 @@
 import { Plus, MessageCircle, LogOut, Shield, Trash2 } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { useChat } from '../store/chat'
-import { Logo } from './Logo'
+import { LogoIcon } from './Logo'
 import { useNavigate } from 'react-router-dom'
 
 export function Sidebar() {
@@ -19,7 +19,7 @@ export function Sidebar() {
     >
       {/* Header com logo */}
       <div className="p-4 border-b border-ayria-border">
-        <Logo size={32} />
+        <LogoIcon size={32} variant="circular" />
       </div>
 
       {/* Nova conversa */}
