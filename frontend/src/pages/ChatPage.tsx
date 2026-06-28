@@ -9,7 +9,7 @@ import { Logo, LogoIcon } from '../components/Logo'
 import { ProfileEditModal } from '../components/ProfileEditModal'
 import { useChat } from '../store/chat'
 import { useAuth } from '../store/auth'
-import { LogOut, Shield, Pencil } from 'lucide-react'
+import { LogOut, Shield, Pencil, UserCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 export function ChatPage() {
@@ -41,17 +41,8 @@ export function ChatPage() {
       <main className="flex-1 flex flex-col">
         {/* Header com glassmorphism */}
         <header className="glass px-6 py-4 flex items-center gap-3">
-          {/* Esquerda: logo AYRIA + título */}
-          <div className="flex items-center gap-3">
-            <LogoIcon size={56} variant="circular" />
-            <div>
-              <div className="font-semibold text-ayria-text">AYRIA</div>
-              <div className="text-xs text-ayria-success flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-                Online · pronta pra conversar
-              </div>
-            </div>
-          </div>
+          {/* Esquerda: APENAS logo AYRIA (sem texto/status) */}
+          <LogoIcon size={56} variant="circular" />
 
           {/* Direita: avatar + nome do user (MOVIDO do rodapé da sidebar) */}
           <div className="ml-auto flex items-center gap-3">
@@ -75,24 +66,36 @@ export function ChatPage() {
               className="flex items-center gap-2 px-2 py-1 rounded-lg transition-colors hover:bg-[#1a1a1a] group"
               title="Editar perfil"
             >
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 relative"
-                style={{
-                  background: user?.role === 'SUPER_ADMIN' || user?.role === 'admin'
-                    ? 'linear-gradient(135deg, #F59E0B, #EF4444)'
-                    : 'linear-gradient(135deg, #6366F1, #A855F7)',
-                  boxShadow: '0 0 12px rgba(99, 102, 241, 0.4)',
-                  border: '2px solid rgba(99, 102, 241, 0.3)',
-                }}
-              >
-                {userInitials}
+              {user?.avatar_url ? (
+                <img
+                  src={user.avatar_url}
+                  alt={user?.full_name || user?.email}
+                  className="w-10 h-10 rounded-full object-cover flex-shrink-0 relative"
+                  style={{
+                    boxShadow: '0 0 12px rgba(99, 102, 241, 0.4)',
+                    border: '2px solid rgba(99, 102, 241, 0.3)',
+                  }}
+                />
+              ) : (
                 <div
-                  className="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ background: 'rgba(0, 0, 0, 0.5)' }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 relative"
+                  style={{
+                    background: user?.role === 'SUPER_ADMIN' || user?.role === 'admin'
+                      ? 'linear-gradient(135deg, #F59E0B, #EF4444)'
+                      : 'linear-gradient(135deg, #6366F1, #A855F7)',
+                    boxShadow: '0 0 12px rgba(99, 102, 241, 0.4)',
+                    border: '2px solid rgba(99, 102, 241, 0.3)',
+                  }}
                 >
-                  <Pencil size={12} className="text-white" />
+                  <UserCircle size={22} className="text-white" />
+                  <div
+                    className="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ background: 'rgba(0, 0, 0, 0.5)' }}
+                  >
+                    <Pencil size={12} className="text-white" />
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="text-right hidden sm:block">
                 <div className="text-sm font-semibold text-ayria-text truncate max-w-[150px]">
                   {user?.full_name || user?.email?.split('@')[0] || 'Você'}
