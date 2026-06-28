@@ -65,7 +65,7 @@ export function AdminPage() {
     try {
       await adminApi.createUser(createForm)
       setShowCreateModal(false)
-      setCreateForm({ email: '', password: '', full_name: '' })
+      setCreateForm({ email: '', password: '', full_name: '', role: 'user' })
       await reloadUsers()
       alert('✅ Usuário criado com sucesso!')
     } catch (e: any) {
