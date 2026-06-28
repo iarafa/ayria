@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../store/auth'
 import { adminApi } from '../lib/api'
 import { Logo } from '../components/Logo'
-import { UserAvatar } from '../components/UserAvatar'
 import { Users, FileText, Settings, ListChecks, LogOut, UserPlus, X, Shield } from 'lucide-react'
 
 type Tab = 'users' | 'knowledge' | 'onboarding' | 'attributes'
@@ -196,17 +195,16 @@ export function AdminPage() {
                   style={{ background: '#111111', border: '1px solid #1E1E2E' }}
                 >
                   <div className="flex items-center gap-3">
-                    <UserAvatar
-                      src={u.avatar_url}
-                      name={u.full_name}
-                      email={u.email}
-                      size={40}
-                      glow={false}
-                    />
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold"
+                      style={{ background: u.role === 'SUPER_ADMIN' ? 'linear-gradient(135deg, #F59E0B, #EF4444)' : 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                    >
+                      {u.email[0].toUpperCase()}
+                    </div>
                     <div>
-                      <div className="text-ayria-text font-medium">{u.full_name || u.email}</div>
+                      <div className="text-ayria-text font-medium">{u.email}</div>
                       <div className="text-xs text-ayria-muted">
-                        {u.full_name ? u.email : ''} · {u.role} · {u.message_count} msgs
+                        {u.full_name || '—'} · {u.role} · {u.message_count} msgs
                       </div>
                     </div>
                   </div>
