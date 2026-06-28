@@ -1,11 +1,8 @@
 /**
- * AYRIA - Logo component (com glow)
+ * AYRIA - Logo component
  *
- * Variações:
- * - <Logo /> — logo + texto "AYRIA" (padrão, sidebar)
- * - <Logo size={120} showText={false} /> — só logo, sem texto (onboarding/login)
- * - <Logo size={32} showText={false} /> — só logo pequeno (header chat, admin)
- * - <LogoIcon size={32} /> — wrapper com fundo gradiente + glow (chat welcome)
+ * Logo direto SEM fundo circular (que ficou visualmente pesado).
+ * Glow indigo opcional pra dar destaque no fundo dark.
  */
 import { useState } from 'react'
 
@@ -13,7 +10,7 @@ interface LogoProps {
   size?: number
   showText?: boolean
   className?: string
-  glow?: boolean  // adiciona drop-shadow glow indigo
+  glow?: boolean
 }
 
 export function Logo({ size = 48, showText = true, className = '', glow = true }: LogoProps) {
@@ -27,7 +24,7 @@ export function Logo({ size = 48, showText = true, className = '', glow = true }
         alt="AYRIA"
         width={size}
         height={size}
-        style={glow ? { filter: 'drop-shadow(0 0 12px rgba(99,102,241,0.4))' } : undefined}
+        style={glow ? { filter: 'drop-shadow(0 0 12px rgba(99,102,241,0.5))' } : undefined}
         onError={() => setErr(true)}
       />
       {showText && (
@@ -43,40 +40,28 @@ export function Logo({ size = 48, showText = true, className = '', glow = true }
 }
 
 /**
- * LogoIcon — logo dentro de círculo com gradiente indigo→purple e glow forte.
- * Substitui o Sparkles genérico em headers e welcome screens.
+ * LogoIcon — apenas o logo direto, SEM círculo de fundo.
+ * Glow indigo opcional pra destacar no fundo dark.
  */
 interface LogoIconProps {
-  size?: number        // diâmetro do círculo (px)
+  size?: number
+  glow?: boolean
   className?: string
 }
 
-export function LogoIcon({ size = 40, className = '' }: LogoIconProps) {
+export function LogoIcon({ size = 40, glow = true, className = '' }: LogoIconProps) {
   const [err, setErr] = useState(false)
   const src = err ? '/ayria-logo-transparent.png' : '/ayria-logo-dark.png'
-  const inner = Math.round(size * 0.6)
 
   return (
-    <div
-      className={`rounded-full flex items-center justify-center ${className}`}
-      style={{
-        width: size,
-        height: size,
-        background: 'linear-gradient(135deg, #6366F1, #A855F7)',
-        boxShadow: '0 0 20px rgba(99, 102, 241, 0.5)',
-      }}
-    >
-      <img
-        src={src}
-        alt="AYRIA"
-        width={inner}
-        height={inner}
-        style={{
-          filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.3))',
-          objectFit: 'contain',
-        }}
-        onError={() => setErr(true)}
-      />
-    </div>
+    <img
+      src={src}
+      alt="AYRIA"
+      width={size}
+      height={size}
+      className={className}
+      style={glow ? { filter: 'drop-shadow(0 0 16px rgba(99,102,241,0.6))' } : undefined}
+      onError={() => setErr(true)}
+    />
   )
 }
