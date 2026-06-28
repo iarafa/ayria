@@ -1,20 +1,22 @@
 /**
  * AYRIA - Chat Page (principal)
  */
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Sidebar } from '../components/Sidebar'
 import { MessageBubble, TypingIndicator } from '../components/MessageBubble'
 import { MessageInput } from '../components/MessageInput'
 import { Logo, LogoIcon } from '../components/Logo'
+import { ProfileEditModal } from '../components/ProfileEditModal'
 import { useChat } from '../store/chat'
 import { useAuth } from '../store/auth'
-import { LogOut, Shield } from 'lucide-react'
+import { LogOut, Shield, Pencil } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 export function ChatPage() {
   const { messages, sending, sendMessage, loadChats } = useChat()
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [editProfileOpen, setEditProfileOpen] = useState(false)
 
   // Iniciais do usuário para avatar inline
   const userInitials = (() => {
@@ -68,9 +70,13 @@ export function ChatPage() {
                 Admin
               </button>
             )}
-            <div className="flex items-center gap-2">
+            <button
+              onClick={() => setEditProfileOpen(true)}
+              className="flex items-center gap-2 px-2 py-1 rounded-lg transition-colors hover:bg-[#1a1a1a] group"
+              title="Editar perfil"
+            >
               <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0"
+                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 relative"
                 style={{
                   background: user?.role === 'SUPER_ADMIN' || user?.role === 'admin'
                     ? 'linear-gradient(135deg, #F59E0B, #EF4444)'
@@ -80,13 +86,22 @@ export function ChatPage() {
                 }}
               >
                 {userInitials}
+                <div
+                  className="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ background: 'rgba(0, 0, 0, 0.5)' }}
+                >
+                  <Pencil size={12} className="text-white" />
+                </div>
               </div>
               <div className="text-right hidden sm:block">
                 <div className="text-sm font-semibold text-ayria-text truncate max-w-[150px]">
                   {user?.full_name || user?.email?.split('@')[0] || 'Você'}
                 </div>
+                <div className="text-xs text-ayria-muted/60 group-hover:text-ayria-primary transition-colors">
+                  Editar perfil
+                </div>
               </div>
-            </div>
+            </button>
             <button
               onClick={logout}
               className="text-ayria-muted hover:text-red-400 transition-colors p-2"
@@ -133,6 +148,12 @@ export function ChatPage() {
         {/* Input */}
         <MessageInput onSend={sendMessage} disabled={sending} />
       </main>
+
+      {/* Modal de edição de perfil */}
+      <ProfileEditModal
+        open={editProfileOpen}
+        onClose={() => setEditProfileOpen(false)}
+      />
     </div>
   )
 }
