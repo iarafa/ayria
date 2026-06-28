@@ -41,8 +41,15 @@ export function ChatPage() {
       <main className="flex-1 flex flex-col">
         {/* Header com glassmorphism */}
         <header className="glass px-6 py-4 flex items-center gap-3">
-          {/* Esquerda: APENAS logo AYRIA (sem texto/status) */}
+          {/* Esquerda: logo AYRIA + título + status */}
           <LogoIcon size={56} variant="circular" />
+          <div>
+            <div className="font-semibold text-ayria-text">AYRIA</div>
+            <div className="text-xs text-ayria-success flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+              Online · pronta pra conversar
+            </div>
+          </div>
 
           {/* Direita: avatar + nome do user (MOVIDO do rodapé da sidebar) */}
           <div className="ml-auto flex items-center gap-3">
