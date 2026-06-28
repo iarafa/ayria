@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
-import { Sparkles, Stars, Check } from 'lucide-react'
+import { Logo, LogoIcon } from '../components/Logo'
+import { Check } from 'lucide-react'
 
 /**
  * AYRIA - Criando seu perfil (tela cinematográfica)
@@ -150,13 +151,12 @@ export default function CreatingProfilePage() {
         <div className="relative z-10 max-w-md w-full text-center" style={{ animation: 'scaleIn 0.8s ease-out' }}>
           {/* LOGO com glow maior */}
           <div
-            className="w-40 h-40 mx-auto rounded-full flex items-center justify-center mb-10"
+            className="mx-auto mb-10"
             style={{
-              background: 'linear-gradient(135deg, #6366F1, #A855F7)',
               animation: 'glowSuccess 3s ease-in-out infinite',
             }}
           >
-            <Check size={80} className="text-white" strokeWidth={3} />
+            <LogoIcon size={160} />
           </div>
 
           {/* TÍTULO */}
@@ -253,13 +253,10 @@ export default function CreatingProfilePage() {
 
         {/* LOGO/ÍCONE */}
         <div
-          className="w-32 h-32 mx-auto rounded-full flex items-center justify-center mb-8"
-          style={{
-            background: 'linear-gradient(135deg, #6366F1, #A855F7)',
-            animation: 'glow 3s ease-in-out infinite',
-          }}
+          className="mx-auto mb-8"
+          style={{ animation: 'glow 3s ease-in-out infinite' }}
         >
-          <Stars size={56} className="text-white" />
+          <LogoIcon size={128} />
         </div>
 
         {/* TÍTULO */}
@@ -285,9 +282,7 @@ export default function CreatingProfilePage() {
               className="text-white text-xl font-bold flex items-center gap-2"
               style={{ animation: 'fadeIn 0.5s ease-out' }}
             >
-              <Sparkles size={20} />
-              Tudo pronto!
-              <Sparkles size={20} />
+              ✨ Tudo pronto! ✨
             </p>
           )}
         </div>

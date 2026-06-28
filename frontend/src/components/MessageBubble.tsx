@@ -6,7 +6,7 @@
  * (raciocínio vazado pelo modelo) — info útil pra debug.
  */
 import { useEffect, useRef } from 'react'
-import { Sparkles, Brain } from 'lucide-react'
+import { Brain } from 'lucide-react'
 import { useAuth } from '../store/auth'
 
 interface MessageBubbleProps {
@@ -65,7 +65,7 @@ export function MessageBubble({ role, content, model, tokens, thinking }: Messag
         {/* Header: só pra admin */}
         {!isUser && isAdmin && (
           <div className="flex items-center gap-2 mb-2 text-xs text-ayria-muted">
-            <Sparkles size={12} className="text-ayria-primary" />
+            <img src="/ayria-logo-dark.png" alt="AYRIA" width={12} height={12} />
             <span>AYRIA</span>
             {model && <span className="opacity-60">· {model}</span>}
             {tokens && <span className="opacity-60">· {tokens} tokens</span>}
@@ -98,13 +98,19 @@ export function TypingIndicator() {
   return (
     <div className="flex w-full mb-4 justify-start">
       <div
-        className="max-w-[75%] rounded-2xl px-4 py-3 flex items-center gap-1"
+        className="max-w-[75%] rounded-2xl px-4 py-3 flex items-center gap-2"
         style={{
           background: '#111111',
           border: '1px solid rgba(99, 102, 241, 0.2)',
         }}
       >
-        <Sparkles size={12} className="text-ayria-primary mr-2" />
+        <img
+          src="/ayria-logo-dark.png"
+          alt="AYRIA"
+          width={18}
+          height={18}
+          style={{ filter: 'drop-shadow(0 0 4px rgba(99,102,241,0.6))' }}
+        />
         <div
           className="typing-dot w-2 h-2 rounded-full"
           style={{ background: '#6366F1' }}

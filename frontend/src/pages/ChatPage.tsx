@@ -5,8 +5,8 @@ import { useEffect } from 'react'
 import { Sidebar } from '../components/Sidebar'
 import { MessageBubble, TypingIndicator } from '../components/MessageBubble'
 import { MessageInput } from '../components/MessageInput'
+import { Logo, LogoIcon } from '../components/Logo'
 import { useChat } from '../store/chat'
-import { Sparkles } from 'lucide-react'
 
 export function ChatPage() {
   const { messages, sending, sendMessage, loadChats } = useChat()
@@ -23,12 +23,7 @@ export function ChatPage() {
       <main className="flex-1 flex flex-col">
         {/* Header com glassmorphism */}
         <header className="glass px-6 py-4 flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-full flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
-          >
-            <Sparkles size={20} className="text-white" />
-          </div>
+          <LogoIcon size={40} />
           <div>
             <div className="font-semibold text-ayria-text">AYRIA</div>
             <div className="text-xs text-ayria-success flex items-center gap-1">
@@ -43,11 +38,8 @@ export function ChatPage() {
           <div className="max-w-3xl mx-auto">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center py-20">
-                <div
-                  className="w-20 h-20 rounded-full flex items-center justify-center mb-6 glow"
-                  style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
-                >
-                  <Sparkles size={32} className="text-white" />
+                <div className="mb-6 glow">
+                  <LogoIcon size={80} />
                 </div>
                 <h2 className="text-2xl font-bold mb-2 gradient-text">
                   Olá, eu sou AYRIA
