@@ -4,7 +4,6 @@
 import { Plus, MessageCircle, LogOut, Shield, Trash2, Zap } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { useChat } from '../store/chat'
-import { LogoIcon } from './Logo'
 import { useNavigate } from 'react-router-dom'
 
 export function Sidebar() {
@@ -23,10 +22,7 @@ export function Sidebar() {
       className="w-[260px] h-screen bg-ayria-card border-r border-ayria-border flex flex-col"
       style={{ background: '#111111' }}
     >
-      {/* Header com logo */}
-      <div className="p-4 border-b border-ayria-border">
-        <LogoIcon size={32} variant="circular" />
-      </div>
+      {/* Header sem logo (movido do welcome — ver ChatPage) */}
 
       {/* Nova conversa */}
       <div className="p-4">
