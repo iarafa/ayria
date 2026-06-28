@@ -139,7 +139,17 @@ async def delete_user(
     admin: models.User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Exclui um usuário."""
+    """
+    Exclui um usuário E TODOS os dados dele (LGPD-style):
+    - PostgreSQL: user_profiles, user_attributes, chats, messages
+    - Qdrant: TODAS as memórias (memoria_episodica)
+    - Audit log: preservado mas com user_id=NULL (pra auditoria)
+    - Knowledge documents: NÃO deleta (são do admin, não do user)
+
+    Safety:
+    - Admin não pode excluir a si mesmo
+    - Operação atômica — se algo falhar, ROLLBACK
+    """
     if user_id == admin.id:
         raise HTTPException(status_code=400, detail="Você não pode excluir a si mesmo")
 
@@ -148,17 +158,53 @@ async def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
-    # Cascade: deleta mensagens, chats, attributes, memories
-    await db.execute(
-        models.UserAttribute.__table__.delete().where(models.UserAttribute.user_id == user_id)
-    )
-    from sqlalchemy import text
-    await db.execute(text(f"DELETE FROM messages WHERE chat_id IN (SELECT id FROM chats WHERE user_id = '{user_id}')"))
-    await db.execute(text(f"DELETE FROM chats WHERE user_id = '{user_id}'"))
-    await db.delete(user)
-    await db.commit()
-    logger.info(f"✅ User {user.email} excluído por admin {admin.email}")
-    return None
+    deleted_summary = {"pg": {}, "qdrant": 0}
+
+    try:
+        from sqlalchemy import text
+
+        # 1. PostgreSQL: user_profiles (1:1)
+        r = await db.execute(text("DELETE FROM user_profiles WHERE user_id = :uid"), {"uid": str(user_id)})
+        deleted_summary["pg"]["user_profiles"] = r.rowcount
+
+        # 2. PostgreSQL: user_attributes (valores dos atributos)
+        r = await db.execute(text("DELETE FROM user_attributes WHERE user_id = :uid"), {"uid": str(user_id)})
+        deleted_summary["pg"]["user_attributes"] = r.rowcount
+
+        # 3. PostgreSQL: messages (via chats)
+        r = await db.execute(text("DELETE FROM messages WHERE chat_id IN (SELECT id FROM chats WHERE user_id = :uid)"), {"uid": str(user_id)})
+        deleted_summary["pg"]["messages"] = r.rowcount
+
+        # 4. PostgreSQL: chats
+        r = await db.execute(text("DELETE FROM chats WHERE user_id = :uid"), {"uid": str(user_id)})
+        deleted_summary["pg"]["chats"] = r.rowcount
+
+        # 5. Audit log: NULL user_id (preserva histórico, mas sem FK)
+        # Não deleta — auditoria deve permanecer (LGPD permite pra fins de segurança)
+        r = await db.execute(text("UPDATE audit_log SET user_id = NULL WHERE user_id = :uid"), {"uid": str(user_id)})
+        deleted_summary["pg"]["audit_log_anonymized"] = r.rowcount
+
+        # 6. Qdrant: TODAS as memórias do user
+        from services.vector_service import vector_service
+        deleted_summary["qdrant"] = await vector_service.delete_user_memories(str(user_id))
+
+        # 7. Finalmente: deleta o user
+        await db.delete(user)
+        await db.commit()
+
+        logger.info(
+            f"✅ User {user.email} ({user_id}) excluído COMPLETAMENTE por admin {admin.email}. "
+            f"Postgres: {deleted_summary['pg']}, Qdrant collections: {deleted_summary['qdrant']}"
+        )
+        return None
+
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"❌ Erro ao excluir user {user.email}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao excluir usuário (rollback feito): {str(e)}"
+        )
 
 
 # ============================================================

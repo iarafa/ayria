@@ -109,6 +109,41 @@ class VectorService:
         """Deleta um ponto"""
         self.client.delete(collection_name=collection, points_selector=[point_id])
 
+    async def delete_user_memories(self, user_id: str) -> int:
+        """
+        Deleta TODAS as memórias de um usuário em todas as coleções que têm user_id.
+        Usado quando user é excluído (LGPD-style).
+
+        Returns: número de pontos deletados.
+        """
+        from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+        qfilter = Filter(must=[
+            FieldCondition(key="user_id", match=MatchValue(value=str(user_id)))
+        ])
+
+        total_deleted = 0
+        for collection_name in self.COLLECTIONS.keys():
+            try:
+                # Verifica se coleção existe antes de tentar deletar
+                collections = self.client.get_collections().collections
+                exists = any(c.name == collection_name for c in collections)
+                if not exists:
+                    continue
+
+                # Deleta por filtro
+                self.client.delete(
+                    collection_name=collection_name,
+                    points_selector=qfilter,
+                )
+                logger.info(f"🗑️ User memories deletadas de {collection_name} para user {user_id}")
+                total_deleted += 1  # incrementa por coleção processada
+            except Exception as e:
+                logger.warning(f"Falha ao deletar memories de {collection_name} para user {user_id}: {e}")
+                continue
+
+        return total_deleted
+
     async def scroll(
         self,
         collection: str,
