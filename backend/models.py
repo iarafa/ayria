@@ -32,6 +32,8 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
     numerology_data = Column(JSONB)  # mapa numerológico calculado
+    astrology_data = Column(JSONB)  # mapa astral completo (sol, lua, asc, planetas, casas)
+    profile_status = Column(String(50), default="pending")  # pending|calculating|ready|failed
     onboarding_status = Column(String(50), default="pending")  # pending|in_progress|completed|skipped
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -10,6 +10,7 @@ import { OnboardingPage } from './pages/OnboardingPage'
 import { ChatPage } from './pages/ChatPage'
 import { AdminPage } from './pages/AdminPage'
 import { NumerologyReveal } from './pages/NumerologyReveal'
+import CreatingProfilePage from './pages/CreatingProfilePage'
 
 function PrivateRoute({ children, adminOnly = false, requireOnboarding = false }: { children: React.ReactNode; adminOnly?: boolean; requireOnboarding?: boolean }) {
   const { user, token, loadUser } = useAuth()
@@ -65,10 +66,10 @@ export default function App() {
         }
       />
       <Route
-        path="/numerology"
+        path="/criando-perfil"
         element={
           <PrivateRoute>
-            <NumerologyReveal />
+            <CreatingProfilePage />
           </PrivateRoute>
         }
       />

@@ -89,6 +89,7 @@ class OnboardingAnswerResponse(BaseModel):
     numerology_data: Optional[Dict[str, Any]] = None
     numerology_calculated: bool = False
     progress: str  # ex: "3/9"
+    profile_status: Optional[str] = "pending"  # pending|calculating|ready|failed
 
 
 class NumerologyResponse(BaseModel):

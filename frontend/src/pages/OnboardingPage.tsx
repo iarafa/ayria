@@ -46,7 +46,7 @@ export function OnboardingPage() {
         value,
       })
       if (currentIdx + 1 >= questions.length) {
-        navigate('/numerology')
+        navigate('/criando-perfil')
       } else {
         setCurrentIdx(currentIdx + 1)
       }

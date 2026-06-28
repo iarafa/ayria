@@ -34,3 +34,5 @@ pytest-asyncio==0.24.0
 azure-storage-blob>=12.19.0
 langchain>=0.2.0
 slowapi>=0.1.9
+kerykeion>=4.0.0
+pyswisseph>=2.10.0

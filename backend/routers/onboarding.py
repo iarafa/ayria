@@ -6,16 +6,18 @@ AYRIA - Onboarding Router (ALINHADO COM CHECKLIST OFICIAL)
 - Atualiza users.numerology_data
 - Marca onboarding_status='completed' ao terminar
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 import uuid
 from datetime import datetime
+from typing import Any, Dict
 import logging
 
 from database import get_db
 from utils.security import get_current_user
 from services.numerology_service import calcular_mapa_completo, gerar_relatorio_numerologico
+from services.astrology_service import astrology_service
 import models
 import schemas
 
@@ -77,6 +79,7 @@ async def get_status(
 @router.post("/answer", response_model=schemas.OnboardingAnswerResponse)
 async def post_answer(
     payload: schemas.OnboardingAnswer,
+    background_tasks: BackgroundTasks,
     user: models.User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -173,17 +176,20 @@ async def post_answer(
         profile.onboarding_completed = True
         profile.completed_at = datetime.utcnow()
 
-        # 5. CALCULA NUMEROLOGIA COMPLETA
-        try:
-            mapa = calcular_mapa_completo(attrs_jsonb)
-            user.numerology_data = mapa
-            numerology_calculated = True
-            logger.info(
-                f"✅ Numerologia calculada para user {user.email}: "
-                f"CV={mapa.get('caminho_vida', {}).get('numero', '?')}"
-            )
-        except Exception as e:
-            logger.error(f"❌ Erro ao calcular numerologia: {e}")
+        # Marca como "calculando perfil" - frontend fica em tela cinematográfica
+        user.profile_status = "calculating"
+
+        # Calcula em BACKGROUND (numerologia + astrologia silenciosos)
+        # Frontend faz polling em /api/profile/status até 'ready'
+        background_tasks.add_task(
+            calcular_perfil_completo_background,
+            user_id=str(user.id),
+            attrs=attrs_jsonb,
+        )
+        numerology_calculated = True
+        logger.info(
+            f"✅ Onboarding completo para user {user.email} - cálculo de perfil em background"
+        )
 
     await db.commit()
     await db.refresh(user)
@@ -194,7 +200,67 @@ async def post_answer(
         numerology_data=user.numerology_data,
         numerology_calculated=numerology_calculated,
         progress=f"{answered_count}/{total_questions}",
+        profile_status=user.profile_status,
     )
+
+
+async def calcular_perfil_completo_background(user_id: str, attrs: Dict[str, Any]):
+    """
+    Calcula numerologia + astrologia em BACKGROUND.
+    User NÃO é notificado — é invisível.
+    """
+    from database import AsyncSessionLocal
+
+    try:
+        # 1. Numerologia (sempre funciona, é matemática pura)
+        try:
+            mapa_num = calcular_mapa_completo(attrs)
+        except Exception as e:
+            logger.error(f"Erro numerologia: {e}")
+            mapa_num = None
+
+        # 2. Astrologia (precisa data + hora + local)
+        try:
+            data_nasc = attrs.get("data_nascimento")
+            hora_nasc = attrs.get("hora_nascimento") or "12:00"
+            cidade = attrs.get("local_nascimento") or "São Paulo"
+            nome = attrs.get("nome_completo") or "User"
+
+            mapa_ast = None
+            if data_nasc:
+                mapa_ast = astrology_service.calcular_mapa(
+                    nome=nome,
+                    data_nascimento=data_nasc,
+                    hora_nascimento=hora_nasc,
+                    cidade=cidade,
+                )
+        except Exception as e:
+            logger.error(f"Erro astrologia: {e}")
+            mapa_ast = None
+
+        # 3. Salva tudo no user
+        async with AsyncSessionLocal() as db:
+            res = await db.execute(select(models.User).where(models.User.id == uuid.UUID(user_id)))
+            user = res.scalar_one_or_none()
+            if user:
+                if mapa_num:
+                    user.numerology_data = mapa_num
+                if mapa_ast:
+                    user.astrology_data = mapa_ast
+                user.profile_status = "ready" if (mapa_num or mapa_ast) else "failed"
+                await db.commit()
+                logger.info(
+                    f"✅ Perfil completo salvo para {user.email}: "
+                    f"num={'OK' if mapa_num else 'NÃO'} ast={'OK' if mapa_ast else 'NÃO'}"
+                )
+    except Exception as e:
+        logger.error(f"❌ Erro crítico no background de perfil: {e}")
+        async with AsyncSessionLocal() as db:
+            res = await db.execute(select(models.User).where(models.User.id == uuid.UUID(user_id)))
+            user = res.scalar_one_or_none()
+            if user:
+                user.profile_status = "failed"
+                await db.commit()
 
 
 @router.get("/numerology", response_model=schemas.NumerologyResponse)
@@ -212,3 +278,21 @@ async def get_numerology(
         mapa=mapa,
         relatorio=relatorio,
     )
+
+# =====================================================================
+# PROFILE STATUS (polling pra tela "Criando seu perfil...")
+# =====================================================================
+@router.get("/profile/status")
+async def get_profile_status(
+    user: models.User = Depends(get_current_user),
+):
+    """
+    Retorna status do cálculo do perfil.
+    Frontend faz polling até status='ready' ou 'failed'.
+    """
+    return {
+        "profile_status": user.profile_status or "pending",
+        "onboarding_status": user.onboarding_status,
+        "has_numerology": user.numerology_data is not None,
+        "has_astrology": user.astrology_data is not None,
+    }

@@ -25,6 +25,7 @@ from utils.security import get_current_user
 from services.ai_service import ai_service
 from services.vector_service import vector_service
 from services.numerology_service import gerar_relatorio_numerologico
+from services.astrology_service import astrology_service
 import models
 import schemas
 
@@ -132,6 +133,11 @@ async def send_message(
         # Usa relatório narrativo ao invés de JSON cru (mais legível pra IA)
         relatorio = gerar_relatorio_numerologico(user.numerology_data)
         profile_text += f"\n\nMAPA NUMEROLÓGICO CALCULADO:\n{relatorio}"
+
+    # Astrologia (calculada silenciosamente)
+    if user.astrology_data:
+        texto_astrologico = astrology_service.gerar_texto_perfil(user.astrology_data)
+        profile_text += f"\n\n{texto_astrologico}"
     
     # RAG: busca conhecimento relevante
     rag_context = "(nenhum conhecimento específico encontrado)"
