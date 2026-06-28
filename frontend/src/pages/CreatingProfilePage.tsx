@@ -36,23 +36,32 @@ export default function CreatingProfilePage() {
   // Polling no backend pra saber quando perfil ficou pronto
   useEffect(() => {
     let ativo = true
+    const startedAt = Date.now()
+    const TIMEOUT_MS = 60000  // safety net: 60s
+
     const poll = async () => {
       try {
         const { data } = await api.get('/api/onboarding/profile/status')
         if (data.profile_status === 'ready') {
-          // Espera a fase narrativa terminar se ainda não terminou
           setTimeout(() => ativo && navigate('/chat'), 800)
           return
         }
         if (data.profile_status === 'failed') {
-          // Mesmo se falhou, deixa entrar no chat (vai funcionar sem perfil)
           setTimeout(() => ativo && navigate('/chat'), 2000)
           return
         }
-        // Continua polling
+        // Safety net: se passou 60s, vai pro chat mesmo assim
+        if (Date.now() - startedAt > TIMEOUT_MS) {
+          console.warn('Profile timeout - navegando pro chat')
+          navigate('/chat')
+          return
+        }
         if (ativo) setTimeout(poll, 800)
       } catch (e) {
-        // Erro de rede — continua polling
+        if (Date.now() - startedAt > TIMEOUT_MS) {
+          navigate('/chat')
+          return
+        }
         if (ativo) setTimeout(poll, 2000)
       }
     }

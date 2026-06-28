@@ -285,11 +285,23 @@ async def get_numerology(
 @router.get("/profile/status")
 async def get_profile_status(
     user: models.User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Retorna status do cálculo do perfil.
     Frontend faz polling até status='ready' ou 'failed'.
+
+    Auto-fix: se onboarding já está 'completed' mas profile_status é 'pending'
+    (caso de users antigos/legados que caíram antes do novo fluxo),
+    marca como 'ready' automaticamente.
     """
+    # Auto-fix para users legados
+    if user.onboarding_status == "completed" and (user.profile_status or "pending") == "pending":
+        user.profile_status = "ready"
+        await db.commit()
+        await db.refresh(user)
+        logger.info(f"✅ Auto-fix: user {user.email} legado marcado como ready")
+
     return {
         "profile_status": user.profile_status or "pending",
         "onboarding_status": user.onboarding_status,
