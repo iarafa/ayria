@@ -19,7 +19,7 @@ interface MessageBubbleProps {
 }
 
 function renderMarkdown(text: string): string {
-  return text
+  let rendered = text
     .replace(/### (.*)/g, '<h3>$1</h3>')
     .replace(/## (.*)/g, '<h2>$1</h2>')
     .replace(/# (.*)/g, '<h1>$1</h1>')
@@ -31,6 +31,15 @@ function renderMarkdown(text: string): string {
     .replace(/^- (.*)/gm, '<li>$1</li>')
     .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
     .replace(/\n/g, '<br/>')
+
+  // Destaque especial: 'AYRIA' em ROXO (cor do logo gradient)
+  // Cor: gradient-text indigo→purple → #A855F7 (roxo médio do gradient)
+  rendered = rendered.replace(
+    /\bAYRIA\b/g,
+    '<span style="color: #A855F7; font-weight: 700; background: linear-gradient(135deg, #6366F1, #A855F7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">AYRIA</span>'
+  )
+
+  return rendered
 }
 
 export function MessageBubble({ role, content, model, tokens, thinking }: MessageBubbleProps) {
