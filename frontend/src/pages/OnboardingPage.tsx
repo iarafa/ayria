@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { onboardingApi, OnboardingQuestion } from '../lib/api'
-import { Logo } from '../components/Logo'
+import { Logo, LogoIcon } from '../components/Logo'
 import { ChevronRight, ChevronLeft, Check } from 'lucide-react'
 import { useAuth } from '../store/auth'
 
@@ -74,7 +74,9 @@ export function OnboardingPage() {
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#050505' }}>
         <div className="text-center max-w-md">
-          <Logo size={120} showText={false} className="justify-center mb-6" />
+          <div className="flex justify-center mb-6">
+            <LogoIcon size={140} variant="circular" />
+          </div>
           <h1 className="text-3xl font-bold mb-3 gradient-text">Tudo pronto!</h1>
           <p className="text-ayria-muted mb-6">
             Você já completou o onboarding. Vamos conversar?

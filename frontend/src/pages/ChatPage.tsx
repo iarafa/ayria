@@ -23,7 +23,7 @@ export function ChatPage() {
       <main className="flex-1 flex flex-col">
         {/* Header com glassmorphism */}
         <header className="glass px-6 py-4 flex items-center gap-3">
-          <LogoIcon size={40} />
+          <LogoIcon size={40} variant="circular" />
           <div>
             <div className="font-semibold text-ayria-text">AYRIA</div>
             <div className="text-xs text-ayria-success flex items-center gap-1">
@@ -39,7 +39,7 @@ export function ChatPage() {
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center py-20">
                 <div className="mb-6 glow">
-                  <LogoIcon size={80} />
+                  <LogoIcon size={120} variant="circular" />
                 </div>
                 <h2 className="text-2xl font-bold mb-2 gradient-text">
                   Olá, eu sou AYRIA

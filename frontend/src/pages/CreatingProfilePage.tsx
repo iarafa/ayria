@@ -156,7 +156,7 @@ export default function CreatingProfilePage() {
               animation: 'glowSuccess 3s ease-in-out infinite',
             }}
           >
-            <LogoIcon size={160} />
+            <LogoIcon size={220} variant="circular" />
           </div>
 
           {/* TÍTULO */}
@@ -256,7 +256,7 @@ export default function CreatingProfilePage() {
           className="mx-auto mb-8"
           style={{ animation: 'glow 3s ease-in-out infinite' }}
         >
-          <LogoIcon size={128} />
+          <LogoIcon size={180} variant="circular" />
         </div>
 
         {/* TÍTULO */}

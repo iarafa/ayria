@@ -1,8 +1,10 @@
 /**
  * AYRIA - Logo component
  *
- * Logo direto SEM fundo circular (que ficou visualmente pesado).
- * Glow indigo opcional pra dar destaque no fundo dark.
+ * 3 variantes:
+ * - <Logo /> ou <Logo showText={false} /> — logo simples (sem bolinha)
+ * - <LogoIcon /> — logo simples com glow
+ * - <LogoIcon variant="circular" /> — logo NA BOLINHA (badge cyberpunk)
  */
 import { useState } from 'react'
 
@@ -39,19 +41,23 @@ export function Logo({ size = 48, showText = true, className = '', glow = true }
   )
 }
 
-/**
- * LogoIcon — apenas o logo direto, SEM círculo de fundo.
- * Glow indigo opcional pra destacar no fundo dark.
- */
 interface LogoIconProps {
   size?: number
   glow?: boolean
   className?: string
+  variant?: 'plain' | 'circular'
 }
 
-export function LogoIcon({ size = 40, glow = true, className = '' }: LogoIconProps) {
+/**
+ * LogoIcon:
+ * - variant="plain" (padrão): logo direto com glow opcional
+ * - variant="circular": logo NA BOLINHA (badge cyberpunk neon)
+ */
+export function LogoIcon({ size = 40, glow = true, className = '', variant = 'plain' }: LogoIconProps) {
   const [err, setErr] = useState(false)
-  const src = err ? '/ayria-logo-transparent.png' : '/ayria-logo-dark.png'
+  const src = variant === 'circular'
+    ? (err ? '/ayria-logo-transparent.png' : '/ayria-logo-circular.png')
+    : (err ? '/ayria-logo-transparent.png' : '/ayria-logo-dark.png')
 
   return (
     <img
