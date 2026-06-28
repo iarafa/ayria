@@ -84,22 +84,7 @@ export function Sidebar() {
             Admin
           </button>
         )}
-        <div className="flex items-center gap-2 text-sm">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold"
-            style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
-          >
-            {user?.email?.[0]?.toUpperCase() || '?'}
-          </div>
-          <div className="flex-1 truncate text-ayria-text">{user?.email}</div>
-          <button
-            onClick={logout}
-            className="text-ayria-muted hover:text-red-400"
-            title="Sair"
-          >
-            <LogOut size={16} />
-          </button>
-        </div>
+        {/* Footer limpo — avatar+nome+logout foram MOVIDOS pro header principal (canto direito) */}
       </div>
     </aside>
   )
