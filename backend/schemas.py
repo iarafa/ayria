@@ -180,6 +180,8 @@ class KnowledgeDocumentResponse(BaseModel):
     description: Optional[str]
     file_name: Optional[str]
     file_size_bytes: Optional[int]
+    storage_url: Optional[str] = None
+    storage_provider: Optional[str] = None
     status: str
     chunks_count: int
     indexed_at: Optional[datetime]

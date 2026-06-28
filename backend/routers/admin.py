@@ -251,7 +251,12 @@ async def upload_document(
 ):
     """Upload de documento pra base de conhecimento"""
     # Upload pro storage
-    upload_result = await storage_service.upload(file.filename, file.file)
+    file_bytes = await file.read()
+    upload_result = await storage_service.upload(
+        file_bytes=file_bytes,
+        filename=file.filename,
+        content_type=file.content_type,
+    )
     
     # Cria registro
     doc = models.KnowledgeDocument(
@@ -259,10 +264,10 @@ async def upload_document(
         title=title,
         description=description,
         file_name=file.filename,
-        file_size_bytes=upload_result["size"],
-        storage_url=upload_result["path"],
-        storage_provider="local",
-        file_hash=upload_result["hash"],
+        file_size_bytes=upload_result["size_bytes"],
+        storage_url=upload_result["url"],
+        storage_provider=upload_result["storage"],
+        file_hash=upload_result.get("hash", ""),
         status="pending",
         chunks_count=0,
         uploaded_by=admin.id,

@@ -43,6 +43,8 @@ services:
       dockerfile: Dockerfile.backend
     container_name: ayria-backend
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ayria}:${POSTGRES_PASSWORD:-ayria…026}@postgres:5432/ayria
       QDRANT_URL: http://qdrant:6333

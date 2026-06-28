@@ -248,7 +248,24 @@ export function AdminPage() {
                   className="p-4 rounded-xl flex items-center justify-between"
                   style={{ background: '#111111', border: '1px solid #1E1E2E' }}
                 >
-                  <div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <div className="text-ayria-text font-medium">{d.title}</div>
+                      <span
+                        className="text-[10px] px-2 py-0.5 rounded uppercase tracking-wider font-semibold"
+                        style={{
+                          background: d.storage_provider === 'azure' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(168, 85, 247, 0.15)',
+                          color: d.storage_provider === 'azure' ? '#38BDF8' : '#A855F7',
+                          border: `1px solid ${d.storage_provider === 'azure' ? 'rgba(56, 189, 248, 0.3)' : 'rgba(168, 85, 247, 0.3)'}`,
+                        }}
+                      >
+                        {d.storage_provider || 'local'}
+                      </span>
+                    </div>
+                    <div className="text-xs text-ayria-muted mt-1">
+                      {d.file_name} · {(d.file_size_bytes / 1024).toFixed(1)}KB · {d.status}
+                    </div>
+                  </div>
                     <div className="text-ayria-text font-medium">{d.title}</div>
                     <div className="text-xs text-ayria-muted">
                       {d.file_name} · {(d.file_size_bytes / 1024).toFixed(1)}KB · {d.status}

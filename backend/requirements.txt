@@ -41,3 +41,4 @@ langchain-text-splitters==0.3.2
 # Testes
 pytest==8.3.3
 pytest-asyncio==0.24.0
+azure-storage-blob>=12.19.0
