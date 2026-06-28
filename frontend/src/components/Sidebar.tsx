@@ -1,7 +1,7 @@
 /**
  * AYRIA - Sidebar (histórico + nova conversa + perfil)
  */
-import { Plus, MessageCircle, LogOut, Shield, Trash2 } from 'lucide-react'
+import { Plus, MessageCircle, LogOut, Shield, Trash2, Zap } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { useChat } from '../store/chat'
 import { LogoIcon } from './Logo'
@@ -11,6 +11,12 @@ export function Sidebar() {
   const { user, logout } = useAuth()
   const { chats, currentChatId, loadMessages, createChat, deleteChat } = useChat()
   const navigate = useNavigate()
+
+  // ============ CRÉDITOS (FAKE por enquanto) ============
+  // TODO: integrar com API real de consumo (tokens, créditos, plano)
+  const creditsUsed = 23
+  const creditsTotal = 100
+  const creditsPercent = (creditsUsed / creditsTotal) * 100
 
   return (
     <aside
@@ -74,7 +80,33 @@ export function Sidebar() {
       </div>
 
       {/* Perfil + ações */}
-      <div className="p-4 border-t border-ayria-border space-y-2">
+      <div className="p-4 border-t border-ayria-border space-y-3">
+        {/* CRÉDITOS — consumo da ferramenta (FAKE por enquanto) */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <Zap size={12} className="text-ayria-primary" />
+              <span className="text-xs font-semibold text-ayria-text">Créditos</span>
+            </div>
+            <span className="text-xs text-ayria-muted">
+              {creditsUsed}/{creditsTotal}
+            </span>
+          </div>
+          <div
+            className="w-full h-2 rounded-full overflow-hidden"
+            style={{ background: '#1E1E2E' }}
+          >
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${creditsPercent}%`,
+                background: 'linear-gradient(90deg, #6366F1, #A855F7)',
+                boxShadow: '0 0 8px rgba(99, 102, 241, 0.5)',
+              }}
+            />
+          </div>
+        </div>
+
         {(user?.role === 'admin' || user?.role === 'SUPER_ADMIN') && (
           <button
             onClick={() => navigate('/admin')}
@@ -84,7 +116,6 @@ export function Sidebar() {
             Admin
           </button>
         )}
-        {/* Footer limpo — avatar+nome+logout foram MOVIDOS pro header principal (canto direito) */}
       </div>
     </aside>
   )
