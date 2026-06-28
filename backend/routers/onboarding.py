@@ -38,11 +38,13 @@ async def get_status(
     )
     profile = profile_res.scalar_one_or_none()
 
-    # Carrega respostas já salvas em user_attributes
+    # Carrega respostas já salvas em user_attributes (com JOIN pra pegar attribute_code da definition)
     answered_res = await db.execute(
-        select(models.UserAttribute).where(models.UserAttribute.user_id == user.id)
+        select(models.UserAttribute, models.AttributeDefinition)
+        .join(models.AttributeDefinition, models.UserAttribute.attribute_definition_id == models.AttributeDefinition.id)
+        .where(models.UserAttribute.user_id == user.id)
     )
-    answered_attrs = {a.attribute_code: a.value for a in answered_res.scalars().all()}
+    answered_attrs = {attr_def.code: ua.value for ua, attr_def in answered_res.all()}
 
     # Carrega perguntas ativas
     questions_res = await db.execute(
