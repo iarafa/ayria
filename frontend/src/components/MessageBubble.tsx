@@ -32,11 +32,11 @@ function renderMarkdown(text: string): string {
     .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
     .replace(/\n/g, '<br/>')
 
-  // Destaque especial: 'AYRIA' em ROXO (cor do logo gradient)
-  // Cor: gradient-text indigo→purple → #A855F7 (roxo médio do gradient)
+  // Destaque especial: 'AYRIA' em MAGENTA VIBRANTE (cor do logo cyberpunk neon)
+  // Gradient cyan→magenta→purple (mesmo do anel neon do logo)
   rendered = rendered.replace(
     /\bAYRIA\b/g,
-    '<span style="color: #A855F7; font-weight: 700; background: linear-gradient(135deg, #6366F1, #A855F7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">AYRIA</span>'
+    '<span style="color: #EC4899; font-weight: 700; background: linear-gradient(135deg, #00FFFF, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 0 12px rgba(236, 72, 153, 0.5);">AYRIA</span>'
   )
 
   return rendered
