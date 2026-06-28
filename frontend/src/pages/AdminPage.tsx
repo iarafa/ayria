@@ -21,7 +21,9 @@ export function AdminPage() {
 
   // Modal state
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [createForm, setCreateForm] = useState({ email: '', password: '', full_name: '' })
+  const [createForm, setCreateForm] = useState({ email: '', password: '', full_name: '', role: 'user' })
+  const [editingUser, setEditingUser] = useState<any>(null)
+  const [editForm, setEditForm] = useState({ full_name: '', is_active: true })
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
@@ -73,15 +75,31 @@ export function AdminPage() {
     }
   }
 
-  const handleToggleRole = async (u: any) => {
-    const newRole = u.role === 'SUPER_ADMIN' ? 'user' : 'SUPER_ADMIN'
-    if (!confirm(`Mudar role de ${u.email} para ${newRole}?`)) return
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingUser) return
     try {
-      await adminApi.updateUserRole(u.id, newRole)
+      await adminApi.updateUser(editingUser.id, editForm)
+      setEditingUser(null)
       await reloadUsers()
-    } catch (e: any) {
-      alert('Erro: ' + (e.response?.data?.detail || 'desconhecido'))
+    } catch (err: any) {
+      alert('Erro ao editar: ' + (err.response?.data?.detail || err.message))
     }
+  }
+
+  const handleDeleteUser = async (u: any) => {
+    if (!confirm(`Excluir o usuário ${u.email}?\n\nIsso deleta também todas as mensagens, chats e dados dele.\n\nEssa ação NÃO pode ser desfeita.`)) return
+    try {
+      await adminApi.deleteUser(u.id)
+      await reloadUsers()
+    } catch (err: any) {
+      alert('Erro ao excluir: ' + (err.response?.data?.detail || err.message))
+    }
+  }
+
+  const startEditUser = (u: any) => {
+    setEditingUser(u)
+    setEditForm({ full_name: u.full_name || '', is_active: u.is_active })
   }
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -210,14 +228,24 @@ export function AdminPage() {
                       {u.onboarding_status}
                     </span>
                     {u.id !== user?.id && (
-                      <button
-                        onClick={() => handleToggleRole(u)}
-                        className="text-xs px-2 py-1 rounded text-amber-400 hover:text-amber-300 flex items-center gap-1"
-                        title="Promover/Rebaixar para SUPER_ADMIN"
-                      >
-                        <Shield size={12} />
-                        {u.role}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => startEditUser(u)}
+                          className="text-xs px-3 py-1 rounded flex items-center gap-1"
+                          style={{ background: 'rgba(99,102,241,0.15)', color: '#6366F1' }}
+                          title="Editar usuário"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(u)}
+                          className="text-xs px-3 py-1 rounded text-red-400 hover:text-red-300 flex items-center gap-1"
+                          style={{ background: 'rgba(239,68,68,0.1)' }}
+                          title="Excluir usuário"
+                        >
+                          Excluir
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -382,6 +410,19 @@ export function AdminPage() {
                 </p>
               </div>
 
+              <div className="flex items-center gap-3 pt-2">
+                <input
+                  type="checkbox"
+                  id="isAdminCheckbox"
+                  checked={createForm.role === 'SUPER_ADMIN'}
+                  onChange={(e) => setCreateForm({ ...createForm, role: e.target.checked ? 'SUPER_ADMIN' : 'user' })}
+                  className="w-4 h-4 rounded accent-indigo-500"
+                />
+                <label htmlFor="isAdminCheckbox" className="text-sm text-ayria-text cursor-pointer">
+                  Criar como <strong>administrador</strong> (acesso ao dashboard admin)
+                </label>
+              </div>
+
               {createError && (
                 <div
                   className="px-4 py-2 rounded-lg text-sm"
@@ -407,6 +448,78 @@ export function AdminPage() {
                   style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
                 >
                   {creating ? 'Criando...' : 'Criar usuário'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDITAR */}
+      {editingUser && (
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50 p-4"
+          style={{ background: 'rgba(0,0,0,0.7)' }}
+          onClick={() => setEditingUser(null)}
+        >
+          <div
+            className="w-full max-w-md p-6 rounded-2xl"
+            style={{ background: '#0a0a0a', border: '1px solid #1E1E2E' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold gradient-text">Editar usuário</h2>
+              <button onClick={() => setEditingUser(null)} className="text-ayria-muted hover:text-ayria-text">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="text-xs text-ayria-muted mb-4 space-y-1">
+              <div>📧 <strong className="text-ayria-text">{editingUser.email}</strong></div>
+              <div>👤 Role: <strong className="text-ayria-text">{editingUser.role}</strong> (não pode ser alterado)</div>
+            </div>
+
+            <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div>
+                <label className="block text-sm text-ayria-muted mb-2">Nome completo</label>
+                <input
+                  type="text"
+                  value={editForm.full_name}
+                  onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                  placeholder="Nome do usuário"
+                  className="w-full px-4 py-3 rounded-xl text-ayria-text outline-none"
+                  style={{ background: '#050505', border: '1px solid #1E1E2E' }}
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="isActiveCheckbox"
+                  checked={editForm.is_active}
+                  onChange={(e) => setEditForm({ ...editForm, is_active: e.target.checked })}
+                  className="w-4 h-4 rounded accent-indigo-500"
+                />
+                <label htmlFor="isActiveCheckbox" className="text-sm text-ayria-text cursor-pointer">
+                  Usuário <strong>ativo</strong> (pode logar)
+                </label>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  className="flex-1 py-3 rounded-xl text-ayria-text"
+                  style={{ border: '1px solid #1E1E2E' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl text-white font-semibold"
+                  style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                >
+                  Salvar
                 </button>
               </div>
             </form>

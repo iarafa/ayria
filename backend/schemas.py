@@ -15,6 +15,7 @@ class UserRegister(BaseModel):
     email: str
     password: str = Field(min_length=6, max_length=128)
     full_name: Optional[str] = None
+    role: Optional[str] = "user"  # admin pode passar SUPER_ADMIN na criação
 
 
 class UserLogin(BaseModel):
@@ -210,8 +211,10 @@ class AdminUserResponse(BaseModel):
         from_attributes = True
 
 
-class UserRoleUpdate(BaseModel):
-    role: str = Field(pattern=r"^(user|admin|SUPER_ADMIN)$")
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    is_active: Optional[bool] = None
+    # NÃO inclui role — promoção não permitida pela UI
 
 
 # Update forward refs

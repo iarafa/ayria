@@ -1,6 +1,9 @@
 """
 AYRIA - Admin Router
 GET    /api/admin/users
+POST   /api/admin/users            - Cria user (admin pode passar role=admin)
+PUT    /api/admin/users/{id}        - Edita nome / is_active
+DELETE /api/admin/users/{id}        - Exclui user
 GET    /api/admin/knowledge/list
 POST   /api/admin/knowledge/upload
 DELETE /api/admin/knowledge/{id}
@@ -8,7 +11,6 @@ GET    /api/admin/onboarding/config
 PUT    /api/admin/onboarding/config
 GET    /api/admin/attributes
 POST   /api/admin/attributes
-PUT    /api/admin/users/{id}/role
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -56,51 +58,30 @@ async def list_users(
     return result
 
 
-@router.put("/users/{user_id}/role", response_model=schemas.AdminUserResponse)
-async def update_user_role(
-    user_id: uuid.UUID,
-    payload: schemas.UserRoleUpdate,
-    admin: models.User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    """Atualiza role de um usuário"""
-    res = await db.execute(select(models.User).where(models.User.id == user_id))
-    user = res.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    
-    user.role = payload.role
-    await db.commit()
-    await db.refresh(user)
-    
-    return schemas.AdminUserResponse(
-        id=user.id, email=user.email, full_name=user.full_name,
-        role=user.role, is_active=user.is_active,
-        onboarding_status=user.onboarding_status or "pending",
-        created_at=user.created_at, last_login_at=user.last_login_at,
-        message_count=0,
-    )
-
-
 @router.post("/users", response_model=schemas.AdminUserResponse, status_code=201)
 async def create_user(
     payload: schemas.UserRegister,
     admin: models.User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Admin cria novo usuário"""
+    """Admin cria novo usuário. Pode passar role=SUPER_ADMIN no payload se quiser criar admin."""
     existing = await db.execute(
         select(models.User).where(models.User.email == payload.email)
     )
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email já cadastrado")
-    
+
+    # Admin pode escolher role no momento da criação
+    requested_role = getattr(payload, "role", "user")
+    if requested_role not in ("user", "SUPER_ADMIN"):
+        requested_role = "user"
+
     user = models.User(
         id=uuid.uuid4(),
         email=payload.email,
         password_hash=hash_password(payload.password),
         full_name=payload.full_name,
-        role="user",  # Admin SEMPRE cria como user (não pode promover via esse endpoint)
+        role=requested_role,  # Admin define role direto na criação (sem promoção depois)
         is_active=True,
         is_verified=True,  # Admin cria já verificado
         onboarding_status="pending",
@@ -108,7 +89,7 @@ async def create_user(
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    
+
     return schemas.AdminUserResponse(
         id=user.id, email=user.email, full_name=user.full_name,
         role=user.role, is_active=user.is_active,
@@ -116,6 +97,68 @@ async def create_user(
         created_at=user.created_at, last_login_at=user.last_login_at,
         message_count=0,
     )
+
+
+@router.put("/users/{user_id}", response_model=schemas.AdminUserResponse)
+async def update_user(
+    user_id: uuid.UUID,
+    payload: schemas.UserUpdate,
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Edita nome e/ou is_active de um usuário (NÃO muda role)."""
+    res = await db.execute(select(models.User).where(models.User.id == user_id))
+    user = res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    if user.id == admin.id:
+        raise HTTPException(status_code=400, detail="Você não pode editar a si mesmo")
+
+    # Editar apenas campos permitidos (NÃO role)
+    if payload.full_name is not None:
+        user.full_name = payload.full_name
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
+
+    await db.commit()
+    await db.refresh(user)
+
+    return schemas.AdminUserResponse(
+        id=user.id, email=user.email, full_name=user.full_name,
+        role=user.role, is_active=user.is_active,
+        onboarding_status=user.onboarding_status or "pending",
+        created_at=user.created_at, last_login_at=user.last_login_at,
+        message_count=0,
+    )
+
+
+@router.delete("/users/{user_id}", status_code=204)
+async def delete_user(
+    user_id: uuid.UUID,
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Exclui um usuário."""
+    if user_id == admin.id:
+        raise HTTPException(status_code=400, detail="Você não pode excluir a si mesmo")
+
+    res = await db.execute(select(models.User).where(models.User.id == user_id))
+    user = res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    # Cascade: deleta mensagens, chats, attributes, memories
+    await db.execute(
+        models.UserAttribute.__table__.delete().where(models.UserAttribute.user_id == user_id)
+    )
+    from sqlalchemy import text
+    await db.execute(text(f"DELETE FROM messages WHERE chat_id IN (SELECT id FROM chats WHERE user_id = '{user_id}')"))
+    await db.execute(text(f"DELETE FROM chats WHERE user_id = '{user_id}'"))
+    await db.delete(user)
+    await db.commit()
+    logger.info(f"✅ User {user.email} excluído por admin {admin.email}")
+    return None
 
 
 # ============================================================
