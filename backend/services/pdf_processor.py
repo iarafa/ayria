@@ -115,37 +115,33 @@ class PDFProcessor:
         return chunks
 
     async def generate_embedding(self, text: str) -> List[float]:
-        """Gera embedding via OpenAI ou fallback"""
-        # OpenAI é o que tem embeddings de verdade
-        openai_key = os.getenv("OPENAI_API_KEY", "")
-        if openai_key:
-            try:
-                from openai import AsyncOpenAI
-                client = AsyncOpenAI(api_key=openai_key)
-                resp = await client.embeddings.create(
-                    model="text-embedding-3-small",
-                    input=text[:8000],
-                )
-                return resp.data[0].embedding
-            except Exception as e:
-                logger.warning(f"OpenAI embeddings falhou: {e}")
-
-        # Tenta MiniMax (mas provavelmente nao tem endpoint /embeddings)
+        """
+        Gera embedding usando APENAS MiniMax (sem OpenAI).
+        Tenta o endpoint OpenAI-compatible /embeddings do MiniMax;
+        se a API não suportar embeddings, usa fallback hash determinístico.
+        """
         ai_api_key = os.getenv("AI_API_KEY", "")
         ai_base_url = os.getenv("AI_BASE_URL", "")
-        if ai_api_key and ai_base_url:
-            try:
-                from openai import AsyncOpenAI
-                client = AsyncOpenAI(api_key=ai_api_key, base_url=ai_base_url)
-                resp = await client.embeddings.create(
-                    model="text-embedding-3-small",
-                    input=text[:8000],
-                )
-                return resp.data[0].embedding
-            except Exception as e:
-                logger.debug(f"MiniMax embeddings nao disponivel: {e}")
 
-        # Fallback final: hash determinístico
+        if ai_api_key and ai_base_url:
+            # Tenta alguns nomes de modelo e endpoints comuns do MiniMax
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=ai_api_key, base_url=ai_base_url)
+
+            for model_name in ["text-embedding-3-small", "text-embedding-ada-002", "embedding-1"]:
+                try:
+                    resp = await client.embeddings.create(
+                        model=model_name,
+                        input=text[:8000],
+                    )
+                    if resp.data and len(resp.data) > 0:
+                        logger.info(f"✅ Embedding via MiniMax/{model_name}")
+                        return resp.data[0].embedding
+                except Exception as e:
+                    logger.debug(f"MiniMax/{model_name} embeddings: {e}")
+                    continue
+
+        # Fallback hash determinístico (placeholder - sem semântica real)
         import hashlib
         h = hashlib.sha512(text.encode()).digest()
         embedding = []
@@ -153,7 +149,10 @@ class PDFProcessor:
             byte_idx = (i * 8) % len(h)
             val = int.from_bytes(h[byte_idx:byte_idx+4], "big") / (2**32)
             embedding.append((val - 0.5) * 2)
-        logger.debug(f"Usando embedding hash (sem OpenAI configurado)")
+        logger.warning(
+            "⚠️ Embedding hash determinístico (MiniMax sem endpoint /embeddings). "
+            "RAG funciona mas busca semântica é limitada."
+        )
         return embedding
 
     async def process_pdf(
