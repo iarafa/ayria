@@ -14,6 +14,8 @@ interface AuthState {
   register: (email: string, password: string, fullName?: string) => Promise<boolean>
   logout: () => void
   loadUser: () => Promise<void>
+  updateProfile: (data: { full_name?: string; avatar_url?: string }) => Promise<boolean>
+  uploadAvatar: (file: File) => Promise<string | null>
 }
 
 export const useAuth = create<AuthState>((set) => ({
@@ -60,6 +62,28 @@ export const useAuth = create<AuthState>((set) => ({
     } catch {
       localStorage.removeItem('ayria_token')
       set({ user: null, token: null })
+    }
+  },
+
+  updateProfile: async (data) => {
+    try {
+      const { data: updated } = await authApi.updateMe(data)
+      set({ user: updated })
+      return true
+    } catch (e: any) {
+      set({ error: e.response?.data?.detail || 'Erro ao atualizar perfil' })
+      return false
+    }
+  },
+
+  uploadAvatar: async (file: File) => {
+    try {
+      const { data } = await authApi.uploadAvatar(file)
+      set({ user: data })
+      return data.avatar_url
+    } catch (e: any) {
+      set({ error: e.response?.data?.detail || 'Erro ao enviar foto' })
+      return null
     }
   },
 }))

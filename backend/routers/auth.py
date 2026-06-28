@@ -3,8 +3,10 @@ AYRIA - Auth Router
 POST /api/auth/register
 POST /api/auth/login
 GET  /api/auth/me
+PATCH /api/auth/me         (atualizar nome/avatar_url)
+POST /api/auth/me/avatar   (upload de foto)
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from datetime import datetime, timedelta
@@ -118,4 +120,72 @@ async def login(payload: schemas.UserLogin, request: Request, db: AsyncSession =
 @router.get("/me", response_model=schemas.UserResponse)
 async def get_me(user: models.User = Depends(get_current_user)):
     """Retorna dados do usuário logado"""
+    return schemas.UserResponse.model_validate(user)
+
+
+class ProfileUpdateRequest(BaseModel):
+    """PATCH /api/auth/me — atualizar dados do próprio user"""
+    full_name: str | None = None
+    avatar_url: str | None = None
+
+
+@router.patch("/me", response_model=schemas.UserResponse)
+async def update_me(
+    payload: ProfileUpdateRequest,
+    user: models.User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Atualiza nome e/ou avatar_url do usuário logado"""
+    if payload.full_name is not None:
+        user.full_name = payload.full_name.strip()[:255] if payload.full_name.strip() else None
+    if payload.avatar_url is not None:
+        user.avatar_url = payload.avatar_url.strip()[:500] if payload.avatar_url.strip() else None
+    user.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(user)
+    return schemas.UserResponse.model_validate(user)
+
+
+@router.post("/me/avatar", response_model=schemas.UserResponse)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    user: models.User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Upload de foto de perfil. Salva no Azure Blob Storage e retorna URL pública."""
+    # Valida tipo MIME
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Arquivo precisa ser uma imagem (JPEG, PNG, GIF, WebP)"
+        )
+
+    # Limita tamanho (5MB)
+    contents = await file.read()
+    if len(contents) > 5 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Imagem deve ter no máximo 5MB"
+        )
+
+    # Salva no Azure Blob Storage
+    try:
+        from services.storage_service import upload_user_avatar
+        avatar_url = await upload_user_avatar(
+            user_id=str(user.id),
+            filename=file.filename or "avatar.jpg",
+            content_type=file.content_type,
+            data=contents,
+            previous_url=user.avatar_url,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao salvar foto: {str(e)}"
+        )
+
+    user.avatar_url = avatar_url
+    user.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(user)
     return schemas.UserResponse.model_validate(user)

@@ -34,6 +34,7 @@ class UserResponse(BaseModel):
     id: uuid.UUID
     email: str
     full_name: Optional[str]
+    avatar_url: Optional[str] = None
     role: str
     onboarding_status: str
     numerology_data: Optional[Dict[str, Any]] = None
@@ -214,6 +215,7 @@ class AdminUserResponse(BaseModel):
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
     is_active: Optional[bool] = None
     # NÃO inclui role — promoção não permitida pela UI
 

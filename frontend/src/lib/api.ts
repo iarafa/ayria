@@ -24,6 +24,7 @@ export interface User {
   id: string
   email: string
   full_name?: string
+  avatar_url?: string | null
   role: string
   onboarding_status: string
   numerology_data?: any
@@ -64,6 +65,15 @@ export const authApi = {
   login: (data: { email: string; password: string }) =>
     api.post('/api/auth/login', data),
   me: () => api.get('/api/auth/me'),
+  updateMe: (data: { full_name?: string; avatar_url?: string }) =>
+    api.patch('/api/auth/me', data),
+  uploadAvatar: (file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return api.post('/api/auth/me/avatar', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
 }
 
 export const onboardingApi = {

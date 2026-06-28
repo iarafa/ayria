@@ -5,15 +5,27 @@ import { useEffect } from 'react'
 import { Sidebar } from '../components/Sidebar'
 import { MessageBubble, TypingIndicator } from '../components/MessageBubble'
 import { MessageInput } from '../components/MessageInput'
-import { Logo, LogoIcon } from '../components/Logo'
+import { UserAvatar } from '../components/UserAvatar'
 import { useChat } from '../store/chat'
+import { useAuth } from '../store/auth'
 
 export function ChatPage() {
   const { messages, sending, sendMessage, loadChats } = useChat()
+  const { user } = useAuth()
 
   useEffect(() => {
     loadChats()
   }, [])
+
+  // Saudação personalizada baseada na hora
+  const greeting = (() => {
+    const h = new Date().getHours()
+    if (h < 12) return 'Bom dia'
+    if (h < 18) return 'Boa tarde'
+    return 'Boa noite'
+  })()
+
+  const userName = user?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'você'
 
   return (
     <div className="h-screen flex" style={{ background: '#050505' }}>
@@ -21,14 +33,21 @@ export function ChatPage() {
 
       {/* Área principal */}
       <main className="flex-1 flex flex-col">
-        {/* Header com glassmorphism */}
+        {/* Header — AGORA mostra foto + nome do USUÁRIO (não mais o logo AYRIA) */}
         <header className="glass px-6 py-4 flex items-center gap-3">
-          <LogoIcon size={56} variant="circular" />
+          <UserAvatar
+            src={user?.avatar_url}
+            name={user?.full_name}
+            email={user?.email}
+            size={56}
+          />
           <div>
-            <div className="font-semibold text-ayria-text">AYRIA</div>
+            <div className="font-semibold text-ayria-text">
+              {user?.full_name || user?.email?.split('@')[0] || 'Você'}
+            </div>
             <div className="text-xs text-ayria-success flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-              Online · pronta pra conversar
+              Conversando com AYRIA
             </div>
           </div>
         </header>
@@ -38,15 +57,15 @@ export function ChatPage() {
           <div className="max-w-3xl mx-auto">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center py-20">
-                <div className="mb-6 glow">
-                  <LogoIcon size={160} variant="circular" />
-                </div>
-                <h2 className="text-2xl font-bold mb-2 gradient-text">
-                  Olá, eu sou AYRIA
+                <h2 className="text-3xl font-bold mb-3 gradient-text">
+                  {greeting}, {userName}
                 </h2>
                 <p className="text-ayria-muted max-w-md">
                   Estou aqui pra te ajudar a se conhecer melhor. Pode me contar o que
                   quiser — sobre seus sentimentos, sonhos, dúvidas. A conversa é sua.
+                </p>
+                <p className="text-ayria-muted/60 text-sm mt-6">
+                  Comece digitando algo abaixo ↓
                 </p>
               </div>
             )}

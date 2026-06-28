@@ -4,7 +4,7 @@
 import { Plus, MessageCircle, LogOut, Shield, Trash2 } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { useChat } from '../store/chat'
-import { Logo } from './Logo'
+import { UserAvatar } from './UserAvatar'
 import { useNavigate } from 'react-router-dom'
 
 export function Sidebar() {
@@ -17,10 +17,7 @@ export function Sidebar() {
       className="w-[260px] h-screen bg-ayria-card border-r border-ayria-border flex flex-col"
       style={{ background: '#111111' }}
     >
-      {/* Header com logo */}
-      <div className="p-4 border-b border-ayria-border">
-        <Logo size={32} />
-      </div>
+      {/* Header com botão Nova Conversa direto (sem logo no topo) */}
 
       {/* Nova conversa */}
       <div className="p-4">
@@ -85,13 +82,19 @@ export function Sidebar() {
           </button>
         )}
         <div className="flex items-center gap-2 text-sm">
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold"
-            style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
-          >
-            {user?.email?.[0]?.toUpperCase() || '?'}
+          <UserAvatar
+            src={user?.avatar_url}
+            name={user?.full_name}
+            email={user?.email}
+            size={32}
+            glow={false}
+          />
+          <div className="flex-1 truncate">
+            <div className="text-ayria-text truncate">{user?.full_name || user?.email?.split('@')[0]}</div>
+            {user?.full_name && (
+              <div className="text-xs text-ayria-muted truncate">{user?.email}</div>
+            )}
           </div>
-          <div className="flex-1 truncate text-ayria-text">{user?.email}</div>
           <button
             onClick={logout}
             className="text-ayria-muted hover:text-red-400"

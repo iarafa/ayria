@@ -181,3 +181,66 @@ class StorageService:
 
 # Singleton
 storage_service = StorageService()
+
+async def upload_user_avatar(
+    user_id: str,
+    filename: str,
+    content_type: str,
+    data: bytes,
+    previous_url: Optional[str] = None,
+) -> str:
+    """
+    Upload de foto de perfil do usuário.
+
+    - Salva no Azure Blob Storage no path avatars/{user_id}/{uuid}.{ext}
+    - Se previous_url for fornecida, deleta o avatar antigo
+    - Retorna URL pública
+
+    Path interno:
+    storage_service.upload() é usado (já lida com Azure/local fallback)
+    """
+    import re
+
+    # Extrai extensão
+    ext_match = re.search(r'\.([a-zA-Z0-9]+)(?:\?|$)', filename)
+    if ext_match:
+        ext = ext_match.group(1).lower()
+    else:
+        # Inferir pelo content_type
+        ct_to_ext = {
+            "image/jpeg": "jpg",
+            "image/jpg": "jpg",
+            "image/png": "png",
+            "image/gif": "gif",
+            "image/webp": "webp",
+        }
+        ext = ct_to_ext.get(content_type, "jpg")
+
+    if ext not in ("jpg", "jpeg", "png", "gif", "webp"):
+        ext = "jpg"
+
+    # Sanitiza filename
+    safe_filename = re.sub(r'[^a-zA-Z0-9._-]', '_', filename)[:50] or "avatar"
+
+    # Path único: avatars/{user_id}/{uuid}_{filename}
+    blob_name = f"avatars/{user_id}/{uuid.uuid4().hex[:12]}_{safe_filename}"
+    if not blob_name.lower().endswith(f".{ext}"):
+        blob_name += f".{ext}"
+
+    # Upload (storage_service já lida com Azure/local)
+    result = await storage_service.upload(
+        file_bytes=data,
+        filename=blob_name,
+        content_type=content_type,
+    )
+
+    public_url = result.get("url") if isinstance(result, dict) else result
+
+    # Tenta deletar avatar antigo (best-effort)
+    if previous_url and previous_url != public_url:
+        try:
+            await storage_service.delete(previous_url)
+        except Exception as e:
+            logger.warning(f"Não conseguiu deletar avatar antigo {previous_url}: {e}")
+
+    return public_url

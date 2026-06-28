@@ -28,6 +28,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(255))
+    avatar_url = Column(String(500))  # URL pública da foto (Azure Blob Storage)
     role = Column(String(20), default="user", index=True)  # user | admin | SUPER_ADMIN
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
