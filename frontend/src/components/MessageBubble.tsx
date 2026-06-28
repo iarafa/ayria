@@ -18,7 +18,7 @@ interface MessageBubbleProps {
   thinking?: string | null
 }
 
-function renderMarkdown(text: string): string {
+export function renderMarkdown(text: string): string {
   let rendered = text
     .replace(/### (.*)/g, '<h3>$1</h3>')
     .replace(/## (.*)/g, '<h2>$1</h2>')

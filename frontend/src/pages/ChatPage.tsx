@@ -3,7 +3,7 @@
  */
 import { useEffect, useState } from 'react'
 import { Sidebar } from '../components/Sidebar'
-import { MessageBubble, TypingIndicator } from '../components/MessageBubble'
+import { MessageBubble, TypingIndicator, renderMarkdown } from '../components/MessageBubble'
 import { MessageInput } from '../components/MessageInput'
 import { Logo, LogoIcon } from '../components/Logo'
 import { ProfileEditModal } from '../components/ProfileEditModal'
@@ -119,9 +119,10 @@ export function ChatPage() {
           <div className="max-w-3xl mx-auto">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center py-20">
-                <p className="text-ayria-muted max-w-md">
-                  Olá, eu sou AYRIA — estou aqui pra te ajudar a se conhecer melhor. Pode me contar o que quiser — sobre seus sentimentos, sonhos, dúvidas. A conversa é sua.
-                </p>
+                <p
+                  className="text-ayria-muted max-w-md"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown('Olá, eu sou AYRIA — estou aqui pra te ajudar a se conhecer melhor. Pode me contar o que quiser — sobre seus sentimentos, sonhos, dúvidas. A conversa é sua.') }}
+                />
               </div>
             )}
 
