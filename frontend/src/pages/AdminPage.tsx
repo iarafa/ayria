@@ -266,11 +266,6 @@ export function AdminPage() {
                       {d.file_name} · {(d.file_size_bytes / 1024).toFixed(1)}KB · {d.status}
                     </div>
                   </div>
-                    <div className="text-ayria-text font-medium">{d.title}</div>
-                    <div className="text-xs text-ayria-muted">
-                      {d.file_name} · {(d.file_size_bytes / 1024).toFixed(1)}KB · {d.status}
-                    </div>
-                  </div>
                   <button
                     onClick={() => handleDelete(d.id)}
                     className="text-red-400 hover:text-red-300 text-sm"
