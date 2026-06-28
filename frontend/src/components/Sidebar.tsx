@@ -40,12 +40,12 @@ export function Sidebar() {
           onClick={async () => {
             await createChat()
           }}
-          className="w-full py-3 px-4 rounded-xl font-semibold text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-90"
+          className="w-full py-2 px-3 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-1.5 transition-opacity hover:opacity-90"
           style={{
             background: 'linear-gradient(135deg, #6366F1, #A855F7)',
           }}
         >
-          <Plus size={18} />
+          <Plus size={14} />
           Nova Conversa
         </button>
       </div>
