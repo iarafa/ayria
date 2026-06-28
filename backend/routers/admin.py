@@ -442,19 +442,51 @@ async def delete_document(
     admin: models.User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Deleta documento"""
+    """
+    Deleta documento de conhecimento E TODOS os vestígios:
+    1. Qdrant: TODOS os chunks indexados (conhecimento_geral)
+    2. Azure Blob / Storage local: arquivo PDF original
+    3. PostgreSQL: registro do documento
+
+    Safety: rollback em caso de erro.
+    """
     res = await db.execute(
         select(models.KnowledgeDocument).where(models.KnowledgeDocument.id == doc_id)
     )
     doc = res.scalar_one_or_none()
     if not doc:
         raise HTTPException(status_code=404, detail="Documento não encontrado")
-    
-    # Remove do storage
-    if doc.storage_url:
-        stored_name = doc.storage_url.split("/")[-1]
-        await storage_service.delete(stored_name)
-    
-    await db.delete(doc)
-    await db.commit()
-    return None
+
+    deleted_summary = {"qdrant_chunks": 0, "storage": False}
+
+    try:
+        # 1. Qdrant: deleta chunks do documento (compilado/indexado)
+        from services.vector_service import vector_service
+        deleted_summary["qdrant_chunks"] = await vector_service.delete_document_chunks(str(doc_id))
+
+        # 2. Storage (Azure Blob ou local): remove arquivo PDF original
+        if doc.storage_url:
+            # Extrai blob_name limpo (sem SAS query string)
+            stored_name = doc.storage_url.split("/")[-1]
+            if "?" in stored_name:
+                stored_name = stored_name.split("?")[0]
+            storage_deleted = await storage_service.delete(stored_name)
+            deleted_summary["storage"] = storage_deleted
+
+        # 3. PostgreSQL: deleta o registro
+        await db.delete(doc)
+        await db.commit()
+
+        logger.info(
+            f"✅ Documento '{doc.file_name}' ({doc_id}) excluído COMPLETAMENTE por admin {admin.email}. "
+            f"Chunks Qdrant: {deleted_summary['qdrant_chunks']}, Storage: {deleted_summary['storage']}"
+        )
+        return None
+
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"❌ Erro ao excluir documento {doc_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao excluir documento (rollback feito): {str(e)}"
+        )

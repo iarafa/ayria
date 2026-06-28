@@ -144,6 +144,42 @@ class VectorService:
 
         return total_deleted
 
+    async def delete_document_chunks(self, document_id: str) -> int:
+        """
+        Deleta TODOS os chunks de um documento da coleção conhecimento_geral.
+        Usado quando admin deleta um knowledge document.
+
+        Returns: número de pontos deletados.
+        """
+        from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+        qfilter = Filter(must=[
+            FieldCondition(key="document_id", match=MatchValue(value=str(document_id)))
+        ])
+
+        try:
+            # Verifica se coleção existe
+            collections = self.client.get_collections().collections
+            if not any(c.name == "conhecimento_geral" for c in collections):
+                return 0
+
+            # Conta antes pra logar
+            before = self.client.count(
+                collection_name="conhecimento_geral",
+                count_filter=qfilter,
+            ).count
+
+            # Deleta
+            self.client.delete(
+                collection_name="conhecimento_geral",
+                points_selector=qfilter,
+            )
+            logger.info(f"🗑️ Deletados {before} chunks do documento {document_id} do Qdrant")
+            return before
+        except Exception as e:
+            logger.warning(f"Falha ao deletar chunks do documento {document_id}: {e}")
+            return 0
+
     async def scroll(
         self,
         collection: str,
