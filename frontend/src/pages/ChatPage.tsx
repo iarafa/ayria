@@ -119,13 +119,6 @@ export function ChatPage() {
           <div className="max-w-3xl mx-auto">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center py-20">
-                <h2 className="text-3xl font-bold mb-2 gradient-text">
-                  AYRIA
-                </h2>
-                <div className="text-xs text-ayria-success flex items-center justify-center gap-1 mb-4">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-                  Online · pronta pra conversar
-                </div>
                 <p className="text-ayria-muted max-w-md">
                   Olá, eu sou AYRIA — estou aqui pra te ajudar a se conhecer melhor. Pode me contar o que quiser — sobre seus sentimentos, sonhos, dúvidas. A conversa é sua.
                 </p>
