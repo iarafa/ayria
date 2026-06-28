@@ -119,17 +119,6 @@ export function ChatPage() {
           <div className="max-w-3xl mx-auto">
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center py-20">
-                <div className="mb-6">
-                  <img
-                    src="/ayria-logo-dark.png"
-                    alt="AYRIA"
-                    width={140}
-                    height={140}
-                    style={{
-                      filter: 'drop-shadow(0 0 20px rgba(99,102,241,0.6))',
-                    }}
-                  />
-                </div>
                 <h2 className="text-3xl font-bold mb-2 gradient-text">
                   AYRIA
                 </h2>
