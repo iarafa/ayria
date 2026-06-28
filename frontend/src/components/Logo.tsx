@@ -56,7 +56,7 @@ interface LogoIconProps {
 export function LogoIcon({ size = 40, glow = true, className = '', variant = 'plain' }: LogoIconProps) {
   const [err, setErr] = useState(false)
   const src = variant === 'circular'
-    ? (err ? '/ayria-logo-transparent.png' : '/ayria-logo-circular.png')
+    ? (err ? '/ayria-logo-circular.png' : '/ayria-logo-circular-solid.png')
     : (err ? '/ayria-logo-transparent.png' : '/ayria-logo-dark.png')
 
   return (
