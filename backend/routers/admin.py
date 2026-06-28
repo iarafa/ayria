@@ -10,11 +10,12 @@ GET    /api/admin/attributes
 POST   /api/admin/attributes
 PUT    /api/admin/users/{id}/role
 """
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 import uuid
 import logging
+from datetime import datetime
 
 from database import get_db
 from utils.security import require_admin, hash_password
@@ -242,6 +243,7 @@ async def list_documents(
 
 @router.post("/knowledge/upload", response_model=schemas.KnowledgeDocumentResponse, status_code=201)
 async def upload_document(
+    background_tasks: BackgroundTasks,
     title: str = Form(...),
     description: str = Form(None),
     collection: str = Form("conhecimento_geral"),
@@ -276,11 +278,73 @@ async def upload_document(
     db.add(doc)
     await db.commit()
     await db.refresh(doc)
-    
-    # Em produção: disparar BackgroundTask pra chunking + embedding + Qdrant
-    # Por enquanto: marca como "indexed" manualmente
-    
+
+    # REAL: dispara BackgroundTask pra chunking + embedding + Qdrant
+    background_tasks.add_task(
+        process_document_background,
+        doc_id=str(doc.id),
+        file_bytes=file_bytes,
+        file_name=file.filename,
+        collection=collection,
+        db_url=str(db.bind.url) if db.bind else "",
+    )
+
+    logger.info(f"📚 Doc '{title}' salvo ({len(file_bytes)} bytes) - indexação em background")
+
     return doc
+
+
+async def process_document_background(
+    doc_id: str,
+    file_bytes: bytes,
+    file_name: str,
+    collection: str,
+    db_url: str,
+):
+    """Background: chunking + embedding + Qdrant"""
+    from services.pdf_processor import pdf_processor
+    from database import AsyncSessionLocal
+
+    try:
+        result = await pdf_processor.process_pdf(
+            file_bytes=file_bytes,
+            file_name=file_name,
+            document_id=doc_id,
+            collection=collection,
+        )
+
+        # Atualiza status no DB
+        async with AsyncSessionLocal() as db:
+            doc_res = await db.execute(
+                select(models.KnowledgeDocument).where(models.KnowledgeDocument.id == uuid.UUID(doc_id))
+            )
+            doc = doc_res.scalar_one_or_none()
+            if doc:
+                if result.get("errors", 0) == 0 and result.get("indexed", 0) > 0:
+                    doc.status = "indexed"
+                    doc.chunks_count = result["indexed"]
+                    doc.indexed_at = datetime.utcnow()
+                else:
+                    doc.status = "failed"
+                    doc.error_message = f"{result.get('errors', 0)} erros no processamento"
+                await db.commit()
+
+        logger.info(f"✅ Background processado: doc {doc_id} status={doc.status if doc else 'unknown'}")
+    except Exception as e:
+        logger.error(f"❌ Erro no background processing: {e}", exc_info=True)
+        # Marca como failed
+        try:
+            async with AsyncSessionLocal() as db:
+                doc_res = await db.execute(
+                    select(models.KnowledgeDocument).where(models.KnowledgeDocument.id == uuid.UUID(doc_id))
+                )
+                doc = doc_res.scalar_one_or_none()
+                if doc:
+                    doc.status = "failed"
+                    doc.error_message = str(e)[:500]
+                    await db.commit()
+        except Exception:
+            pass
 
 
 @router.delete("/knowledge/{doc_id}", status_code=204)

@@ -54,6 +54,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Audit middleware (registra acoes no audit_log)
+from middleware.audit import AuditMiddleware
+app.add_middleware(AuditMiddleware)
+
 
 # ============================================================
 # Health & Info
@@ -108,12 +112,14 @@ async def info():
 
 
 # Routers
-from routers import auth, onboarding, chats, chat, admin
+from routers import auth, onboarding, chats, chat, admin, memory, training
 app.include_router(auth.router)
 app.include_router(onboarding.router)
 app.include_router(chats.router)
 app.include_router(chat.router)
 app.include_router(admin.router)
+app.include_router(memory.router)
+app.include_router(training.router)
 
 
 if __name__ == "__main__":

@@ -105,9 +105,44 @@ class VectorService:
             for r in results
         ]
     
-    async def delete(self, collection: str, point_id: str):
+    async def delete(self, collection: str, point_id: str, user_id: Optional[str] = None):
         """Deleta um ponto"""
         self.client.delete(collection_name=collection, points_selector=[point_id])
+
+    async def scroll(
+        self,
+        collection: str,
+        user_id: Optional[str] = None,
+        memory_type: Optional[str] = None,
+        limit: int = 20,
+    ) -> List[Dict]:
+        """Lista pontos com filtros"""
+        from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+        conditions = []
+        if user_id:
+            conditions.append(FieldCondition(key="user_id", match=MatchValue(value=user_id)))
+        if memory_type:
+            conditions.append(FieldCondition(key="type", match=MatchValue(value=memory_type)))
+
+        qfilter = Filter(must=conditions) if conditions else None
+
+        results, _ = self.client.scroll(
+            collection_name=collection,
+            scroll_filter=qfilter,
+            limit=limit,
+            with_payload=True,
+            with_vectors=False,
+        )
+
+        out = []
+        for point in results:
+            out.append({
+                "id": str(point.id),
+                "payload": dict(point.payload or {}),
+                "text": (point.payload or {}).get("text", ""),
+            })
+        return out
     
     async def get_collection_info(self, collection: str) -> Dict:
         """Info da collection"""

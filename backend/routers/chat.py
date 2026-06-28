@@ -65,6 +65,12 @@ async def send_message(
     db: AsyncSession = Depends(get_db),
 ):
     """Envia mensagem e recebe resposta da AYRIA"""
+    # BLOQUEIO: user precisa ter completado onboarding (exceto SUPER_ADMIN)
+    if user.role != "SUPER_ADMIN" and user.onboarding_status != "completed":
+        raise HTTPException(
+            status_code=403,
+            detail="Complete o onboarding antes de usar o chat. Redirecione para /onboarding.",
+        )
     
     # 1. Pega ou cria chat
     chat_id = payload.chat_id

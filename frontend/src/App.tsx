@@ -11,7 +11,7 @@ import { ChatPage } from './pages/ChatPage'
 import { AdminPage } from './pages/AdminPage'
 import { NumerologyReveal } from './pages/NumerologyReveal'
 
-function PrivateRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
+function PrivateRoute({ children, adminOnly = false, requireOnboarding = false }: { children: React.ReactNode; adminOnly?: boolean; requireOnboarding?: boolean }) {
   const { user, token, loadUser } = useAuth()
   const [loading, setLoading] = useState(true)
 
@@ -38,6 +38,16 @@ function PrivateRoute({ children, adminOnly = false }: { children: React.ReactNo
   if (adminOnly && user?.role !== 'admin' && user?.role !== 'SUPER_ADMIN') {
     return <Navigate to="/chat" replace />
   }
+
+  // BLOQUEIO: se rota exige onboarding completo e user não tem, manda pro onboarding
+  if (
+    requireOnboarding &&
+    user?.role !== 'SUPER_ADMIN' &&
+    user?.onboarding_status !== 'completed'
+  ) {
+    return <Navigate to="/onboarding" replace />
+  }
+
   return <>{children}</>
 }
 
@@ -65,7 +75,7 @@ export default function App() {
       <Route
         path="/chat"
         element={
-          <PrivateRoute>
+          <PrivateRoute requireOnboarding>
             <ChatPage />
           </PrivateRoute>
         }

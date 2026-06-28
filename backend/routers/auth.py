@@ -4,7 +4,7 @@ POST /api/auth/register
 POST /api/auth/login
 GET  /api/auth/me
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from datetime import datetime, timedelta
@@ -20,6 +20,14 @@ import models
 import schemas
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+# Rate limiting simples in-memory (production: use Redis)
+from collections import defaultdict
+import time as _time
+_login_attempts = defaultdict(list)
+_register_attempts = defaultdict(list)
+RATE_LIMIT_LOGIN = 5  # max 5 tentativas
+RATE_LIMIT_WINDOW = 60  # por 60 segundos
 
 
 @router.post("/register", response_model=schemas.TokenResponse, status_code=201)
@@ -69,8 +77,18 @@ async def register(payload: schemas.UserRegister, db: AsyncSession = Depends(get
 
 
 @router.post("/login", response_model=schemas.TokenResponse)
-async def login(payload: schemas.UserLogin, db: AsyncSession = Depends(get_db)):
+async def login(payload: schemas.UserLogin, request: Request, db: AsyncSession = Depends(get_db)):
     """Login com email + senha"""
+    # Rate limit por IP
+    ip = request.client.host if request.client else "unknown"
+    now = _time.time()
+    _login_attempts[ip] = [t for t in _login_attempts[ip] if now - t < RATE_LIMIT_WINDOW]
+    if len(_login_attempts[ip]) >= RATE_LIMIT_LOGIN:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Muitas tentativas de login. Tente em {RATE_LIMIT_WINDOW}s.",
+        )
+    _login_attempts[ip].append(now)
     result = await db.execute(
         select(models.User).where(models.User.email == payload.email)
     )
