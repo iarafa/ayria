@@ -85,9 +85,6 @@ export function ChatPage() {
                 <div className="text-sm font-semibold text-ayria-text truncate max-w-[150px]">
                   {user?.full_name || user?.email?.split('@')[0] || 'Você'}
                 </div>
-                <div className="text-xs text-ayria-muted truncate max-w-[150px]">
-                  {user?.email}
-                </div>
               </div>
             </div>
             <button
