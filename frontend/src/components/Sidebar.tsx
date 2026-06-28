@@ -5,6 +5,7 @@ import { Plus, MessageCircle, LogOut, Shield, Trash2 } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { useChat } from '../store/chat'
 import { UserAvatar } from './UserAvatar'
+import { Logo } from './Logo'
 import { useNavigate } from 'react-router-dom'
 
 export function Sidebar() {
@@ -12,15 +13,39 @@ export function Sidebar() {
   const { chats, currentChatId, loadMessages, createChat, deleteChat } = useChat()
   const navigate = useNavigate()
 
+  const firstName = user?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Você'
+
   return (
     <aside
       className="w-[260px] h-screen bg-ayria-card border-r border-ayria-border flex flex-col"
       style={{ background: '#111111' }}
     >
-      {/* Header com botão Nova Conversa direto (sem logo no topo) */}
+      {/* TOPO: Logo AYRIA */}
+      <div className="p-4 border-b border-ayria-border">
+        <Logo size={32} />
+      </div>
+
+      {/* User info: avatar + primeiro nome (acima de Nova Conversa) */}
+      <div className="px-4 pt-4 pb-2 flex items-center gap-3">
+        <UserAvatar
+          src={user?.avatar_url}
+          name={user?.full_name}
+          email={user?.email}
+          size={36}
+          glow={false}
+        />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-ayria-text truncate">
+            {firstName}
+          </div>
+          <div className="text-xs text-ayria-muted truncate">
+            {user?.role === 'SUPER_ADMIN' || user?.role === 'admin' ? 'Administrador' : 'Online'}
+          </div>
+        </div>
+      </div>
 
       {/* Nova conversa */}
-      <div className="p-4">
+      <div className="px-4 pb-4">
         <button
           onClick={async () => {
             await createChat()
@@ -81,26 +106,14 @@ export function Sidebar() {
             Admin
           </button>
         )}
-        <div className="flex items-center gap-2 text-sm">
-          <UserAvatar
-            src={user?.avatar_url}
-            name={user?.full_name}
-            email={user?.email}
-            size={32}
-            glow={false}
-          />
-          <div className="flex-1 truncate">
-            <div className="text-ayria-text truncate">{user?.full_name || user?.email?.split('@')[0]}</div>
-            {user?.full_name && (
-              <div className="text-xs text-ayria-muted truncate">{user?.email}</div>
-            )}
-          </div>
+        <div className="flex items-center justify-end gap-2 text-sm">
           <button
             onClick={logout}
-            className="text-ayria-muted hover:text-red-400"
+            className="text-ayria-muted hover:text-red-400 flex items-center gap-1"
             title="Sair"
           >
-            <LogOut size={16} />
+            <LogOut size={14} />
+            <span className="text-xs">Sair</span>
           </button>
         </div>
       </div>
