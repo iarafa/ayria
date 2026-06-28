@@ -8,6 +8,7 @@
 import { useEffect, useRef } from 'react'
 import { Brain } from 'lucide-react'
 import { useAuth } from '../store/auth'
+import { LogoIcon } from './Logo'
 
 interface MessageBubbleProps {
   role: 'user' | 'assistant' | 'system'
@@ -98,31 +99,27 @@ export function TypingIndicator() {
   return (
     <div className="flex w-full mb-4 justify-start">
       <div
-        className="max-w-[75%] rounded-2xl px-4 py-3 flex items-center gap-2"
+        className="max-w-[75%] rounded-2xl px-4 py-3 flex items-center gap-3"
         style={{
           background: '#111111',
           border: '1px solid rgba(99, 102, 241, 0.2)',
         }}
       >
-        <img
-          src="/ayria-logo-dark.png"
-          alt="AYRIA"
-          width={18}
-          height={18}
-          style={{ filter: 'drop-shadow(0 0 4px rgba(99,102,241,0.6))' }}
-        />
-        <div
-          className="typing-dot w-2 h-2 rounded-full"
-          style={{ background: '#6366F1' }}
-        />
-        <div
-          className="typing-dot w-2 h-2 rounded-full"
-          style={{ background: '#6366F1' }}
-        />
-        <div
-          className="typing-dot w-2 h-2 rounded-full"
-          style={{ background: '#6366F1' }}
-        />
+        <LogoIcon size={28} variant="circular" />
+        <div className="flex items-center gap-1">
+          <div
+            className="typing-dot w-2 h-2 rounded-full"
+            style={{ background: '#6366F1' }}
+          />
+          <div
+            className="typing-dot w-2 h-2 rounded-full"
+            style={{ background: '#6366F1' }}
+          />
+          <div
+            className="typing-dot w-2 h-2 rounded-full"
+            style={{ background: '#6366F1' }}
+          />
+        </div>
       </div>
     </div>
   )
