@@ -6,9 +6,11 @@ import { useNavigate } from 'react-router-dom'
 import { onboardingApi, OnboardingQuestion } from '../lib/api'
 import { Logo } from '../components/Logo'
 import { ChevronRight, ChevronLeft, Check } from 'lucide-react'
+import { useAuth } from '../store/auth'
 
 export function OnboardingPage() {
   const navigate = useNavigate()
+  const { loadUser } = useAuth()
   const [questions, setQuestions] = useState<OnboardingQuestion[]>([])
   const [currentIdx, setCurrentIdx] = useState(0)
   const [answers, setAnswers] = useState<Record<string, any>>({})
@@ -46,6 +48,9 @@ export function OnboardingPage() {
         value,
       })
       if (currentIdx + 1 >= questions.length) {
+        // Atualiza o user no state (onboarding_status=completed) antes de navegar
+        // Evita loop /chat → /onboarding por user desatualizado
+        await loadUser()
         navigate('/criando-perfil')
       } else {
         setCurrentIdx(currentIdx + 1)
