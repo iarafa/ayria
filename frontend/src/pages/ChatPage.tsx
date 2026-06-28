@@ -41,15 +41,8 @@ export function ChatPage() {
       <main className="flex-1 flex flex-col">
         {/* Header com glassmorphism */}
         <header className="glass px-6 py-4 flex items-center gap-3">
-          {/* Esquerda: logo AYRIA + título + status */}
+          {/* Esquerda: APENAS logo AYRIA (texto/status movido pro welcome) */}
           <LogoIcon size={56} variant="circular" />
-          <div>
-            <div className="font-semibold text-ayria-text">AYRIA</div>
-            <div className="text-xs text-ayria-success flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-              Online · pronta pra conversar
-            </div>
-          </div>
 
           {/* Direita: avatar + nome do user (MOVIDO do rodapé da sidebar) */}
           <div className="ml-auto flex items-center gap-3">
@@ -138,12 +131,15 @@ export function ChatPage() {
                     }}
                   />
                 </div>
-                <h2 className="text-2xl font-bold mb-2 gradient-text">
-                  Olá, eu sou AYRIA
+                <h2 className="text-3xl font-bold mb-2 gradient-text">
+                  AYRIA
                 </h2>
+                <div className="text-xs text-ayria-success flex items-center justify-center gap-1 mb-4">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                  Online · pronta pra conversar
+                </div>
                 <p className="text-ayria-muted max-w-md">
-                  Estou aqui pra te ajudar a se conhecer melhor. Pode me contar o que
-                  quiser — sobre seus sentimentos, sonhos, dúvidas. A conversa é sua.
+                  Olá, eu sou AYRIA — estou aqui pra te ajudar a se conhecer melhor. Pode me contar o que quiser — sobre seus sentimentos, sonhos, dúvidas. A conversa é sua.
                 </p>
               </div>
             )}
