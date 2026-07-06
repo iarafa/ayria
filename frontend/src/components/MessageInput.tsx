@@ -19,9 +19,9 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
   }
 
   return (
-    <div className="w-full max-w-3xl mx-auto px-4 pb-6">
+    <div className="w-full max-w-3xl mx-auto px-3 pb-4 sm:px-4 sm:pb-6">
       <div
-        className="flex items-end gap-2 rounded-2xl p-2"
+        className="flex items-end gap-1.5 sm:gap-2 rounded-2xl p-1.5 sm:p-2"
         style={{
           background: '#111111',
           border: '1px solid #1E1E2E',
@@ -39,18 +39,19 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
           placeholder="Pergunte algo à AYRIA..."
           rows={1}
           disabled={disabled}
-          className="flex-1 bg-transparent text-ayria-text placeholder-ayria-muted resize-none outline-none px-3 py-2"
+          className="flex-1 min-w-0 bg-transparent text-ayria-text placeholder-ayria-muted resize-none outline-none px-2 py-1.5 sm:px-3 sm:py-2 text-sm sm:text-base"
           style={{ maxHeight: 200, fontFamily: 'Inter, sans-serif' }}
         />
         <button
           onClick={handleSend}
           disabled={disabled || !text.trim()}
-          className="p-2 rounded-xl text-white disabled:opacity-30 transition-opacity hover:opacity-90"
+          className="p-2 rounded-xl text-white disabled:opacity-30 transition-opacity hover:opacity-90 flex-shrink-0"
           style={{
             background: 'linear-gradient(135deg, #6366F1, #A855F7)',
           }}
         >
-          <Send size={18} />
+          <Send size={16} className="sm:hidden" />
+          <Send size={18} className="hidden sm:block" />
         </button>
       </div>
     </div>

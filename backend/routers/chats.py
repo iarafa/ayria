@@ -107,7 +107,54 @@ async def list_messages(
         .order_by(models.Message.created_at)
     )
     messages = res.scalars().all()
-    return [schemas.MessageResponse.model_validate(m) for m in messages]
+
+    # FIX (29/06): NÃO usar MessageResponse.model_validate(m) — atributo
+    # "metadata" em SQLAlchemy é MetaData() da classe base, não nossa coluna
+    # JSONB (a coluna chama "metadata" no DB mas o attr Python é metadata_json).
+    # Mesmo bug que apareceu no modo observador em 28/06 — corrigido aqui.
+    return [
+        schemas.MessageResponse(
+            id=m.id,
+            chat_id=m.chat_id,
+            role=m.role,
+            content=m.content,
+            ai_model=m.ai_model,
+            tokens_used=m.tokens_used,
+            created_at=m.created_at,
+            metadata=m.metadata_json or {},
+        )
+        for m in messages
+    ]
+
+
+@router.patch("/{chat_id}", response_model=schemas.ChatResponse)
+async def update_chat(
+    chat_id: uuid.UUID,
+    payload: schemas.ChatUpdate,
+    user: models.User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Atualiza título/tema da conversa"""
+    res = await db.execute(
+        select(models.Chat).where(
+            models.Chat.id == chat_id,
+            models.Chat.user_id == user.id,
+        )
+    )
+    chat = res.scalar_one_or_none()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada")
+
+    # Atualiza apenas o title (único campo editável via este endpoint)
+    if payload.title is not None:
+        title_clean = payload.title.strip()
+        if len(title_clean) > 100:
+            raise HTTPException(status_code=400, detail="Título muito longo (máx 100 caracteres)")
+        chat.title = title_clean if title_clean else None
+
+    await db.commit()
+    await db.refresh(chat)
+    return chat
 
 
 @router.delete("/{chat_id}", status_code=204)

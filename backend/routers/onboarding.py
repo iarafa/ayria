@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict
 import logging
 
@@ -46,21 +46,49 @@ async def get_status(
     )
     answered_attrs = {attr_def.code: ua.value for ua, attr_def in answered_res.all()}
 
+    # Carrega status de cada atributo (pra filtrar o que ainda precisa de resposta)
+    attr_status_res = await db.execute(
+        select(models.UserAttribute, models.AttributeDefinition)
+        .join(models.AttributeDefinition, models.UserAttribute.attribute_definition_id == models.AttributeDefinition.id)
+        .where(models.UserAttribute.user_id == user.id)
+    )
+    attr_status_map = {attr_def.code: ua.status for ua, attr_def in attr_status_res.all()}
+
     # Carrega perguntas ativas
     questions_res = await db.execute(
         select(models.OnboardingConfig)
         .where(models.OnboardingConfig.is_active == True)
         .order_by(models.OnboardingConfig.step)
     )
-    questions = questions_res.scalars().all()
+    all_questions = questions_res.scalars().all()
 
-    # Step atual = quantas respostas já tem + 1
-    current_step = len(answered_attrs) + 1
+    # 🛡️ FIX: se user JÁ TEM onboarding_status='completed' (admin bypass, ou user finalizou),
+    # não devolver perguntas mesmo que user_attributes esteja vazio
+    if (user.onboarding_status or "").lower() == "completed":
+        return schemas.OnboardingStatus(
+            status="completed",
+            current_step=len(all_questions) + 1,
+            total_steps=len(all_questions),
+            numerology_data=user.numerology_data,
+            questions=[],
+            answered={},
+        )
+
+    # FILTRA: mostra só perguntas que ainda não foram respondidas/puladas/adiadas
+    TERMINAL_STATUSES = {'answered', 'skipped', 'pending_next_chat', 'snoozed'}
+    questions = [
+        q for q in all_questions
+        if attr_status_map.get(q.attribute_code) not in TERMINAL_STATUSES
+    ]
+
+    # Step atual = quantas respostas TERMINAIS já tem + 1
+    terminal_count = sum(1 for s in attr_status_map.values() if s in TERMINAL_STATUSES)
+    current_step = terminal_count + 1
 
     return schemas.OnboardingStatus(
         status=user.onboarding_status or "pending",
         current_step=current_step,
-        total_steps=len(questions),
+        total_steps=len(all_questions),
         numerology_data=user.numerology_data,
         questions=[
             {
@@ -87,10 +115,13 @@ async def post_answer(
 ):
     """
     Salva resposta de uma pergunta de onboarding.
-    
-    - Salva em user_attributes (tabela)
-    - Atualiza profile.attributes (JSONB para compatibilidade)
-    - Se última pergunta → calcula numerologia e marca completed
+
+    Ações suportadas (payload.action):
+    - 'answer' (default): salva o valor como respondido (status='answered')
+    - 'skip': pular permanentemente (status='skipped')
+    - 'later': responder depois (status='pending_next_chat' → Sistema 2)
+    - 'continue_without': user confirmou que segue sem (status='skipped')
+    - 'snooze': adiar X horas (status='snoozed')
     """
     if not payload.attribute_code:
         raise HTTPException(status_code=400, detail="attribute_code obrigatório")
@@ -138,21 +169,90 @@ async def post_answer(
         )
     )
     existing = attr_res.scalar_one_or_none()
-    if existing:
-        existing.value = payload.value
-        existing.updated_at = datetime.utcnow()
-    else:
-        new_attr = models.UserAttribute(
-            id=uuid.uuid4(),
-            user_id=user.id,
-            attribute_definition_id=attr_def.id,
-            value=payload.value,
-        )
-        db.add(new_attr)
 
-    # 2. Sincroniza em profile.attributes (JSONB para retrocompat)
+    # Determina status baseado na ação do user
+    action = payload.action or 'answer'
+    now = datetime.utcnow()
+
+    if action == 'skip' or action == 'continue_without':
+        # Pular — NÃO pergunta de novo nesse onboarding, valor fica em branco
+        new_status = 'skipped'
+        if existing:
+            existing.value = None
+            existing.status = new_status
+            existing.skipped_at = now
+            existing.updated_at = now
+        else:
+            new_attr = models.UserAttribute(
+                id=uuid.uuid4(),
+                user_id=user.id,
+                attribute_definition_id=attr_def.id,
+                value=None,
+                status=new_status,
+                skipped_at=now,
+            )
+            db.add(new_attr)
+    elif action == 'later':
+        # Responder depois — vai pra fila do Sistema 2
+        new_status = 'pending_next_chat'
+        if existing:
+            existing.value = None
+            existing.status = new_status
+            existing.last_asked_at = now
+            existing.updated_at = now
+        else:
+            new_attr = models.UserAttribute(
+                id=uuid.uuid4(),
+                user_id=user.id,
+                attribute_definition_id=attr_def.id,
+                value=None,
+                status=new_status,
+                last_asked_at=now,
+            )
+            db.add(new_attr)
+    elif action == 'snooze':
+        # Adiar por X horas
+        snooze_hours = payload.snooze_hours or 24
+        snooze_until = now + timedelta(hours=snooze_hours)
+        new_status = 'snoozed'
+        if existing:
+            existing.value = existing.value
+            existing.status = new_status
+            existing.snooze_until = snooze_until
+            existing.updated_at = now
+        else:
+            new_attr = models.UserAttribute(
+                id=uuid.uuid4(),
+                user_id=user.id,
+                attribute_definition_id=attr_def.id,
+                value=None,
+                status=new_status,
+                snooze_until=snooze_until,
+            )
+            db.add(new_attr)
+    else:
+        # Responder normalmente (action='answer')
+        new_status = 'answered'
+        if existing:
+            existing.value = payload.value
+            existing.status = new_status
+            existing.skipped_at = None
+            existing.snooze_until = None
+            existing.updated_at = now
+        else:
+            new_attr = models.UserAttribute(
+                id=uuid.uuid4(),
+                user_id=user.id,
+                attribute_definition_id=attr_def.id,
+                value=payload.value,
+                status=new_status,
+            )
+            db.add(new_attr)
+
+    # 2. Sincroniza em profile.attributes APENAS se for answered
     attrs_jsonb = dict(profile.attributes or {})
-    attrs_jsonb[payload.attribute_code] = payload.value
+    if new_status == 'answered':
+        attrs_jsonb[payload.attribute_code] = payload.value
     profile.attributes = attrs_jsonb
 
     # 3. Atualiza status
@@ -160,6 +260,7 @@ async def post_answer(
         user.onboarding_status = "in_progress"
 
     # 4. Verifica se completou TODAS perguntas
+    # Considera como "respondida" tudo que NÃO é pending
     total_questions_res = await db.execute(
         select(func.count(models.OnboardingConfig.id))
         .where(models.OnboardingConfig.is_active == True)
@@ -168,9 +269,25 @@ async def post_answer(
 
     answered_count_res = await db.execute(
         select(func.count(models.UserAttribute.id))
-        .where(models.UserAttribute.user_id == user.id)
+        .where(
+            models.UserAttribute.user_id == user.id,
+            # Status TERMINAIS — todos não-pending contam como "tratados"
+            # para fins de completar o onboarding (later vai pra chat, skipped nunca pergunta)
+            models.UserAttribute.status.in_(['answered', 'skipped', 'snoozed', 'pending_next_chat'])
+        )
     )
     answered_count = answered_count_res.scalar() or 0
+
+    # Mensagem de aviso quando user pula (sobre limitação de interpretação)
+    warning_message = None
+    if action == 'skip':
+        # Só adiciona aviso na PRIMEIRA vez que pula (não em 'continue_without' que é confirmação)
+        if action == 'skip' and (not existing or existing.status != 'skipped'):
+            warning_message = (
+                "Tudo bem! Mas saiba que sem essa informação, posso não te "
+                "interpretar tão bem. Quer continuar mesmo assim, ou prefere "
+                "responder depois?"
+            )
 
     numerology_calculated = False
     if answered_count >= total_questions:
@@ -203,6 +320,7 @@ async def post_answer(
         numerology_calculated=numerology_calculated,
         progress=f"{answered_count}/{total_questions}",
         profile_status=user.profile_status,
+        warning_message=warning_message,
     )
 
 
@@ -309,4 +427,176 @@ async def get_profile_status(
         "onboarding_status": user.onboarding_status,
         "has_numerology": user.numerology_data is not None,
         "has_astrology": user.astrology_data is not None,
+    }
+
+
+# =====================================================================
+# SISTEMA 2 — Perguntas pendentes pra perguntar em chat novo
+# =====================================================================
+@router.get("/pending", response_model=schemas.PendingQuestionsResponse)
+async def get_pending_questions(
+    user: models.User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Retorna TODAS as perguntas pendentes do user.
+    
+    Usado pelo frontend quando user entra num chat novo:
+    - Lista perguntas com status 'pending_next_chat' ou 'pending_current_chat'
+    - Lista 'snoozed' que já passaram do snooze_until
+    """
+    now = datetime.utcnow()
+    
+    # Busca perguntas pendentes
+    pending_res = await db.execute(
+        select(models.UserAttribute, models.AttributeDefinition)
+        .join(models.AttributeDefinition, models.UserAttribute.attribute_definition_id == models.AttributeDefinition.id)
+        .where(
+            models.UserAttribute.user_id == user.id,
+            models.UserAttribute.status.in_(['pending_next_chat', 'pending_current_chat']),
+        )
+        .order_by(models.UserAttribute.last_asked_at.asc().nulls_first())
+    )
+    pending_attrs = pending_res.all()
+    
+    # Busca perguntas snoozed que já expiraram
+    snoozed_res = await db.execute(
+        select(models.UserAttribute, models.AttributeDefinition)
+        .join(models.AttributeDefinition, models.UserAttribute.attribute_definition_id == models.AttributeDefinition.id)
+        .where(
+            models.UserAttribute.user_id == user.id,
+            models.UserAttribute.status == 'snoozed',
+            models.UserAttribute.snooze_until <= now,
+        )
+        .order_by(models.UserAttribute.snooze_until.asc())
+    )
+    snoozed_attrs = snoozed_res.all()
+    
+    pending_list = []
+    for ua, attr_def in pending_attrs:
+        pending_list.append(schemas.PendingQuestion(
+            attribute_code=attr_def.code,
+            question_text=attr_def.label,
+            helper_text=None,
+            question_type=attr_def.attribute_type or 'text',
+            status=ua.status,
+            last_asked_at=ua.last_asked_at.isoformat() if ua.last_asked_at else None,
+            snooze_until=ua.snooze_until.isoformat() if ua.snooze_until else None,
+        ))
+    
+    for ua, attr_def in snoozed_attrs:
+        pending_list.append(schemas.PendingQuestion(
+            attribute_code=attr_def.code,
+            question_text=attr_def.label,
+            helper_text=None,
+            question_type=attr_def.attribute_type or 'text',
+            status=ua.status,
+            last_asked_at=ua.last_asked_at.isoformat() if ua.last_asked_at else None,
+            snooze_until=ua.snooze_until.isoformat() if ua.snooze_until else None,
+        ))
+    
+    return schemas.PendingQuestionsResponse(
+        pending=pending_list,
+        total_pending=len(pending_list),
+    )
+
+
+@router.post("/pending/{attribute_code}/respond")
+async def respond_pending(
+    attribute_code: str,
+    payload: schemas.OnboardingAnswer,
+    user: models.User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    User respondeu uma pergunta pendente (Sistema 2 — fora do onboarding).
+    
+    - Marca status como 'answered'
+    - Atualiza profile.attributes
+    - Retorna lista de próximas pendentes (se houver)
+    """
+    payload.attribute_code = attribute_code
+    payload.action = 'answer'
+    
+    # Reusa a lógica do post_answer normal
+    return await post_answer(payload, BackgroundTasks(), user, db)
+
+
+@router.post("/pending/{attribute_code}/skip")
+async def skip_pending(
+    attribute_code: str,
+    user: models.User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    User pulou pergunta pendente no chat (Sistema 2).
+    Avisa sobre limitação e pede confirmação.
+    """
+    attr_res = await db.execute(
+        select(models.UserAttribute, models.AttributeDefinition)
+        .join(models.AttributeDefinition, models.UserAttribute.attribute_definition_id == models.AttributeDefinition.id)
+        .where(
+            models.UserAttribute.user_id == user.id,
+            models.AttributeDefinition.code == attribute_code,
+        )
+    )
+    row = attr_res.first()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Pergunta não encontrada")
+    
+    ua, attr_def = row
+    
+    # Marca como 'pending_next_chat' (pergunta de novo no próximo chat)
+    ua.status = 'pending_next_chat'
+    ua.last_asked_at = datetime.utcnow()
+    ua.updated_at = datetime.utcnow()
+    
+    await db.commit()
+    
+    return {
+        "attribute_code": attribute_code,
+        "status": "pending_next_chat",
+        "warning_message": (
+            f"Sem problema! Mas saiba que sem essa informação, posso não te "
+            f"interpretar tão bem. Quer continuar mesmo assim, ou prefere "
+            f"responder depois?"
+        ),
+        "options": ["continue_without", "later"],
+    }
+
+
+@router.post("/pending/{attribute_code}/snooze")
+async def snooze_pending(
+    attribute_code: str,
+    hours: int = 24,
+    user: models.User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Adia pergunta pendente por X horas"""
+    attr_res = await db.execute(
+        select(models.UserAttribute, models.AttributeDefinition)
+        .join(models.AttributeDefinition, models.UserAttribute.attribute_definition_id == models.AttributeDefinition.id)
+        .where(
+            models.UserAttribute.user_id == user.id,
+            models.AttributeDefinition.code == attribute_code,
+        )
+    )
+    row = attr_res.first()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Pergunta não encontrada")
+    
+    ua, _ = row
+    ua.status = 'snoozed'
+    ua.snooze_until = datetime.utcnow() + timedelta(hours=hours)
+    ua.last_asked_at = datetime.utcnow()
+    ua.updated_at = datetime.utcnow()
+    
+    await db.commit()
+    
+    return {
+        "attribute_code": attribute_code,
+        "status": "snoozed",
+        "snooze_until": ua.snooze_until.isoformat(),
     }

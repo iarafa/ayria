@@ -259,6 +259,19 @@ export function ProfileEditModal({ open, onClose }: ProfileEditModalProps) {
             {saving ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
+
+        {/* 🆕 SECURITY: botão de trocar senha (separado pra UX melhor) */}
+        <div className="mt-4 pt-4 border-t border-ayria-border">
+          <button
+            onClick={() => {
+              onClose()
+              window.dispatchEvent(new CustomEvent('ayria:open-change-password'))
+            }}
+            className="w-full py-2 rounded-xl text-sm text-amber-400 hover:bg-amber-900/20 transition flex items-center justify-center gap-2"
+          >
+            🔒 Trocar senha
+          </button>
+        </div>
       </div>
     </div>
   )

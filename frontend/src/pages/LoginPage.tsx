@@ -1,21 +1,32 @@
 /**
  * AYRIA - Login Page
+ *
+ * Fluxo de login:
+ * 1. Usuário entra email + senha
+ * 2. Se sucesso: cria chat NOVO (vazio) e navega pra /chat
+ * 3. Chat anteriores aparecem na sidebar (escolha opcional)
  */
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../store/auth'
+import { useChat } from '../store/chat'
 import { LogoIcon } from '../components/Logo'
 
 export function LoginPage() {
   const { login, loading, error } = useAuth()
-  const [email, setEmail] = useState('admin@ayria.local')
-  const [password, setPassword] = useState('admin123')
+  const { createChat } = useChat()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const ok = await login(email, password)
-    if (ok) navigate('/chat')
+    if (ok) {
+      // Cria chat novo e já entra nele (vazio, sem tema)
+      await createChat()
+      navigate('/chat')
+    }
   }
 
   return (

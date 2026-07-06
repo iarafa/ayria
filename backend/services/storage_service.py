@@ -77,6 +77,7 @@ class StorageService:
         file_bytes: bytes,
         filename: str,
         content_type: Optional[str] = None,
+        folder: str = "",
     ) -> dict:
         """
         Upload de arquivo. Retorna dict com:
@@ -84,6 +85,11 @@ class StorageService:
         - path: path/blob name
         - size_bytes: tamanho
         - storage: "azure" ou "local"
+        - folder: pasta onde foi salvo
+
+        Args:
+            folder: subpasta dentro do container (ex: "avatar", "knowledge/conhecimento_geral")
+                    NUNCA começa com /. Sempre termina sem /.
         """
         # Gera nome único (filename pode ser SpooledTemporaryFile ou str)
         if hasattr(filename, 'name'):
@@ -91,48 +97,73 @@ class StorageService:
         ext = os.path.splitext(str(filename))[1]
         unique_name = f"{uuid.uuid4()}{ext}"
 
+        # Monta path final: {folder}/{uuid}.{ext} (se folder)
+        folder_clean = folder.strip().strip("/").strip()
+        if folder_clean:
+            blob_path = f"{folder_clean}/{unique_name}"
+        else:
+            blob_path = unique_name
+
         # Tenta Azure primeiro
         if not self.use_local and self._azure_container:
             try:
-                blob_client = self._azure_container.get_blob_client(unique_name)
+                blob_client = self._azure_container.get_blob_client(blob_path)
                 blob_client.upload_blob(
                     file_bytes,
                     overwrite=True,
                     content_type=content_type or "application/octet-stream",
                 )
                 url = blob_client.url
-                logger.info(f"✅ Upload Azure: {unique_name} ({len(file_bytes)} bytes)")
+                logger.info(f"✅ Upload Azure OK: {blob_path} ({len(file_bytes)} bytes)")
+                # Verificação: tenta HEAD no blob pra confirmar que existe
+                try:
+                    props = blob_client.get_blob_properties()
+                    logger.info(f"   ✅ Blob verificado: size={props.size}, etag={props.etag}")
+                except Exception as verify_err:
+                    logger.warning(f"   ⚠️ Upload retornou OK mas HEAD falhou: {verify_err}")
                 return {
                     "url": url,
-                    "path": unique_name,
+                    "path": blob_path,
                     "size_bytes": len(file_bytes),
                     "storage": "azure",
+                    "folder": folder_clean or None,
                     "uploaded_at": datetime.utcnow().isoformat() + "Z",
                 }
             except Exception as e:
                 logger.error(f"❌ Upload Azure falhou: {e}. Fallback local.")
 
-        # Fallback local
-        local_path = f"/app/uploads/{unique_name}"
+        # Fallback local (só se Azure desabilitado OU upload falhou)
+        local_path = f"/app/uploads/{blob_path}"
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
         with open(local_path, "wb") as f:
             f.write(file_bytes)
+        logger.warning(f"⚠️ FALLBACK LOCAL usado (Azure falhou ou desabilitado): {local_path}")
 
         return {
-            "url": f"/uploads/{unique_name}",  # URL local (servida pelo FastAPI static)
+            "url": f"/uploads/{blob_path}",  # URL local (servida pelo FastAPI static)
             "path": local_path,
             "size_bytes": len(file_bytes),
             "storage": "local",
+            "folder": folder_clean or None,
             "uploaded_at": datetime.utcnow().isoformat() + "Z",
         }
 
     async def delete(self, path: str) -> bool:
-        """Deleta arquivo"""
-        if not self.use_local and self._azure_container and not path.startswith("/"):
+        """
+        Deleta arquivo. Aceita:
+        - URL completa do blob (com ou sem SAS): https://acct.blob.core.windows.net/ayria/folder/file.pdf?...
+        - Blob path relativo: folder/file.pdf
+        - Path local: /app/uploads/folder/file.pdf
+
+        Extrai o blob_name correto (com pasta) antes de deletar.
+        """
+        blob_path = self._extract_blob_path(path)
+
+        if not self.use_local and self._azure_container and not blob_path.startswith("/"):
             try:
-                blob_client = self._azure_container.get_blob_client(path)
+                blob_client = self._azure_container.get_blob_client(blob_path)
                 blob_client.delete_blob()
-                logger.info(f"🗑️ Azure blob deletado: {path}")
+                logger.info(f"🗑️ Azure blob deletado: {blob_path}")
                 return True
             except Exception as e:
                 logger.error(f"❌ Erro ao deletar do Azure: {e}")
@@ -169,6 +200,51 @@ class StorageService:
     def is_azure_active(self) -> bool:
         return not self.use_local and self._azure_container is not None
 
+    def _extract_blob_path(self, path_or_url: str) -> str:
+        """
+        Extrai o blob_name (com pasta) de uma URL ou path.
+
+        Aceita:
+        - URL Azure: https://acct.blob.core.windows.net/ayria/folder/file.pdf?sig=...
+        - Blob path: folder/file.pdf
+        - Path local: /app/uploads/folder/file.pdf
+
+        Retorna SEMPRE o blob_path relativo ao container (folder/file.pdf),
+        sem query string (SAS).
+        """
+        s = (path_or_url or "").strip()
+        if not s:
+            return ""
+
+        # Remove query string (SAS)
+        if "?" in s:
+            s = s.split("?", 1)[0]
+
+        # Se for URL Azure (http/https), extrai path depois do container
+        if s.startswith("http://") or s.startswith("https://"):
+            # Formato: https://acct.blob.core.windows.net/{container}/{path}
+            # ou: https://acct.blob.core.windows.net/{container}
+            try:
+                # Pega path depois do host
+                without_scheme = s.split("://", 1)[1]  # acct.blob.core.windows.net/{container}/...
+                path_part = without_scheme.split("/", 1)[1] if "/" in without_scheme else ""  # {container}/...
+                # Remove container name do início
+                container_prefix = f"{self.container_name}/"
+                if path_part.startswith(container_prefix):
+                    return path_part[len(container_prefix):]
+                # fallback: tenta remover primeira pasta
+                parts = path_part.split("/", 1)
+                return parts[1] if len(parts) > 1 else ""
+            except Exception:
+                return ""
+
+        # Se for path local (/app/uploads/folder/file.pdf)
+        if s.startswith("/app/uploads/"):
+            return s[len("/app/uploads/"):]
+
+        # Senão, retorna como tá (já é blob path relativo)
+        return s.lstrip("/")
+
     def get_status(self) -> dict:
         return {
             "storage_active": "azure" if self.is_azure_active else "local",
@@ -192,46 +268,24 @@ async def upload_user_avatar(
     """
     Upload de foto de perfil do usuário.
 
-    - Salva no Azure Blob Storage no path avatars/{user_id}/{uuid}.{ext}
+    - Salva no Azure Blob Storage no path avatar/{user_id}/{uuid}.{ext}
     - Se previous_url for fornecida, deleta o avatar antigo
     - Retorna URL pública
 
     Path interno:
-    storage_service.upload() é usado (já lida com Azure/local fallback)
+    storage_service.upload(folder="avatar/{user_id}") é usado (já lida com Azure/local fallback)
     """
     import re
 
-    # Extrai extensão
-    ext_match = re.search(r'\.([a-zA-Z0-9]+)(?:\?|$)', filename)
-    if ext_match:
-        ext = ext_match.group(1).lower()
-    else:
-        # Inferir pelo content_type
-        ct_to_ext = {
-            "image/jpeg": "jpg",
-            "image/jpg": "jpg",
-            "image/png": "png",
-            "image/gif": "gif",
-            "image/webp": "webp",
-        }
-        ext = ct_to_ext.get(content_type, "jpg")
-
-    if ext not in ("jpg", "jpeg", "png", "gif", "webp"):
-        ext = "jpg"
-
-    # Sanitiza filename
+    # Sanitiza filename pra evitar caracteres estranhos no path
     safe_filename = re.sub(r'[^a-zA-Z0-9._-]', '_', filename)[:50] or "avatar"
 
-    # Path único: avatars/{user_id}/{uuid}_{filename}
-    blob_name = f"avatars/{user_id}/{uuid.uuid4().hex[:12]}_{safe_filename}"
-    if not blob_name.lower().endswith(f".{ext}"):
-        blob_name += f".{ext}"
-
-    # Upload (storage_service já lida com Azure/local)
+    # Upload usando folder=avatar/{user_id} — upload() gera o UUID + extensão sozinho
     result = await storage_service.upload(
         file_bytes=data,
-        filename=blob_name,
+        filename=safe_filename,
         content_type=content_type,
+        folder=f"avatar/{user_id}",
     )
 
     public_url = result.get("url") if isinstance(result, dict) else result

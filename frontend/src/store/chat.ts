@@ -16,6 +16,7 @@ interface ChatState {
   loadMessages: (chatId: string) => Promise<void>
   sendMessage: (content: string) => Promise<void>
   deleteChat: (chatId: string) => Promise<void>
+  updateChatTitle: (chatId: string, title: string) => Promise<void>
 }
 
 export const useChat = create<ChatState>((set, get) => ({
@@ -81,8 +82,30 @@ export const useChat = create<ChatState>((set, get) => ({
         ],
         sending: false,
       })
-    } catch (e) {
-      set({ sending: false, messages: get().messages.filter((m) => m.id !== userMsg.id) })
+      // Dispara evento pra Sidebar atualizar saldo
+      window.dispatchEvent(new CustomEvent('ayria:credits-updated'))
+    } catch (e: any) {
+      // Se 402 (sem saldo), mostra mensagem amigável
+      if (e?.response?.status === 402) {
+        const detail = e.response.data?.detail
+        const msg = typeof detail === 'object' ? detail.message : 'Seus créditos acabaram.'
+        const sysMsg: Message = {
+          id: 'sys-' + Date.now(),
+          chat_id: get().currentChatId || '',
+          role: 'system',
+          content: msg,
+          created_at: new Date().toISOString(),
+        }
+        set({
+          messages: [...get().messages, sysMsg],
+          sending: false,
+        })
+        // Remove msg otimista do user (não foi processada)
+        set({ messages: get().messages.filter((m) => m.id !== userMsg.id) })
+        window.dispatchEvent(new CustomEvent('ayria:credits-updated'))
+      } else {
+        set({ sending: false, messages: get().messages.filter((m) => m.id !== userMsg.id) })
+      }
     }
   },
 
@@ -92,6 +115,14 @@ export const useChat = create<ChatState>((set, get) => ({
       chats: get().chats.filter((c) => c.id !== chatId),
       currentChatId: get().currentChatId === chatId ? null : get().currentChatId,
       messages: get().currentChatId === chatId ? [] : get().messages,
+    })
+  },
+
+  updateChatTitle: async (chatId, title) => {
+    const cleanTitle = title.trim() || null
+    const { data } = await chatApi.updateChat(chatId, cleanTitle || '')
+    set({
+      chats: get().chats.map((c) => (c.id === chatId ? { ...c, title: data.title } : c)),
     })
   },
 }))

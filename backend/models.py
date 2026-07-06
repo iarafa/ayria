@@ -3,8 +3,8 @@ AYRIA - SQLAlchemy Models (ORM)
 Reflete o schema PostgreSQL definido em migrations/init.sql
 """
 from sqlalchemy import (
-    Column, String, Text, Integer, Boolean, DateTime, ForeignKey,
-    UniqueConstraint, CheckConstraint, Index, BigInteger, JSON
+    Column, String, Text, Integer, Boolean, DateTime, Date, ForeignKey,
+    UniqueConstraint, CheckConstraint, Index, BigInteger, JSON, Numeric, SmallInteger
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB, INET
 from sqlalchemy.orm import relationship
@@ -40,11 +40,35 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     last_login_at = Column(DateTime(timezone=True))
 
+    # ============ BILLING / PLANOS / CRÉDITOS ============
+    selected_plan_id = Column(UUID(as_uuid=True), ForeignKey("plans.id", ondelete="SET NULL"), index=True)
+    credit_balance = Column(Integer, nullable=False, default=0)  # saldo atual (nunca negativo)
+    credit_status = Column(String(50), nullable=False, default="inactive")  # inactive|active|exhausted|suspended
+    plan_selected_at = Column(DateTime(timezone=True))
+    billing_status = Column(String(50), nullable=False, default="billing_not_enabled")  # billing_not_enabled|active|past_due|canceled|trialing
+    billing_provider = Column(String(50))  # stripe|asaas|mercadopago|null (futuro)
+    external_customer_id = Column(String(255))
+    external_subscription_id = Column(String(255))
+    next_renewal_date = Column(DateTime(timezone=True))
+    credits_last_granted_at = Column(DateTime(timezone=True))
+
+    # ============ BLOCK (controle de acesso manual pelo admin) ============
+    blocked_until = Column(DateTime(timezone=True))  # NULL = sem bloqueio OR permanente quando blocked_at != NULL e blocked_until NULL
+    blocked_at    = Column(DateTime(timezone=True))  # quando foi bloqueado (NULL = desbloqueado)
+    blocked_by    = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))  # admin que bloqueou
+    block_reason  = Column(Text)  # motivo / justificativa
+
     # Relationships
     profile = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
     chats = relationship("Chat", back_populates="user", cascade="all, delete-orphan")
     messages = relationship("Message", back_populates="user", cascade="all, delete-orphan")
     documents_uploaded = relationship("KnowledgeDocument", back_populates="uploader")
+    selected_plan = relationship("Plan", back_populates="users", foreign_keys=[selected_plan_id])
+    credit_transactions = relationship("CreditTransaction", back_populates="user", cascade="all, delete-orphan", order_by="CreditTransaction.created_at.desc()")
+    supervisor_analyses = relationship("SupervisorAnalysis", back_populates="user", cascade="all, delete-orphan")
+    supervisor_alerts = relationship("SupervisorAlert", back_populates="user", cascade="all, delete-orphan", foreign_keys="SupervisorAlert.user_id")
+    supervisor_daily_summaries = relationship("SupervisorDailySummary", back_populates="user", cascade="all, delete-orphan")
+    spiritual_preference = relationship("SpiritualPreference", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 
 # ============================================================
@@ -96,6 +120,16 @@ class UserAttribute(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     attribute_definition_id = Column(UUID(as_uuid=True), ForeignKey("attribute_definitions.id", ondelete="CASCADE"), nullable=False, index=True)
     value = Column(JSONB, nullable=False)
+    # Status do atributo (migração 007):
+    # - 'answered': user respondeu, valor em `value`
+    # - 'skipped': user pulou no onboarding, NÃO pergunta de novo
+    # - 'pending_next_chat': user disse "responder depois", pergunta no PRÓXIMO chat
+    # - 'pending_current_chat': pergunta ativa no chat atual (aguardando resposta)
+    # - 'snoozed': user pediu pra adiar, lembra depois de snooze_until
+    status = Column(String(20), nullable=False, default='answered')
+    skipped_at = Column(DateTime(timezone=True))
+    snooze_until = Column(DateTime(timezone=True))
+    last_asked_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -137,6 +171,45 @@ class Chat(Base):
 
     user = relationship("User", back_populates="chats")
     messages = relationship("Message", back_populates="chat", cascade="all, delete-orphan", order_by="Message.created_at")
+    supervisor_analyses = relationship("SupervisorAnalysis", back_populates="chat", cascade="all, delete-orphan")
+
+
+# ============================================================
+# SISTEMA 2 v3 — Perguntas puladas POR CHAT (reset ao criar novo chat)
+# ============================================================
+class ChatQuestionSkip(Base):
+    __tablename__ = "chat_question_skip"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    chat_id = Column(UUID(as_uuid=True), ForeignKey("chats.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    attribute_code = Column(String(100), nullable=False)
+    skipped_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint('chat_id', 'attribute_code', name='chat_question_skip_chat_code_uq'),
+    )
+
+
+# ============================================================
+# SISTEMA 5 — Preferência espiritual/religiosa do user
+# (1:1 com user; NULL = não respondeu)
+# ============================================================
+from sqlalchemy.dialects.postgresql import ARRAY as PgArray
+
+class SpiritualPreference(Base):
+    __tablename__ = "spiritual_preferences"
+
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    religion = Column(String(100), nullable=False)  # ex: 'cristao_catolico'
+    custom_label = Column(String(255))               # preenchido se religion='outro'
+    custom_tags = Column(PgArray(Text), default=list) # tags extras
+    notes = Column(Text)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="spiritual_preference")
 
 
 # ============================================================
@@ -154,6 +227,7 @@ class Message(Base):
     ai_model = Column(String(100))
     metadata_json = Column("metadata", JSONB, default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    supervisor_analyses = relationship("SupervisorAnalysis", back_populates="message", cascade="all, delete-orphan")
 
     chat = relationship("Chat", back_populates="messages")
     user = relationship("User", back_populates="messages")
@@ -201,3 +275,154 @@ class AuditLog(Base):
     ip_address = Column(INET)
     user_agent = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+# ============================================================
+# 9. PLANS (planos comerciais — Básico, Intermediário, Premium)
+# ============================================================
+class Plan(Base):
+    __tablename__ = "plans"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    name = Column(String(100), nullable=False)  # "Básico", "Intermediário", "Premium"
+    slug = Column(String(50), unique=True, nullable=False, index=True)  # basico|intermediario|premium
+    credits = Column(Integer, nullable=False)  # créditos concedidos ao assinar
+    price_brl = Column(Numeric(10, 2), nullable=False)  # preço em reais (referência)
+    active = Column(Boolean, nullable=False, default=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    users = relationship("User", back_populates="selected_plan", foreign_keys="User.selected_plan_id")
+
+
+# ============================================================
+# 10. CREDIT_TRANSACTIONS (auditoria de movimentação de créditos)
+# ============================================================
+class CreditTransaction(Base):
+    __tablename__ = "credit_transactions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    type = Column(String(50), nullable=False, index=True)  # grant_initial_plan|usage_chat_message|bonus_manual|adjustment_manual|recharge_future|refund_future
+    amount = Column(Integer, nullable=False)  # positivo=grant, negativo=uso
+    balance_before = Column(Integer, nullable=False)
+    balance_after = Column(Integer, nullable=False)
+    description = Column(Text, nullable=False)
+    reference_type = Column(String(50))  # ex: chat_message, admin_adjust, migration
+    reference_id = Column(String(100))  # ex: message_id
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    # Relationships
+    user = relationship("User", back_populates="credit_transactions")
+
+
+# ============================================================
+# 11. SUPERVISOR_ANALYSIS (classificação de risco por mensagem)
+# ============================================================
+class SupervisorAnalysis(Base):
+    __tablename__ = "supervisor_analysis"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    message_id = Column(UUID(as_uuid=True), ForeignKey("messages.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    chat_id = Column(UUID(as_uuid=True), ForeignKey("chats.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    level = Column(String(20), nullable=False, index=True)  # NORMAL | ATENCAO | URGENCIA
+    risk_sublevel = Column(SmallInteger)  # 1=N1(suicídio), 2=N2(crime/violência), 3=N3(vício)
+    score = Column(Numeric(4, 3), nullable=False, default=0.0)
+    reason = Column(Text)
+    recommended_action = Column(Text)
+    signals = Column(JSONB, default=list)  # list[str] de sinais detectados
+    context_used = Column(JSONB, default=dict)  # contexto adicional (numerologia, etc)
+
+    model_used = Column(String(50), default="MiniMax-M3")
+    analysis_duration_ms = Column(Integer)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    # Relationships
+    user = relationship("User", back_populates="supervisor_analyses")
+    chat = relationship("Chat", back_populates="supervisor_analyses")
+    message = relationship("Message", back_populates="supervisor_analyses")
+    alerts = relationship("SupervisorAlert", back_populates="analysis", cascade="all, delete-orphan")
+
+
+# ============================================================
+# 12. SUPERVISOR_ALERTS (alertas críticos notificados ao admin)
+# ============================================================
+class SupervisorAlert(Base):
+    __tablename__ = "supervisor_alerts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    analysis_id = Column(UUID(as_uuid=True), ForeignKey("supervisor_analysis.id", ondelete="SET NULL"))
+
+    level = Column(String(20), nullable=False, index=True)  # ATENCAO | URGENCIA
+    status = Column(String(20), nullable=False, default="open", index=True)  # open|acknowledged|resolved|dismissed
+    title = Column(Text, nullable=False)
+    message = Column(Text)
+    message_excerpt = Column(Text)
+
+    acknowledged_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    acknowledged_at = Column(DateTime(timezone=True))
+    resolved_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    resolved_at = Column(DateTime(timezone=True))
+    resolution_notes = Column(Text)
+
+    occurrences = Column(Integer, default=1)
+    last_occurrence_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # ✅ TRUE = análise veio da IA (model_used contém 'minimax' ou similar)
+    # FALSE = veio só do pré-check regex (batch ainda não confirmou)
+    # NULL = legado (anterior a essa coluna)
+    ia_confirmed = Column(Boolean, nullable=True, index=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="supervisor_alerts", foreign_keys=[user_id])
+    analysis = relationship("SupervisorAnalysis", back_populates="alerts")
+
+
+# ============================================================
+# 13. SUPERVISOR_DAILY_SUMMARY (resumo diário por user)
+# ============================================================
+class SupervisorDailySummary(Base):
+    __tablename__ = "supervisor_daily_summary"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    summary_date = Column(Date, nullable=False, index=True)
+
+    total_messages = Column(Integer, default=0)
+    normal_count = Column(Integer, default=0)
+    atencao_count = Column(Integer, default=0)
+    urgencia_count = Column(Integer, default=0)
+    current_level = Column(String(20), default="NORMAL")
+    max_score = Column(Numeric(4, 3), default=0.0)
+
+    # Relationships
+    user = relationship("User", back_populates="supervisor_daily_summaries")
+
+
+# ============================================================
+# 14. AYRIA_PROMPT_CONFIG (system prompt editável pelo admin — aba "ALMA")
+# ============================================================
+class AyriaPromptConfig(Base):
+    """System prompt editável pelo admin no dashboard.
+
+    Estrutura key-value simples (key= 'system_prompt', is_active=true).
+    Quando não houver config ativo, o chat.py usa o SYSTEM_PROMPT_TEMPLATE hardcoded.
+    """
+    __tablename__ = "ayria_prompt_config"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    key = Column(String(100), unique=True, nullable=False, index=True)  # ex: 'system_prompt'
+    content = Column(Text, nullable=False)
+    is_active = Column(Boolean, default=True, index=True)
+    description = Column(Text)  # nota do admin: "versão com guardrails"
+    updated_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

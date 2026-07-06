@@ -9,7 +9,8 @@ import { RegisterPage } from './pages/RegisterPage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { ChatPage } from './pages/ChatPage'
 import { AdminPage } from './pages/AdminPage'
-import { NumerologyReveal } from './pages/NumerologyReveal'
+import { AdminLoginPage } from './pages/AdminLoginPage'
+import { ObserveUserPage } from './pages/ObserveUserPage'
 import CreatingProfilePage from './pages/CreatingProfilePage'
 
 function PrivateRoute({ children, adminOnly = false, requireOnboarding = false }: { children: React.ReactNode; adminOnly?: boolean; requireOnboarding?: boolean }) {
@@ -41,9 +42,11 @@ function PrivateRoute({ children, adminOnly = false, requireOnboarding = false }
   }
 
   // BLOQUEIO: se rota exige onboarding completo e user não tem, manda pro onboarding
+  // ADMIN (role 'admin' ou 'SUPER_ADMIN') NUNCA precisa de onboarding
   if (
     requireOnboarding &&
     user?.role !== 'SUPER_ADMIN' &&
+    user?.role !== 'admin' &&
     user?.onboarding_status !== 'completed'
   ) {
     return <Navigate to="/onboarding" replace />
@@ -52,16 +55,30 @@ function PrivateRoute({ children, adminOnly = false, requireOnboarding = false }
   return <>{children}</>
 }
 
+function OnboardingRedirect({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
+  if (!user) return <>{children}</>  // ainda carregando, mostra o children (que vai redirecionar)
+
+  const isAdmin = user.role === 'SUPER_ADMIN' || user.role === 'admin'
+  if (isAdmin) return <Navigate to="/admin" replace />
+  if (user.onboarding_status === 'completed') return <Navigate to="/chat" replace />
+
+  return <>{children}</>
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/admin/login" element={<AdminLoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route
         path="/onboarding"
         element={
           <PrivateRoute>
-            <OnboardingPage />
+            <OnboardingRedirect>
+              <OnboardingPage />
+            </OnboardingRedirect>
           </PrivateRoute>
         }
       />
@@ -86,6 +103,14 @@ export default function App() {
         element={
           <PrivateRoute adminOnly>
             <AdminPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/admin/observe/:userId"
+        element={
+          <PrivateRoute adminOnly>
+            <ObserveUserPage />
           </PrivateRoute>
         }
       />

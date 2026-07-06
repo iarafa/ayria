@@ -17,14 +17,11 @@ class Settings(BaseSettings):
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_API_KEY: str = ""
     
-    # IA (OpenAI-compatible: serve pra MiniMax, OpenAI, qualquer um)
+    # IA: APENAS MiniMax (regra absoluta — NUNCA OpenAI)
     AI_API_KEY: str = ""
     AI_BASE_URL: str = "https://api.minimax.io/v1"
-    AI_MODEL: str = "MiniMax-M2.7"
-    
-    # Fallback OpenAI
-    OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    AI_MODEL: str = "MiniMax-M3"
+    AI_PROVIDER: str = "MiniMax"
     
     JWT_SECRET: str = "CHANGE_ME_AYRIA_DEV_ONLY"
     JWT_ALGORITHM: str = "HS256"
@@ -39,6 +36,22 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# ============================================================
+# 🆕 SECURITY: validar secrets no startup (não sobe app com defaults fracos)
+# ============================================================
+if settings.ENVIRONMENT == "production":
+    _WEAK_JWT = {"CHANGE_ME_AYRIA_DEV_ONLY", "change_me_in_prod", ""}
+    if settings.JWT_SECRET in _WEAK_JWT or len(settings.JWT_SECRET) < 32:
+        raise RuntimeError(
+            "🚨 JWT_SECRET está com valor default/fraco! "
+            "Defina JWT_SECRET (>=32 chars) no .env antes de subir em prod."
+        )
+    if "ayria_dev" in settings.DATABASE_URL or "ayria_secure_pass_2026" in settings.DATABASE_URL:
+        raise RuntimeError(
+            "🚨 DATABASE_URL está com senha default! "
+            "Defina POSTGRES_PASSWORD no .env antes de subir em prod."
+        )
 
 
 # Engine assíncrono (principal)

@@ -1,10 +1,9 @@
 /**
  * AYRIA - Logo component
  *
- * Estrutura:
- * - <Logo /> — logo com texto (sidebar, headers com nome)
- * - <LogoIcon variant="plain" /> — só o PNG do logo
- * - <LogoIcon variant="circular" /> — círculo preto CSS atrás + PNG transparente do logo por cima
+ * - <Logo /> — logo + texto
+ * - <LogoIcon variant="plain" /> — só PNG do logo
+ * - <LogoIcon variant="circular" /> — círculo neon do logo, sem caixa/quadrado
  */
 import { useState } from 'react'
 
@@ -38,57 +37,34 @@ interface LogoIconProps {
   variant?: 'plain' | 'circular'
 }
 
-/**
- * LogoIcon:
- *
- * - variant="plain" (default): só o PNG do logo, com glow opcional
- *
- * - variant="circular": ESTRUTURA EM CAMADAS:
- *   1. <div> circular PRETO via CSS (border-radius: 50%, background: #0A0A0A)
- *   2. <img> do logo TRANSPARENTE (ayria-logo-circular.png) por cima
- *
- *   Resultado: bolinha preta perfeita + anel neon + logo, sem quadrado.
- */
 export function LogoIcon({ size = 40, glow = true, className = '', variant = 'plain' }: LogoIconProps) {
   const [err, setErr] = useState(false)
 
   if (variant === 'circular') {
+    // SEM container, SEM background, SEM box-shadow, SEM overflow:hidden.
+    // O PNG já é circular com cantos transparentes.
+    // objectFit: 'contain' garante que o PNG aparece inteiro (sem corte).
+    // Cache-bust via query string pra navegador não usar cache antigo.
+    const v = '20260629b'
     return (
-      <div
+      <img
+        src={`${err ? '/ayria-logo-transparent.png' : '/ayria-logo-circular.png'}?v=${v}`}
+        alt="AYRIA"
+        width={size}
+        height={size}
         className={className}
         style={{
+          display: 'block',
           width: size,
           height: size,
-          borderRadius: '50%',
-          background: '#0A0A0A',
-          boxShadow: glow
-            ? '0 0 20px rgba(99, 102, 241, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.05)'
-            : 'inset 0 0 0 1px rgba(255, 255, 255, 0.05)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'hidden',
-          flexShrink: 0,
+          objectFit: 'contain',
+          filter: glow ? 'drop-shadow(0 0 12px rgba(99,102,241,0.5))' : undefined,
         }}
-      >
-        <img
-          src={err ? '/ayria-logo-transparent.png' : '/ayria-logo-circular.png'}
-          alt="AYRIA"
-          width={size}
-          height={size}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            filter: glow ? 'drop-shadow(0 0 8px rgba(99,102,241,0.5))' : undefined,
-          }}
-          onError={() => setErr(true)}
-        />
-      </div>
+        onError={() => setErr(true)}
+      />
     )
   }
 
-  // variant="plain"
   return (
     <img
       src={err ? '/ayria-logo-transparent.png' : '/ayria-logo-dark.png'}

@@ -28,6 +28,36 @@ async def lifespan(app: FastAPI):
             print("   ✅ Database tables ensured")
         except Exception as e:
             print(f"   ⚠️  Database init warning: {e}")
+
+    # Seed: garante que os 3 planos oficiais existem (idempotente)
+    try:
+        from database import AsyncSessionLocal
+        from sqlalchemy import select
+        import models
+        async with AsyncSessionLocal() as db:
+            existing_slugs = set(
+                (await db.execute(select(models.Plan.slug))).scalars().all()
+            )
+            official = [
+                ("Básico", "basico", 100, 29.90),
+                ("Intermediário", "intermediario", 500, 59.90),
+                ("Premium", "premium", 1000, 99.90),
+            ]
+            added = 0
+            for name, slug, credits, price in official:
+                if slug not in existing_slugs:
+                    db.add(models.Plan(
+                        name=name, slug=slug, credits=credits,
+                        price_brl=price, active=True,
+                    ))
+                    added += 1
+            if added:
+                await db.commit()
+                print(f"   ✅ Seed: {added} plano(s) criado(s)")
+            else:
+                print(f"   ✅ Seed: 3 planos já presentes")
+    except Exception as e:
+        print(f"   ⚠️  Seed planos warning: {e}")
     
     print("✨ AYRIA online")
     yield
@@ -39,8 +69,10 @@ app = FastAPI(
     title="AYRIA API",
     description="Plataforma de IA para autoconhecimento, psicologia e numerologia",
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    # 🆕 Segurança: docs abertos só em dev. Em prod, desabilita pra não vazar superfície de ataque.
+    docs_url="/docs" if settings.ENVIRONMENT == "development" else None,
+    redoc_url="/redoc" if settings.ENVIRONMENT == "development" else None,
+    openapi_url="/openapi.json" if settings.ENVIRONMENT == "development" else None,
     lifespan=lifespan,
 )
 
@@ -57,6 +89,14 @@ app.add_middleware(
 # Audit middleware (registra acoes no audit_log)
 from middleware.audit import AuditMiddleware
 app.add_middleware(AuditMiddleware)
+
+# No-cache middleware (impede cache de dados sensíveis no navegador)
+from middleware.no_cache import NoCacheAPIMiddleware
+app.add_middleware(NoCacheAPIMiddleware)
+
+# 🆕 Security headers middleware (CSP, X-Frame-Options, HSTS, etc.)
+from middleware.security_headers import SecurityHeadersMiddleware
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 # ============================================================
@@ -112,7 +152,7 @@ async def info():
 
 
 # Routers
-from routers import auth, onboarding, chats, chat, admin, memory, training
+from routers import auth, onboarding, chats, chat, admin, memory, training, credits, supervisor, spiritual
 app.include_router(auth.router)
 app.include_router(onboarding.router)
 app.include_router(chats.router)
@@ -120,6 +160,9 @@ app.include_router(chat.router)
 app.include_router(admin.router)
 app.include_router(memory.router)
 app.include_router(training.router)
+app.include_router(credits.router)
+app.include_router(supervisor.router)
+app.include_router(spiritual.router)
 
 
 if __name__ == "__main__":

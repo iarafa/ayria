@@ -1,8 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
-import { Logo, LogoIcon } from '../components/Logo'
-import { Check } from 'lucide-react'
+import { LogoIcon } from '../components/Logo'
 
 /**
  * AYRIA - Criando seu perfil (tela cinematográfica)
@@ -12,29 +11,32 @@ import { Check } from 'lucide-react'
  */
 
 // 9 fases narrativas pra cobrir bem os 30s (~3.3s cada)
+// GENÉRICO - sem citar ferramentas específicas (tarot, numerologia, mapa astral, etc.)
+// Quem puxa a prática é o consulente — não a tela de carregamento.
 const FASES = [
-  { texto: "✨ Mapeando suas energias cósmicas", icone: "🌙" },
-  { texto: "🔮 Calculando seu caminho numerológico", icone: "🔢" },
-  { texto: "♈ Decifrando seu mapa astral completo", icone: "⭐" },
-  { texto: "🌟 Posicionando planetas e signos", icone: "🪐" },
-  { texto: "🎭 Identificando seu ascendente e lua", icone: "🌗" },
-  { texto: "🧬 Sincronizando sua essência única", icone: "💫" },
-  { texto: "💎 Calibrando seu tom personalizado", icone: "🎨" },
+  { texto: "✨ Mapeando suas energias", icone: "🌙" },
+  { texto: "🌊 Sentindo suas camadas internas", icone: "💫" },
+  { texto: "🧭 Reconhecendo seus ciclos", icone: "⭐" },
+  { texto: "🌟 Conectando com seu momento de nascimento", icone: "🪐" },
+  { texto: "🎭 Acolhendo sua história única", icone: "🌗" },
+  { texto: "🧬 Sincronizando sua essência", icone: "💫" },
+  { texto: "💎 Calibrando o tom pra você", icone: "🎨" },
   { texto: "🌌 Conectando você ao universo AYRIA", icone: "✨" },
   { texto: "⚡ Quase lá... finalizando", icone: "💜" },
 ]
 
 const DURACAO_POR_FASE_MS = 3300      // 9 fases × 3.3s = ~30s
-const MINIMO_TELA_MS = 30000           // nunca menos que 30s
+const MINIMO_TELA_MS = 30000           // 30s mínimo (cinematográfico — Rafael pediu)
 const TIMEOUT_SEGURANCA_MS = 90000     // 90s safety net
 
 export default function CreatingProfilePage() {
   const navigate = useNavigate()
   const [faseAtual, setFaseAtual] = useState(0)
   const [dots, setDots] = useState('')
-  const [progressoReal, setProgressoReal] = useState(0)  // 0-100 do backend
+  const [_progressoReal, setProgressoReal] = useState(0)  // 0-100 do backend (monitorado mas não renderizado direto)
   const [pronto, setPronto] = useState(false)             // backend terminou + mínimo passou
   const startedAtRef = useRef(Date.now())
+  const primeiraVezRef = useRef(false)  // controla se backend já tava pronto antes do gate
 
   // ======== Animação das fases narrativas (sempre avança, independente do backend) ========
   useEffect(() => {
@@ -55,7 +57,7 @@ export default function CreatingProfilePage() {
     return () => clearInterval(interval)
   }, [pronto])
 
-  // ======== Polling backend + gate de 30s mínimo ========
+  // ======== Polling backend + gate 30s + tela final com botão OK ========
   useEffect(() => {
     let ativo = true
     const startedAt = Date.now()
@@ -65,31 +67,49 @@ export default function CreatingProfilePage() {
       if (!ativo) return
 
       const elapsed = Date.now() - startedAt
-      const backendPronto = await (async () => {
-        try {
-          const { data } = await api.get('/api/onboarding/profile/status')
-          setProgressoReal(data.profile_status === 'ready' ? 100 : data.profile_status === 'failed' ? 50 : 30)
-          return data.profile_status === 'ready' || data.profile_status === 'failed'
-        } catch {
-          return false
-        }
-      })()
+      let status = { profile_status: 'pending', onboarding_status: 'pending' }
+      try {
+        const { data } = await api.get('/api/onboarding/profile/status')
+        status = data
+        setProgressoReal(data.profile_status === 'ready' ? 100 : data.profile_status === 'failed' ? 50 : 30)
+      } catch (e) {
+        // ignora
+      }
 
-      // GATE: backend pronto E passou 30s mínimo
-      if (backendPronto && elapsed >= MINIMO_TELA_MS) {
+      // SEGURO 1: onboarding INCOMPLETO → volta pro onboarding (resolve bug do user que tá em /criando-perfil sem terminar)
+      if (status.onboarding_status !== 'completed' && !primeiraVezRef.current) {
+        primeiraVezRef.current = true
+        console.warn('Onboarding incompleto — voltando pra /onboarding')
+        if (ativo) navigate('/onboarding')
+        return
+      }
+
+      // SEGURO 2: profile já READY → vai pra tela final, mas NÃO auto-redirect (espera o OK)
+      if (status.profile_status === 'ready' && elapsed >= MINIMO_TELA_MS && !pronto) {
+        primeiraVezRef.current = true
+        console.log('Profile pronto + 30s mínimo atingido — mostrando tela final')
         setPronto(true)
         return
       }
 
-      // Safety net: passou 90s → libera mesmo assim
-      if (elapsed > TIMEOUT_SEGURANCA_MS) {
-        console.warn('Profile timeout total - liberando')
+      // SEGURO 3: passou 30s mínimo → mostra tela final SEMPRE (independente do backend)
+      if (elapsed >= MINIMO_TELA_MS && !pronto) {
+        primeiraVezRef.current = true
+        console.log('30s mínimo atingido — mostrando tela final')
+        setPronto(true)
+        return
+      }
+
+      // SEGURO 4: safety net — passou 90s → libera forçado (não trava user)
+      if (elapsed > TIMEOUT_SEGURANCA_MS && !primeiraVezRef.current) {
+        primeiraVezRef.current = true
+        console.warn('Timeout total - liberando forçado')
         setPronto(true)
         return
       }
 
       // Continua polling
-      const interval = backendPronto ? 2000 : 800
+      const interval = 1500
       if (ativo) setTimeout(poll, interval)
     }
 
@@ -149,13 +169,8 @@ export default function CreatingProfilePage() {
         `}</style>
 
         <div className="relative z-10 max-w-md w-full text-center" style={{ animation: 'scaleIn 0.8s ease-out' }}>
-          {/* LOGO com glow maior */}
-          <div
-            className="mx-auto mb-10"
-            style={{
-              animation: 'glowSuccess 3s ease-in-out infinite',
-            }}
-          >
+          {/* LOGO com glow (filter aplicado direto na img, não no wrapper, pra não desenhar caixa) */}
+          <div className="flex justify-center mb-10">
             <LogoIcon size={220} variant="circular" />
           </div>
 
@@ -179,9 +194,9 @@ export default function CreatingProfilePage() {
             className="text-ayria-muted text-sm mb-12 px-8"
             style={{ animation: 'fadeUp 1s ease-out 0.7s both' }}
           >
-            Seu perfil único foi criado a partir das estrelas,
+            Seu perfil único foi criado a partir do que você trouxe —
             <br />
-            dos números e da sua essência.
+            acolhido do seu jeito.
             <br />
             <span className="text-ayria-primary">AYRIA está te esperando.</span>
           </p>
@@ -251,11 +266,8 @@ export default function CreatingProfilePage() {
       {/* CONTAINER PRINCIPAL */}
       <div className="relative z-10 max-w-md w-full text-center">
 
-        {/* LOGO/ÍCONE */}
-        <div
-          className="mx-auto mb-8"
-          style={{ animation: 'glow 3s ease-in-out infinite' }}
-        >
+        {/* LOGO/ÍCONE (sem wrapper animado — não desenhar caixa) */}
+        <div className="flex justify-center mb-8">
           <LogoIcon size={180} variant="circular" />
         </div>
 
@@ -318,7 +330,7 @@ export default function CreatingProfilePage() {
 
         {/* SUBTÍTULO */}
         <p className="text-ayria-muted text-xs">
-          Decifrando as energias do seu momento de nascimento...
+          Construindo algo só seu, do seu jeito, com calma...
           <br />
           <span className="text-ayria-primary">Isso é especial, só um instante.</span>
         </p>
