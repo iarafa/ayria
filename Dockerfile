@@ -26,22 +26,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     curl \
-    supervisor \
     nginx \
     && rm -rf /var/lib/apt/lists/*
 
+# Backend Python (deps + código) vindo do stage backend
 COPY --from=backend /app /app
 COPY --from=backend /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=backend /usr/local/bin /usr/local/bin
 
+# Frontend dist + nginx config
 COPY --from=frontend /usr/share/nginx/html /usr/share/nginx/html
 COPY nginx-full.conf /etc/nginx/sites-enabled/default
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Script de start (uvicorn em bg + nginx em fg)
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
 
 ENV PYTHONUNBUFFERED=1
 EXPOSE 80
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:80/ || exit 1
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/start.sh"]
