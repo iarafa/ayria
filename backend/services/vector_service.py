@@ -33,29 +33,28 @@ class VectorService:
             url=settings.QDRANT_URL,
             api_key=settings.QDRANT_API_KEY or None,
         )
-        # Lazy init: só tenta conectar quando precisar (não derruba app no startup)
+        # Lazy init: só tenta conectar quando precisar
         self._initialized = False
 
     def _ensure_init(self):
+        """Inicializa collections na primeira chamada. Falha silenciosa."""
         if not self._initialized:
             try:
                 self._ensure_collections()
                 self._initialized = True
             except Exception as e:
-                # Não derruba app — loga e segue. RAG fica degradado.
-                import logging
-                logging.getLogger(__name__).warning(
-                    f"Qdrant indisponível em {self.client._client.base_url}: {e}. "
-                    "Funcionalidades RAG degradadas até Qdrant subir."
+                logger.warning(
+                    f"Qdrant indisponível em {settings.QDRANT_URL}: {e}. "
+                    "RAG ficará degradado até Qdrant subir."
                 )
     
     def _ensure_collections(self):
-        """Cria collections se não existirem"""
-        existing = {c.name for c in self._ensure_init(); self.client.get_collections().collections}
+        """Cria collections se não existirem. Chamado por _ensure_init()."""
+        existing = {c.name for c in self.client.get_collections().collections}
         for name in self.COLLECTIONS:
             if name not in existing:
                 try:
-                    self._ensure_init(); self.client.create_collection(
+                    self.client.create_collection(
                         collection_name=name,
                         vectors_config=VectorParams(
                             size=self.EMBEDDING_DIM,
@@ -75,6 +74,8 @@ class VectorService:
         point_id: Optional[str] = None,
     ):
         """Insere ou atualiza um ponto"""
+        self._ensure_init()
+
         if collection not in self.COLLECTIONS:
             raise ValueError(f"Collection inválida: {collection}. Use uma de: {list(self.COLLECTIONS)}")
         
@@ -83,7 +84,7 @@ class VectorService:
             vector=embedding,
             payload={"text": text, **payload},
         )
-        self._ensure_init(); self.client.upsert(collection_name=collection, points=[point])
+        self.client.upsert(collection_name=collection, points=[point])
     
     async def search(
         self,
@@ -93,6 +94,7 @@ class VectorService:
         user_id: Optional[str] = None,
         score_threshold: float = 0.7,
     ) -> List[Dict]:
+        self._ensure_init()
         """
         Busca semântica.
         Se user_id fornecido em memoria_episodica, filtra por user.
@@ -106,7 +108,7 @@ class VectorService:
                 must=[FieldCondition(key="user_id", match=MatchValue(value=user_id))]
             )
         
-        results = self._ensure_init(); self.client.search(
+        results = self.client.search(
             collection_name=collection,
             query_vector=query_embedding,
             query_filter=query_filter,
@@ -121,7 +123,7 @@ class VectorService:
     
     async def delete(self, collection: str, point_id: str, user_id: Optional[str] = None):
         """Deleta um ponto"""
-        self._ensure_init(); self.client.delete(collection_name=collection, points_selector=[point_id])
+        self.client.delete(collection_name=collection, points_selector=[point_id])
 
     async def delete_user_memories(self, user_id: str) -> int:
         """
@@ -140,13 +142,13 @@ class VectorService:
         for collection_name in self.COLLECTIONS.keys():
             try:
                 # Verifica se coleção existe antes de tentar deletar
-                collections = self._ensure_init(); self.client.get_collections().collections
+                collections = self.client.get_collections().collections
                 exists = any(c.name == collection_name for c in collections)
                 if not exists:
                     continue
 
                 # Deleta por filtro
-                self._ensure_init(); self.client.delete(
+                self.client.delete(
                     collection_name=collection_name,
                     points_selector=qfilter,
                 )
@@ -173,18 +175,18 @@ class VectorService:
 
         try:
             # Verifica se coleção existe
-            collections = self._ensure_init(); self.client.get_collections().collections
+            collections = self.client.get_collections().collections
             if not any(c.name == "conhecimento_geral" for c in collections):
                 return 0
 
             # Conta antes pra logar
-            before = self._ensure_init(); self.client.count(
+            before = self.client.count(
                 collection_name="conhecimento_geral",
                 count_filter=qfilter,
             ).count
 
             # Deleta
-            self._ensure_init(); self.client.delete(
+            self.client.delete(
                 collection_name="conhecimento_geral",
                 points_selector=qfilter,
             )
@@ -212,7 +214,7 @@ class VectorService:
 
         qfilter = Filter(must=conditions) if conditions else None
 
-        results, _ = self._ensure_init(); self.client.scroll(
+        results, _ = self.client.scroll(
             collection_name=collection,
             scroll_filter=qfilter,
             limit=limit,
@@ -233,7 +235,7 @@ class VectorService:
         """Info da collection"""
         if collection not in self.COLLECTIONS:
             return {"error": f"Collection inválida"}
-        info = self._ensure_init(); self.client.get_collection(collection_name=collection)
+        info = self.client.get_collection(collection_name=collection)
         return {
             "name": collection,
             "vectors_count": info.vectors_count,
