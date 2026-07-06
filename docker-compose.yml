@@ -1,0 +1,75 @@
+# AYRIA — Stack local (3 containers separados: postgres + app + qdrant)
+# Padrão Coolify: 1 app por container. Local replica 1:1 pra deploy ficar simples.
+
+version: "3.8"
+
+services:
+  # 1. PostgreSQL — banco de dados (parity com Coolify: postgres:16-alpine)
+  postgres:
+    image: postgres:16-alpine
+    container_name: ayria-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ayria
+      POSTGRES_PASSWORD: ayria_secure_pass_2026
+      POSTGRES_DB: ayria
+    volumes:
+      - ayria_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ayria -d ayria"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. Qdrant — vector DB (portas 6333 HTTP / 6334 gRPC)
+  qdrant:
+    image: qdrant/qdrant:v1.12.0
+    container_name: ayria-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:6333/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 3. App — backend FastAPI (porta 8000)
+  # O "frontend" é servido pelo próprio backend em /api/* + Vite build em /static
+  # No Coolify usaremos imagem ayria-app (unificada nginx + uvicorn).
+  # Local mantemos ayria-backend (já testado, 38h healthy) e servimos o Vite build
+  # via rota estática do próprio backend OU nginx separado.
+  backend:
+    image: ayria-backend:latest
+    container_name: ayria-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ayria:ayria_secure_pass_2026@postgres:5432/ayria
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_API_KEY: ""
+      AI_BASE_URL: https://api.minimax.io/v1
+      AI_MODEL: MiniMax-M3
+      AI_API_KEY: ${AI_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      ENVIRONMENT: development
+      CORS_ORIGINS: "http://localhost:5173,http://localhost:4173,http://192.168.3.37:5173,http://192.168.3.37:4173,http://agente.tecia.app:5173,http://agente.tecia.app:4173,http://agente.tecia.app:8000"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  ayria_pgdata:
+    driver: local
