@@ -1240,6 +1240,59 @@ async def get_system_config(admin=Depends(require_admin)):
 
 
 # ============================================================
+# DEBUG: saúde detalhada do Qdrant (saber se DNS/rede estão OK)
+# ============================================================
+@router.get("/debug/qdrant", response_model=dict)
+async def debug_qdrant(admin=Depends(require_admin)):
+    """Diagnóstico do Qdrant: retorna URL efetiva, status, coleções, latência."""
+    from database import settings
+    import urllib.request, urllib.error, ssl, time as _time, socket
+
+    url = settings.QDRANT_URL
+    api_key_set = bool(settings.QDRANT_API_KEY)
+
+    out = {
+        "qdrant_url": url,
+        "qdrant_api_key_set": api_key_set,
+        "qdrant_api_key_preview": (settings.QDRANT_API_KEY[:8] + "...") if api_key_set else None,
+        "reachable": False,
+        "latency_ms": None,
+        "collections": [],
+        "error": None,
+    }
+
+    # Teste de reachability rápido (3s)
+    try:
+        start = _time.time()
+        # /healthz é endpoint leve do Qdrant
+        health_url = url.rstrip("/") + "/healthz"
+        req = urllib.request.Request(health_url, method="GET")
+        if api_key_set:
+            req.add_header("api-key", settings.QDRANT_API_KEY)
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            out["latency_ms"] = int((_time.time() - start) * 1000)
+            out["healthz_body"] = resp.read()[:200].decode("utf-8", errors="replace")
+        # Se respondeu, lista coleções
+        collections_url = url.rstrip("/") + "/collections"
+        req2 = urllib.request.Request(collections_url, method="GET")
+        if api_key_set:
+            req2.add_header("api-key", settings.QDRANT_API_KEY)
+        with urllib.request.urlopen(req2, timeout=3) as resp2:
+            data = json.loads(resp2.read())
+            out["collections"] = [c["name"] for c in data.get("result", {}).get("collections", [])]
+        out["reachable"] = True
+    except Exception as e:
+        out["error"] = f"{type(e).__name__}: {str(e)[:300]}"
+        # DNS lookup pode falhar — testar com socket
+        try:
+            host = url.split("://", 1)[-1].split(":", 1)[0]
+            socket.gethostbyname(host)
+        except Exception as dns_err:
+            out["dns_error"] = f"{type(dns_err).__name__}: {str(dns_err)[:200]}"
+
+    return out
+
+
 # ============================================================
 # ALMA — Arquitetura Cognitiva Modular (Constituição + Módulos)
 # ============================================================
