@@ -981,6 +981,28 @@ function RagStatusPanel() {
     load()
   }, [])
 
+  const formatError = (e: any, action: string): string => {
+    // Mostra TUDO do erro pra facilitar debug - status, data, message, name
+    const status = e?.response?.status
+    const data = e?.response?.data
+    const detail = data?.detail || data?.message || e?.message
+    const code = data?.error_code || data?.code
+    const lines: string[] = []
+    lines.push(`❌ ERRO ao ${action}`)
+    if (status) lines.push(`Status HTTP: ${status}`)
+    if (code) lines.push(`Código: ${code}`)
+    if (detail) lines.push(`Detalhe: ${detail}`)
+    if (data && typeof data === 'object') {
+      const dataStr = JSON.stringify(data, null, 2)
+      if (dataStr !== `{"detail":"${detail}"}`) {
+        lines.push(`Response data: ${dataStr}`)
+      }
+    }
+    if (e?.message && e.message !== detail) lines.push(`Mensagem: ${e.message}`)
+    if (e?.code) lines.push(`Erro code: ${e.code}`)
+    return lines.join('\n')
+  }
+
   const reindexAll = async () => {
     if (!confirm('Reindexar TODOS os .md? Os chunks antigos serão substituídos.')) return
     setWorking('all')
@@ -990,7 +1012,7 @@ function RagStatusPanel() {
       setMsg({ type: 'ok', text: `✅ ${data.chunks} chunks indexados em ${data.sources.length} fontes.` })
       load()
     } catch (e: any) {
-      setMsg({ type: 'err', text: e?.response?.data?.detail || 'Erro ao reindexar' })
+      setMsg({ type: 'err', text: formatError(e, 'reindexar TODOS') })
     } finally {
       setWorking(null)
     }
@@ -1004,7 +1026,7 @@ function RagStatusPanel() {
       setMsg({ type: 'ok', text: `✅ ${source} reindexado.` })
       load()
     } catch (e: any) {
-      setMsg({ type: 'err', text: e?.response?.data?.detail || 'Erro' })
+      setMsg({ type: 'err', text: formatError(e, `reindexar ${source}`) })
     } finally {
       setWorking(null)
     }
@@ -1019,7 +1041,7 @@ function RagStatusPanel() {
       setMsg({ type: 'ok', text: `🗑️ ${source} removido do Qdrant.` })
       load()
     } catch (e: any) {
-      setMsg({ type: 'err', text: e?.response?.data?.detail || 'Erro' })
+      setMsg({ type: 'err', text: formatError(e, `deletar ${source}`) })
     } finally {
       setWorking(null)
     }
@@ -1071,6 +1093,10 @@ function RagStatusPanel() {
             background: msg.type === 'ok' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
             color: msg.type === 'ok' ? '#10B981' : '#EF4444',
             border: msg.type === 'ok' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            fontFamily: msg.type === 'err' ? 'ui-monospace, monospace' : 'inherit',
+            fontSize: msg.type === 'err' ? '12px' : 'inherit',
           }}
         >
           {msg.text}
