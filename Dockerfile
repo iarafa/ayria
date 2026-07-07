@@ -45,8 +45,8 @@ RUN chmod +x /start.sh
 ENV PYTHONUNBUFFERED=1
 EXPOSE 80
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:80/ || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:80/health || exit 1
 
 CMD ["/start.sh"]
 # v2: start.sh replaces supervisord (2026-07-06)
