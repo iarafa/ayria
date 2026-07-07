@@ -3,6 +3,7 @@
  */
 import { create } from 'zustand'
 import { authApi, User } from '../lib/api'
+import { useChat } from './chat'
 
 interface AuthState {
   user: User | null
@@ -81,6 +82,9 @@ export const useAuth = create<AuthState>((set) => ({
         return false
       }
 
+      // ✅ FIX: limpa chat store antes de setar novo user (evita mostrar chats antigos)
+      try { useChat.getState().reset() } catch {}
+
       // Caminho feliz: só substitui o token e segue
       localStorage.setItem('ayria_token', newToken)
       if (data.refresh_token) localStorage.setItem('ayria_refresh', data.refresh_token)
@@ -112,6 +116,9 @@ export const useAuth = create<AuthState>((set) => ({
         return false
       }
 
+      // ✅ FIX: limpa chat store antes de setar novo user
+      try { useChat.getState().reset() } catch {}
+
       localStorage.setItem('ayria_token', newToken)
       if (data.refresh_token) localStorage.setItem('ayria_refresh', data.refresh_token)
       set({ user: data.user, token: newToken, loading: false })
@@ -123,9 +130,23 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   logout: () => {
-    localStorage.removeItem('ayria_token')
-    localStorage.removeItem('ayria_refresh')
-    set({ user: null, token: null })
+    // ✅ FIX: limpar TUDO — tokens + chat store + storage + redirect.
+    // Sem isso, dados do user anterior ficam no state do React até F5.
+    try {
+      useChat.getState().reset()
+    } catch {}
+    try {
+      localStorage.clear()
+      sessionStorage.clear()
+    } catch {}
+    try {
+      if ('caches' in window) {
+        caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+      }
+    } catch {}
+    set({ user: null, token: null, error: null })
+    // Hard redirect garante que TODO state em memória some
+    window.location.href = '/#/login'
   },
 
   loadUser: async () => {

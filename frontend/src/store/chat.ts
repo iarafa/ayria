@@ -17,6 +17,7 @@ interface ChatState {
   sendMessage: (content: string) => Promise<void>
   deleteChat: (chatId: string) => Promise<void>
   updateChatTitle: (chatId: string, title: string) => Promise<void>
+  reset: () => void
 }
 
 export const useChat = create<ChatState>((set, get) => ({
@@ -124,5 +125,9 @@ export const useChat = create<ChatState>((set, get) => ({
     set({
       chats: get().chats.map((c) => (c.id === chatId ? { ...c, title: data.title } : c)),
     })
+  },
+
+  reset: () => {
+    set({ chats: [], currentChatId: null, messages: [], loading: false, sending: false })
   },
 }))
