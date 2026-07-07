@@ -1648,20 +1648,34 @@ async def prompt_rag_index(
     source = payload.get("source")
     recreate = payload.get("recreate", bool(source))
 
-    if source:
-        # Reindexar 1 arquivo específico
-        from services.prompt_indexer import _index_single
-        p = PROMPTS_DIR / f"{source}.md"
-        if not p.exists():
-            raise HTTPException(status_code=404, detail=f"Arquivo {source}.md não existe.")
+    logger.info(f"🔄 Reindex RAG iniciado: source={source!r}, recreate={recreate}")
 
-        await delete_prompt_source(source)
-        result = await _index_single(p)
-        return {"ok": True, "source": source, **result}
+    try:
+        if source:
+            # Reindexar 1 arquivo específico
+            from services.prompt_indexer import _index_single
+            p = PROMPTS_DIR / f"{source}.md"
+            if not p.exists():
+                raise HTTPException(status_code=404, detail=f"Arquivo {source}.md não existe.")
 
-    # Indexar todos
-    result = await index_all_prompts(recreate=bool(recreate))
-    return {"ok": True, **result}
+            logger.info(f"  → Deletando source antiga: {source}")
+            deleted = await delete_prompt_source(source)
+            logger.info(f"  → Deleted: {deleted}")
+            logger.info(f"  → Indexando: {p}")
+            result = await _index_single(p)
+            logger.info(f"  ✅ Source {source} reindexada: {result}")
+            return {"ok": True, "source": source, "deleted": deleted, **result}
+
+        # Indexar todos
+        logger.info(f"  → Indexando TODOS os prompts (recreate={recreate})")
+        result = await index_all_prompts(recreate=bool(recreate))
+        logger.info(f"  ✅ Reindex completo: {result}")
+        return {"ok": True, **result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"❌ Reindex RAG falhou: source={source!r}, recreate={recreate}")
+        raise HTTPException(status_code=500, detail=f"Erro ao reindexar: {type(e).__name__}: {e}")
 
 
 @router.post("/prompt/rag/delete", response_model=dict)
