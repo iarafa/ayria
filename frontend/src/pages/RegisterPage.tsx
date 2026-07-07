@@ -25,6 +25,8 @@ export function RegisterPage() {
   const [plans, setPlans] = useState<Plan[]>([])
   const [selectedPlanSlug, setSelectedPlanSlug] = useState<string | null>(null)
   const [plansLoading, setPlansLoading] = useState(true)
+  const [verificationSent, setVerificationSent] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
   const navigate = useNavigate()
 
   // Carrega planos do backend
@@ -37,9 +39,40 @@ export function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedPlanSlug) return  // botão fica desabilitado
+    if (!selectedPlanSlug) return
     const ok = await register(email, password, fullName || undefined, selectedPlanSlug)
-    if (ok) navigate('/onboarding')
+    if (ok) {
+      // 🆕 Após register (07/07/2026): se não tem token salvo, é pq email verification está ativo
+      const tokenAfter = localStorage.getItem('ayria_token')
+      if (!tokenAfter) {
+        // Mostra tela "verifique seu email"
+        setVerificationSent(true)
+      } else {
+        navigate('/onboarding')
+      }
+    }
+  }
+
+  // 🆕 Cooldown do reenvio (countdown)
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const t = setTimeout(() => setResendCooldown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [resendCooldown])
+
+  const handleResend = async () => {
+    if (resendCooldown > 0) return
+    try {
+      await api.post('/api/auth/resend-verification', { email })
+      setResendCooldown(60)
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail || 'Erro ao reenviar'
+      if (detail.includes('60 segundos')) {
+        setResendCooldown(60)
+      } else {
+        alert(detail)
+      }
+    }
   }
 
   return (
@@ -49,6 +82,44 @@ export function RegisterPage() {
     >
       <div className="w-full max-w-3xl">
         {/* Logo + título */}
+
+        {/* 🆕 Tela "Verifique seu email" (07/07/2026) */}
+        {verificationSent ? (
+          <div className="space-y-6 text-center">
+            <div className="flex justify-center">
+              <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ background: 'rgba(99, 102, 241, 0.15)' }}>
+                <span className="text-5xl">📬</span>
+              </div>
+            </div>
+            <h1 className="text-3xl font-bold gradient-text">Confirme seu email</h1>
+            <p className="text-ayria-muted max-w-md mx-auto leading-relaxed">
+              Enviamos um link de confirmação para <strong className="text-ayria-text">{email}</strong>.
+              Clique no link pra ativar sua conta e começar a usar a AYRIA.
+            </p>
+            <div className="px-6 py-4 rounded-xl text-sm" style={{ background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)', color: '#A5B4FC' }}>
+              ⏰ O link expira em 24 horas. Verifique também a caixa de spam.
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={resendCooldown > 0}
+                className="px-6 py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+              >
+                {resendCooldown > 0 ? `Reenviar em ${resendCooldown}s` : 'Reenviar email'}
+              </button>
+              <Link
+                to="/login"
+                className="px-6 py-3 rounded-xl font-semibold text-center transition-opacity hover:opacity-90"
+                style={{ background: '#1E1E2E', color: '#fff' }}
+              >
+                Ir pro login
+              </Link>
+            </div>
+          </div>
+        ) : (
+        <>
         <div className="flex justify-center mb-6">
           <LogoIcon size={80} variant="circular" />
         </div>
@@ -188,6 +259,8 @@ export function RegisterPage() {
             Entrar
           </Link>
         </p>
+        </>
+        )}
       </div>
     </div>
   )
