@@ -74,6 +74,22 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"   ⚠️  Database init warning: {e}")
 
+    # 🆕 AUTO-MIGRATION: aplica migrations .sql pendentes em TODO startup
+    # Resolve o problema de Coolify subir com migration não aplicada
+    try:
+        from database import AsyncSessionLocal
+        from services.migrator import run_pending_migrations
+        async with AsyncSessionLocal() as db:
+            migration_stats = await run_pending_migrations(db)
+            if migration_stats["applied"]:
+                print(f"   🔄 Migrations aplicadas: {migration_stats['applied']}")
+            else:
+                print(f"   ✅ Migrations: {len(migration_stats['skipped'])} já aplicadas, nenhuma pendente")
+    except Exception as e:
+        print(f"   ❌ ERRO nas migrations: {e}")
+        # Falha nas migrations é CRÍTICA — não sobe o backend sem banco consistente
+        raise SystemExit(f"Migration failed: {e}")
+
     # Seed: garante que os 3 planos oficiais existem (idempotente)
     try:
         from database import AsyncSessionLocal
