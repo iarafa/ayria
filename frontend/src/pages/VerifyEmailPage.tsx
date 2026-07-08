@@ -6,11 +6,12 @@
  * Comportamento:
  *  - Carrega, mostra spinner
  *  - Chama /api/auth/verify-email?token=...
- *  - Sucesso: mostra confirmação + botão "Ir pro login"
- *  - Erro (expirado/inexistente): mostra erro + opção reenviar
+ *  - Sucesso: redireciona automático pro /login em 2s (08/07/2026 — era clique manual)
+ *  - Email já verificado: redireciona automático pro /login em 2s
+ *  - Erro (expirado/inválido): mostra erro + botão "Criar nova conta" + link secundário "Voltar pro login"
  */
 import { useEffect, useState } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
+import { useSearchParams, Link, useNavigate } from 'react-router-dom'
 import { LogoIcon } from '../components/Logo'
 import { api } from '../lib/api'
 
@@ -19,8 +20,18 @@ type Status = 'loading' | 'success' | 'expired' | 'invalid' | 'already'
 export function VerifyEmailPage() {
   const [params] = useSearchParams()
   const token = params.get('token')
+  const navigate = useNavigate()
   const [status, setStatus] = useState<Status>('loading')
   const [errorMsg, setErrorMsg] = useState('')
+
+  // 🆕 UX fix 08/07/2026: redirect automático após 2s pro /login nos casos de sucesso.
+  // Substitui o "tem que clicar no botão". Limpa timer se componente desmontar antes.
+  useEffect(() => {
+    if (status === 'success' || status === 'already') {
+      const t = window.setTimeout(() => navigate('/login', { replace: true }), 2000)
+      return () => window.clearTimeout(t)
+    }
+  }, [status, navigate])
 
   useEffect(() => {
     if (!token) {
@@ -81,15 +92,11 @@ export function VerifyEmailPage() {
             </div>
             <h1 className="text-3xl font-bold gradient-text">Email confirmado!</h1>
             <p className="text-ayria-muted">
-              Sua conta foi ativada com sucesso. Agora você pode fazer login.
+              Sua conta foi ativada com sucesso.
             </p>
-            <Link
-              to="/login"
-              className="inline-block px-6 py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
-            >
-              Fazer login
-            </Link>
+            <p className="text-sm text-ayria-muted opacity-70">
+              Redirecionando pro login...
+            </p>
           </>
         )}
 
@@ -105,13 +112,9 @@ export function VerifyEmailPage() {
             <p className="text-ayria-muted">
               Sua conta já está ativa. Pode fazer login.
             </p>
-            <Link
-              to="/login"
-              className="inline-block px-6 py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
-            >
-              Fazer login
-            </Link>
+            <p className="text-sm text-ayria-muted opacity-70">
+              Redirecionando pro login...
+            </p>
           </>
         )}
 
@@ -134,6 +137,15 @@ export function VerifyEmailPage() {
             >
               Criar nova conta
             </Link>
+            <p className="text-sm text-ayria-muted">
+              Já tem conta?{' '}
+              <Link
+                to="/login"
+                className="underline opacity-80 hover:opacity-100 transition-opacity"
+              >
+                Voltar pro login
+              </Link>
+            </p>
           </>
         )}
       </div>
