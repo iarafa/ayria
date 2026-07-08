@@ -15,3 +15,12 @@ backend/uploads/*
 spec/
 *.sqlite
 *.db
+
+# frontend build (gerado em runtime, não commitar)
+frontend/dist/
+
+# turbo secrets (gerado pelo vercel/turbo)
+.turbo-secrets.env
+
+# backend logs (gerados em runtime)
+backend/logs/

@@ -1734,6 +1734,8 @@ function SupervisionTab() {
   const [alerts, setAlerts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filterStatus] = useState<string>('open')
+  // 🆕 Sub-abas internas (08/07/2026 — antes era tudo numa página só, ficou bagunçado)
+  const [subTab, setSubTab] = useState<'dashboard' | 'categories' | 'alerts' | 'config'>('dashboard')
   // 🆕 Paginação e filtros
   const [viewTab, setViewTab] = useState<'open' | 'history'>('open')
   // ref pra scrollar ao filtro quando um card N1/N2/N3 for clicado
@@ -1834,6 +1836,14 @@ function SupervisionTab() {
           <div className="text-lg font-semibold text-ayria-text">Painel de Supervisão</div>
           <div className="ml-auto flex items-center gap-2">
             <button
+              onClick={() => setSupPromptOpen(true)}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white border border-purple-500/40 hover:opacity-90"
+              style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.25), rgba(99,102,241,0.25))' }}
+              title="Editar prompt crítico do supervisor"
+            >
+              🛡️ Editar Prompt Crítico
+            </button>
+            <button
               onClick={loadAll}
               className="text-xs px-3 py-1.5 rounded-lg bg-ayria-admin/10 text-ayria-admin border border-ayria-admin/30 hover:bg-ayria-admin/20"
             >
@@ -1841,6 +1851,55 @@ function SupervisionTab() {
             </button>
           </div>
         </div>
+
+        {/* 🆕 SUB-ABAS INTERNAS (08/07/2026) — separa Dashboard, Categorias, Alertas, Config */}
+        <div
+          className="flex items-center gap-1 p-1 rounded-xl mb-4"
+          style={{ background: '#111111', border: '1px solid #1E1E2E' }}
+        >
+          {[
+            { key: 'dashboard',  label: '📊 Dashboard',  hint: 'Visão geral' },
+            { key: 'categories', label: '🏷️ Categorias', hint: 'Keywords por nível' },
+            { key: 'alerts',     label: '🚨 Alertas',    hint: 'Abertos + histórico' },
+            { key: 'config',     label: '⚙️ Config',     hint: 'Comportamento do supervisor' },
+          ].map(s => (
+            <button
+              key={s.key}
+              onClick={() => { setSubTab(s.key as any); setFilterOffset(0) }}
+              className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all flex flex-col items-center justify-center gap-0.5 ${
+                subTab === s.key ? '' : 'text-ayria-muted hover:text-ayria-text'
+              }`}
+              style={subTab === s.key ? {
+                background: 'linear-gradient(135deg, rgba(99,102,241,0.20), rgba(168,85,247,0.20))',
+                color: '#C4B5FD',
+                border: '1px solid rgba(168,85,247,0.4)',
+              } : {}}
+              title={s.hint}
+            >
+              <span>{s.label}</span>
+              <span className="text-[9px] font-normal opacity-70">{s.hint}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* 🆕 SUB-ABA: Dashboard (default) — cards + avisos */}
+        {subTab === 'dashboard' && (
+          <>
+            {/* Banner de avisos importantes (08/07/2026) */}
+            <div className="mb-4 p-3 rounded-xl" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.3)' }}>
+              <div className="flex items-start gap-2">
+                <span className="text-base">💡</span>
+                <div className="flex-1 text-xs text-ayria-text">
+                  <div className="font-semibold mb-1">Como funciona</div>
+                  <ul className="text-ayria-muted space-y-0.5">
+                    <li>• Categorias N1, N2, N3 são checadas em cada mensagem do usuário</li>
+                    <li>• Keywords regex batem primeiro (pré-check); IA confirma depois</li>
+                    <li>• <span className="text-red-300 font-bold">N1</span> = risco à vida · <span className="text-orange-300 font-bold">N2</span> = crimes/violência · <span className="text-purple-300 font-bold">N3</span> = vícios/compulsões</li>
+                    <li>• Por padrão nenhuma categoria BLOQUEIA o chat — admin decide pela aba Alertas</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
 
         <div className="grid grid-cols-5 gap-2">
           {/* TOTAL USERS - minimalista em 1 linha */}
@@ -1946,13 +2005,72 @@ function SupervisionTab() {
           </button>
         </div>
 
-        {/* 🆕 KEYWORDS DE CRISE (somente leitura) — mostra exatamente o que cada nível match_a */}
-        <SupervisorKeywordsViewer />
-
         {/* (banner removido: 'aviso + total + Editar prompt' eram redundantes com os próprios cards
             e com o botão grande '🛡️ Editar Prompt Crítico' no header) */}
-      </div>
+          </>
+        )}
 
+        {/* 🆕 SUB-ABA: Categorias — keywords por nível (read-only) */}
+        {subTab === 'categories' && (
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-sm font-semibold text-ayria-text">📚 Keywords de Crise</div>
+              <button
+                onClick={() => setSupPromptOpen(true)}
+                className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white border border-purple-500/40 hover:opacity-90"
+                style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.25), rgba(99,102,241,0.25))' }}
+                title="Editar keywords via Prompt Crítico"
+              >
+                ✏️ Editar Keywords
+              </button>
+            </div>
+            <SupervisorKeywordsViewer />
+          </div>
+        )}
+
+        {/* 🆕 SUB-ABA: Config — comportamento do supervisor */}
+        {subTab === 'config' && (
+          <div className="space-y-3">
+            <div className="p-4 rounded-xl" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.3)' }}>
+              <div className="flex items-start gap-2">
+                <span className="text-lg">⚙️</span>
+                <div className="flex-1">
+                  <div className="font-semibold text-sm text-ayria-text mb-1">Comportamento atual</div>
+                  <div className="text-xs text-ayria-muted">
+                    NENHUMA categoria bloqueia o chat automaticamente. Admin decide via tela de Supervisão
+                    (aba Alertas).
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 rounded-xl" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
+              <div className="font-semibold text-sm text-ayria-text mb-2">🛡️ Prompt Crítico do Supervisor</div>
+              <p className="text-xs text-ayria-muted mb-3">
+                O supervisor usa este prompt + as keywords acima para analisar cada mensagem em batches.
+                Edite com cuidado — mudanças afetam todos os usuários.
+              </p>
+              <button
+                onClick={() => setSupPromptOpen(true)}
+                className="text-xs px-4 py-2 rounded-lg font-semibold text-white border border-purple-500/40 hover:opacity-90"
+                style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.30), rgba(99,102,241,0.30))' }}
+              >
+                🛡️ Abrir Editor de Prompt Crítico
+              </button>
+            </div>
+            <div className="p-4 rounded-xl" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
+              <div className="font-semibold text-sm text-ayria-text mb-2">📊 Estatísticas do Qdrant (conhecimento_geral)</div>
+              <div className="text-xs text-ayria-muted space-y-1">
+                <div>• Collection: <span className="font-mono">conhecimento_geral</span></div>
+                <div>• Source padrão: <span className="font-mono">prompt_keywords_crise</span></div>
+                <div>• Para reindexar: aba Conhecimento → "Reindex RAG" (categoria supervisor)</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 🆕 SUB-ABA: Alertas — lista + sub-tabs Abertos/Histórico + filtro */}
+        {subTab === 'alerts' && (
+          <div>
       {/* ═══════════════════════════════════════════════════════
           🆕 LAYOUT NOVO: 2 TABS (Abertos / Histórico) + filtro nível + paginação
 
@@ -1962,7 +2080,7 @@ function SupervisionTab() {
           - Histórico: abertos e fechados são coisas DIFERENTES, não mistura
           ═══════════════════════════════════════════════════════ */}
       <div
-        className="flex items-center gap-1 p-1 rounded-xl"
+        className="flex items-center gap-1 p-1 rounded-xl mb-3"
         style={{ background: '#111111', border: '1px solid #1E1E2E' }}
       >
         <button
@@ -2351,6 +2469,9 @@ function SupervisionTab() {
           </div>
         </div>
       )}
+          </div>
+        )}
+      </div>
 
       {/* ============================================================ */}
       {/* MODAL DE EDIÇÃO DO PROMPT DO SUPERVISOR (aberto pelo botão) */}
