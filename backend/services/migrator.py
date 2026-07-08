@@ -54,6 +54,7 @@ SCHEMA_MARKERS = {
     "012_user_block.sql":         "COLUMN users.blocked_until",
     "013_email_verification.sql": "COLUMN users.verification_token",
     "014_backfill_verified.sql": "is_verified_users_backfilled",
+    "015_sub_alma_user.sql": "TABLE user_supervisor_notes",
 }
 
 
@@ -142,7 +143,7 @@ async def run_pending_migrations(db: AsyncSession) -> dict:
     Detecta e aplica migrations pendentes.
     Idempotente e tolerante a bancos legados.
     """
-    stats = {"applied": [], "skipped_existing": [], "skipped_recorded": [], "failed": None}
+    stats = {"applied": [], "skipped_existing": [], "skipped_recorded": [], "failed": None, "skipped": []}
 
     # 1. Tabela de controle
     await ensure_schema_table(db)
@@ -159,6 +160,9 @@ async def run_pending_migrations(db: AsyncSession) -> dict:
     logger.info(f"📋 Migrations: {len(files)} arquivo(s) | {len(recorded)} já registradas")
 
     # 3. Para cada migration, decide se aplica
+    # Alias de conveniência (compat com main.py)
+    stats["skipped"] = []  # preenchido dinamicamente ao final
+
     for filepath in files:
         filename = os.path.basename(filepath)
         marker = SCHEMA_MARKERS.get(filename)

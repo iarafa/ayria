@@ -220,6 +220,14 @@ export const adminApi = {
     api.put('/api/admin/supervisor/keywords/source', { content }),
   restoreSupervisorKeywordsDefault: () =>
     api.post('/api/admin/supervisor/keywords/restore-default', {}),
+  // 🆕 08/07/2026 — chat trancado por categoria de keywords
+  chatKeywordBlock: (category: string, messages: { role: string; content: string }[]) =>
+    api.post(`/api/admin/supervisor/keywords/${encodeURIComponent(category)}/chat`, { messages }),
+  applyKeywordBlock: (category: string, payload: { keywords_to_add?: string[]; keywords_to_remove?: string[] }) =>
+    api.post(`/api/admin/supervisor/keywords/${encodeURIComponent(category)}/apply`, {
+      keywords_to_add: payload.keywords_to_add || [],
+      keywords_to_remove: payload.keywords_to_remove || [],
+    }),
   adjustCredits: (data: { user_id: string; amount: number; description: string; type?: string }) =>
     api.post('/api/admin/credits/adjust', data),
   listPlans: () => api.get('/api/admin/plans'),
@@ -298,4 +306,51 @@ export const adminApi = {
   // Delete module — remove arquivo + RAG + soft-delete config
   deletePromptModule: (module_key: string) =>
     api.delete(`/api/admin/prompt/module/${module_key}`),
+
+  // ===== 🆕 08/07/2026 — SUB-ALMA POR USER =====
+  // Regenera nova versão (vai pra DRAFT, precisa aprovação)
+  regenerateUserAlma: (userId: string) =>
+    api.post(`/api/admin/users/${userId}/alma/regenerate`),
+  // Lê alma ativa + draft pendente
+  getUserAlma: (userId: string) =>
+    api.get(`/api/admin/users/${userId}/alma`),
+  // Aprova draft → active
+  approveUserAlma: (userId: string) =>
+    api.post(`/api/admin/users/${userId}/alma/approve`),
+  // Rejeita draft → archived
+  rejectUserAlma: (userId: string) =>
+    api.post(`/api/admin/users/${userId}/alma/reject`),
+  // Histórico de versões
+  getUserAlmaHistory: (userId: string, limit = 5) =>
+    api.get(`/api/admin/users/${userId}/alma/history?limit=${limit}`),
+  // Rollback pra versão X
+  rollbackUserAlma: (userId: string, version: number) =>
+    api.post(`/api/admin/users/${userId}/alma/rollback/${version}`),
+
+  // ===== 🆕 08/07/2026 — CHAT DE ANÁLISE POR USER =====
+  // Chat IA trancado num user específico (NÃO consome créditos)
+  chatUserAnalysis: (userId: string, messages: { role: string; content: string }[]) =>
+    api.post(`/api/admin/users/${userId}/analysis/chat`, { messages }),
+  // Salvar análise como nota persistente
+  applyUserAnalysisNote: (
+    userId: string,
+    payload: {
+      title: string
+      content: string
+      kind?: 'analysis' | 'observation' | 'action'
+      conversation?: { role: string; content: string }[]
+    },
+  ) =>
+    api.post(`/api/admin/users/${userId}/analysis/apply`, {
+      title: payload.title,
+      content: payload.content,
+      kind: payload.kind || 'analysis',
+      conversation: payload.conversation || [],
+    }),
+  // Listar notas do admin sobre o user
+  listUserAnalysisNotes: (userId: string, limit = 50) =>
+    api.get(`/api/admin/users/${userId}/analysis/notes?limit=${limit}`),
+  // Apagar nota
+  deleteUserAnalysisNote: (userId: string, noteId: string) =>
+    api.delete(`/api/admin/users/${userId}/analysis/notes/${noteId}`),
 }

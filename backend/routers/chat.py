@@ -298,6 +298,45 @@ def _invalidate_prompt_cache():
     for fn in (_load_constitution_from_db, _load_module_overrides_from_db):
         if hasattr(fn, "_cache"):
             delattr(fn, "_cache")
+    # 🆕 08/07/2026 — cache da sub-alma é por user, não global.
+    # Invalidação fina não é trivial, então cache expira naturalmente em 60s.
+
+
+async def _load_user_sub_alma(db: AsyncSession, user_id) -> str | None:
+    """Carrega a sub-alma ATIVA do user. Cache 60s por user.
+
+    Retorna o conteúdo markdown pronto pra injetar no system prompt,
+    ou None se não houver alma ativa.
+
+    🆕 08/07/2026 — camada 2 da alma (individual).
+    """
+    from sqlalchemy import select as _sel
+    # chave de cache inclui user_id pra não vazar entre users
+    cache_key = f"_user_sub_alma_cache_{user_id}"
+
+    cached = globals().get(cache_key)
+    if cached:
+        cached_at, cached_value = cached
+        if _time.time() - cached_at < 60:
+            return cached_value
+
+    try:
+        res = await db.execute(
+            _sel(models.UserAlma)
+            .where(
+                models.UserAlma.user_id == user_id,
+                models.UserAlma.status == "active",
+            )
+            .order_by(models.UserAlma.version.desc())
+            .limit(1)
+        )
+        alma = res.scalar_one_or_none()
+        value = alma.content if alma else None
+
+        globals()[cache_key] = (_time.time(), value)
+        return value
+    except Exception:
+        return None
 
 
 async def montar_system_prompt(
@@ -374,8 +413,17 @@ async def montar_system_prompt(
     # MONTA prompt
     parts = []
 
-    # 1. Constituição base (sempre)
+    # 1. Constituição base (sempre) — INTOCÁVEL
     parts.append(f"# CONSTITUIÇÃO BASE\n\n{constitution}")
+
+    # 1B. 🆕 08/07/2026 — Sub-alma individual do user (modula a constituição)
+    # Só carrega se houver alma ativa. Cache de 60s pra não martelar o banco.
+    try:
+        sub_alma_content = await _load_user_sub_alma(db, user.id)
+        if sub_alma_content:
+            parts.append(f"# SUB-ALMA DO USUÁRIO\n\n{sub_alma_content}")
+    except Exception as _e:
+        logger.warning(f"Falha ao carregar sub-alma do user {user.id}: {_e}")
 
     # 2. Módulos selecionados
     if modules_content:

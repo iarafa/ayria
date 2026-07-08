@@ -16,8 +16,9 @@ import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth } from '../store/auth'
 import { adminApi } from '../lib/api'
 import { LogoIcon } from '../components/Logo'
-import { Eye, Send, ArrowLeft, Shield, MessageCircle, Lock, Menu, X, Cpu } from 'lucide-react'
+import { Eye, Send, ArrowLeft, Shield, MessageCircle, Lock, Menu, X, Cpu, Sparkles, Heart } from 'lucide-react'
 import { MessageDebugModal } from '../components/MessageDebugModal'
+import { UserAnalysisChatModal } from '../components/UserAnalysisChatModal'
 
 interface Chat {
   id: string
@@ -60,6 +61,21 @@ const highlightMessageId = searchParams.get('msg')
   const [loadingChats, setLoadingChats] = useState(false)
   const [loadingMsgs, setLoadingMsgs] = useState(false)
   const [debugMessage, setDebugMessage] = useState<Message | null>(null)
+
+  // 🆕 08/07/2026 — Painel de análise IA + sub-alma
+  const [analysisOpen, setAnalysisOpen] = useState(false)
+  const [almaPanelOpen, setAlmaPanelOpen] = useState(false)
+  const [almaData, setAlmaData] = useState<{
+    active?: any
+    draft?: any
+    has_active: boolean
+    has_draft: boolean
+  } | null>(null)
+  const [almaLoading, setAlmaLoading] = useState(false)
+  const [almaWorking, setAlmaWorking] = useState(false)
+  const [almaHistory, setAlmaHistory] = useState<any[]>([])
+  const [notes, setNotes] = useState<any[]>([])
+  const [notesLoading, setNotesLoading] = useState(false)
 
   // Verifica que é admin
   useEffect(() => {
@@ -148,6 +164,42 @@ const highlightMessageId = searchParams.get('msg')
   const handleSelectChat = (chatId: string) => {
     setCurrentChatId(chatId)
     setSidebarOpen(false)
+  }
+
+  // ============================================================
+  // 🆕 08/07/2026 — Sub-Alma helpers
+  // ============================================================
+  async function openAlmaPanel() {
+    if (!userId) return
+    setAlmaPanelOpen(true)
+    setAlmaLoading(true)
+    setNotesLoading(true)
+    try {
+      const [almaRes, histRes, notesRes] = await Promise.all([
+        adminApi.getUserAlma(userId),
+        adminApi.getUserAlmaHistory(userId, 5),
+        adminApi.listUserAnalysisNotes(userId, 20),
+      ])
+      setAlmaData(almaRes.data)
+      setAlmaHistory(histRes.data?.history || [])
+      setNotes(notesRes.data?.notes || [])
+    } catch (e: any) {
+      alert('Erro: ' + (e?.response?.data?.detail || e.message))
+    } finally {
+      setAlmaLoading(false)
+      setNotesLoading(false)
+    }
+  }
+
+  async function loadNotes() {
+    if (!userId) return
+    setNotesLoading(true)
+    try {
+      const { data } = await adminApi.listUserAnalysisNotes(userId, 20)
+      setNotes(data?.notes || [])
+    } finally {
+      setNotesLoading(false)
+    }
   }
 
   if (loadingUser || !admin) {
@@ -325,6 +377,33 @@ const highlightMessageId = searchParams.get('msg')
               <span className="truncate">Modo somente leitura</span>
             </div>
           </div>
+
+          {/* 🆕 08/07/2026 — Botões Sub-Alma + Análise IA */}
+          <button
+            onClick={() => openAlmaPanel()}
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition"
+            style={{
+              background: 'linear-gradient(135deg, #EC4899, #A855F7)',
+              opacity: almaLoading ? 0.5 : 1,
+            }}
+            disabled={almaLoading}
+            title="Ver/gerenciar a sub-alma individual deste user (camada 2)"
+          >
+            <Heart size={14} />
+            <span>🪞 Sub-Alma</span>
+          </button>
+          <button
+            onClick={() => setAnalysisOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition"
+            style={{
+              background: 'linear-gradient(135deg, #A855F7, #6366F1)',
+            }}
+            title="Chat IA trancado neste user (sem custo)"
+          >
+            <Sparkles size={14} />
+            <span className="hidden md:inline">🤖 Analisar com IA</span>
+            <span className="md:hidden">🤖 IA</span>
+          </button>
         </header>
 
         {/* Mensagens */}
@@ -399,6 +478,97 @@ const highlightMessageId = searchParams.get('msg')
       {/* Modal de debug/transparência — só pra admins */}
       {debugMessage && (
         <MessageDebugModal message={debugMessage} onClose={() => setDebugMessage(null)} />
+      )}
+
+      {/* 🆕 08/07/2026 — Chat IA trancado no user */}
+      {analysisOpen && userId && targetUser && (
+        <UserAnalysisChatModal
+          open={analysisOpen}
+          userId={userId}
+          firstName={(targetUser.full_name || targetUser.email).split(' ')[0]}
+          onClose={() => setAnalysisOpen(false)}
+          onSaved={() => {
+            // Recarregar notas se painel estiver aberto
+            if (almaPanelOpen) loadNotes()
+          }}
+        />
+      )}
+
+      {/* 🆕 08/07/2026 — Painel de Sub-Alma */}
+      {almaPanelOpen && userId && targetUser && (
+        <SubAlmaPanel
+          userId={userId}
+          firstName={(targetUser.full_name || targetUser.email).split(' ')[0]}
+          almaData={almaData}
+          almaLoading={almaLoading}
+          almaWorking={almaWorking}
+          almaHistory={almaHistory}
+          notes={notes}
+          notesLoading={notesLoading}
+          onClose={() => setAlmaPanelOpen(false)}
+          onReload={openAlmaPanel}
+          onRegenerate={async () => {
+            if (!userId) return
+            if (!window.confirm('Regenerar a sub-alma? A ativa vira superseded e a nova vai pra DRAFT.')) return
+            setAlmaWorking(true)
+            try {
+              await adminApi.regenerateUserAlma(userId)
+              await openAlmaPanel()
+            } catch (e: any) {
+              alert('Erro: ' + (e?.response?.data?.detail || e.message))
+            } finally {
+              setAlmaWorking(false)
+            }
+          }}
+          onApprove={async () => {
+            if (!userId) return
+            setAlmaWorking(true)
+            try {
+              await adminApi.approveUserAlma(userId)
+              await openAlmaPanel()
+            } catch (e: any) {
+              alert('Erro: ' + (e?.response?.data?.detail || e.message))
+            } finally {
+              setAlmaWorking(false)
+            }
+          }}
+          onReject={async () => {
+            if (!userId) return
+            if (!window.confirm('Rejeitar e arquivar a draft pendente?')) return
+            setAlmaWorking(true)
+            try {
+              await adminApi.rejectUserAlma(userId)
+              await openAlmaPanel()
+            } catch (e: any) {
+              alert('Erro: ' + (e?.response?.data?.detail || e.message))
+            } finally {
+              setAlmaWorking(false)
+            }
+          }}
+          onRollback={async (version: number) => {
+            if (!userId) return
+            if (!window.confirm(`Voltar pra versão ${version}?`)) return
+            setAlmaWorking(true)
+            try {
+              await adminApi.rollbackUserAlma(userId, version)
+              await openAlmaPanel()
+            } catch (e: any) {
+              alert('Erro: ' + (e?.response?.data?.detail || e.message))
+            } finally {
+              setAlmaWorking(false)
+            }
+          }}
+          onDeleteNote={async (noteId: string) => {
+            if (!userId) return
+            if (!window.confirm('Apagar esta nota?')) return
+            try {
+              await adminApi.deleteUserAnalysisNote(userId, noteId)
+              await loadNotes()
+            } catch (e: any) {
+              alert('Erro: ' + (e?.response?.data?.detail || e.message))
+            }
+          }}
+        />
       )}
     </div>
   )
@@ -664,4 +834,307 @@ function Section({ title, icon, children }: any) {
 
 function Empty({ children }: any) {
   return <div className="text-ayria-muted italic">{children}</div>
+}
+
+
+// ============================================================
+// 🆕 08/07/2026 — Painel de Sub-Alma (gerenciar + ver notas)
+// ============================================================
+function SubAlmaPanel(props: {
+  userId: string
+  firstName: string
+  almaData: any
+  almaLoading: boolean
+  almaWorking: boolean
+  almaHistory: any[]
+  notes: any[]
+  notesLoading: boolean
+  onClose: () => void
+  onReload: () => void
+  onRegenerate: () => void
+  onApprove: () => void
+  onReject: () => void
+  onRollback: (version: number) => void
+  onDeleteNote: (noteId: string) => void
+}) {
+  const {
+    firstName,
+    almaData,
+    almaLoading,
+    almaWorking,
+    almaHistory,
+    notes,
+    notesLoading,
+    onClose,
+    onRegenerate,
+    onApprove,
+    onReject,
+    onRollback,
+    onDeleteNote,
+  } = props
+
+  // ESC fecha
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !almaWorking) onClose()
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [onClose, almaWorking])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)' }}
+      onClick={almaWorking ? undefined : onClose}
+    >
+      <div
+        className="w-full max-w-3xl rounded-2xl flex flex-col"
+        style={{
+          background: '#0A0A0A',
+          border: '2px solid rgba(236, 72, 153, 0.4)',
+          maxHeight: '88vh',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          className="flex items-center justify-between p-4 border-b"
+          style={{ borderColor: '#1E1E2E' }}
+        >
+          <div className="flex items-center gap-2">
+            <Heart size={20} style={{ color: '#EC4899' }} />
+            <h3 className="text-base font-bold text-ayria-text">
+              Sub-Alma de {firstName}
+            </h3>
+            <span
+              className="text-[10px] px-2 py-0.5 rounded uppercase font-bold"
+              style={{ background: 'rgba(236,72,153,0.15)', color: '#EC4899' }}
+            >
+              🔒 só admin
+            </span>
+          </div>
+          <button onClick={onClose} disabled={almaWorking} className="text-ayria-muted hover:text-white">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-4" style={{ maxHeight: 'calc(88vh - 80px)' }}>
+          {/* Estado da sub-alma */}
+          {almaLoading ? (
+            <div className="text-ayria-muted text-center py-8">Carregando…</div>
+          ) : !almaData ? (
+            <div className="text-ayria-muted text-center py-8">Sem dados.</div>
+          ) : (
+            <>
+              {/* Status resumido */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div
+                  className="rounded-xl p-3 text-sm"
+                  style={{
+                    background: almaData.has_active ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.05)',
+                    border: almaData.has_active ? '1px solid rgba(34,197,94,0.3)' : '1px dashed rgba(239,68,68,0.3)',
+                  }}
+                >
+                  <div className="text-xs text-ayria-muted uppercase font-bold mb-1">Ativa</div>
+                  {almaData.has_active ? (
+                    <>
+                      <div className="text-green-400 font-bold">v{almaData.active.version} ✓</div>
+                      <div className="text-xs text-ayria-muted mt-0.5">
+                        {almaData.active.trigger} · {almaData.active.model_used}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-red-400 italic">Nenhuma alma ativa</div>
+                  )}
+                </div>
+                <div
+                  className="rounded-xl p-3 text-sm"
+                  style={{
+                    background: almaData.has_draft ? 'rgba(245,158,11,0.08)' : 'rgba(0,0,0,0.2)',
+                    border: almaData.has_draft ? '1px solid rgba(245,158,11,0.3)' : '1px dashed #1E1E2E',
+                  }}
+                >
+                  <div className="text-xs text-ayria-muted uppercase font-bold mb-1">Draft pendente</div>
+                  {almaData.has_draft ? (
+                    <>
+                      <div className="text-yellow-400 font-bold">v{almaData.draft.version} (aguardando)</div>
+                      <div className="text-xs text-ayria-muted mt-0.5">
+                        {almaData.draft.trigger} · expira {almaData.draft.expires_at?.slice(0, 10) || '?'}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-ayria-muted italic">Nada pra aprovar</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Ações */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={onRegenerate}
+                  disabled={almaWorking}
+                  className="text-xs px-3 py-2 rounded-lg text-white font-bold flex items-center gap-1.5 disabled:opacity-40"
+                  style={{ background: 'linear-gradient(135deg, #EC4899, #A855F7)' }}
+                >
+                  🔄 Regenerar (vai pra draft)
+                </button>
+                {almaData.has_draft && (
+                  <>
+                    <button
+                      onClick={onApprove}
+                      disabled={almaWorking}
+                      className="text-xs px-3 py-2 rounded-lg text-white font-bold flex items-center gap-1.5 disabled:opacity-40"
+                      style={{ background: 'rgba(34,197,94,0.85)' }}
+                    >
+                      ✓ Aprovar draft
+                    </button>
+                    <button
+                      onClick={onReject}
+                      disabled={almaWorking}
+                      className="text-xs px-3 py-2 rounded-lg text-white font-bold flex items-center gap-1.5 disabled:opacity-40"
+                      style={{ background: 'rgba(239,68,68,0.7)' }}
+                    >
+                      ✕ Rejeitar
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Alma ativa */}
+              {almaData.has_active && (
+                <details className="rounded-xl overflow-hidden text-xs" style={{ background: '#0a0a0a', border: '1px solid rgba(34,197,94,0.25)' }}>
+                  <summary className="px-3 py-2 cursor-pointer flex items-center gap-2 font-bold" style={{ background: 'rgba(34,197,94,0.06)' }}>
+                    🌿 Sub-alma ativa (v{almaData.active.version})
+                    <span className="ml-auto text-[10px] text-ayria-muted">
+                      {almaData.active.approved_at?.slice(0, 16).replace('T', ' ')}
+                    </span>
+                  </summary>
+                  <div className="p-3 whitespace-pre-wrap text-ayria-text" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    {almaData.active.content}
+                  </div>
+                </details>
+              )}
+
+              {/* Draft */}
+              {almaData.has_draft && (
+                <details open className="rounded-xl overflow-hidden text-xs" style={{ background: '#0a0a0a', border: '1px solid rgba(245,158,11,0.3)' }}>
+                  <summary className="px-3 py-2 cursor-pointer flex items-center gap-2 font-bold" style={{ background: 'rgba(245,158,11,0.08)' }}>
+                    📝 Draft pendente (v{almaData.draft.version})
+                  </summary>
+                  <div className="p-3 whitespace-pre-wrap text-ayria-text" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    {almaData.draft.content}
+                  </div>
+                </details>
+              )}
+
+              {/* Histórico */}
+              {almaHistory.length > 1 && (
+                <details className="rounded-xl overflow-hidden text-xs" style={{ background: '#0a0a0a', border: '1px solid #1E1E2E' }}>
+                  <summary className="px-3 py-2 cursor-pointer flex items-center gap-2 font-bold">
+                    🕘 Histórico ({almaHistory.length} versões)
+                  </summary>
+                  <div className="p-3 space-y-2">
+                    {almaHistory.map((v) => (
+                      <div
+                        key={v.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded"
+                        style={{ background: '#141420', border: '1px solid #1E1E2E' }}
+                      >
+                        <span className="font-mono text-xs">v{v.version}</span>
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded font-bold uppercase"
+                          style={{
+                            background:
+                              v.status === 'active' ? 'rgba(34,197,94,0.2)'
+                              : v.status === 'draft' ? 'rgba(245,158,11,0.2)'
+                              : v.status === 'superseded' ? 'rgba(99,102,241,0.15)'
+                              : 'rgba(239,68,68,0.15)',
+                            color:
+                              v.status === 'active' ? '#86EFAC'
+                              : v.status === 'draft' ? '#FCD34D'
+                              : v.status === 'superseded' ? '#A5B4FC'
+                              : '#FCA5A5',
+                          }}
+                        >
+                          {v.status}
+                        </span>
+                        <span className="text-ayria-muted text-xs flex-1">{v.trigger}</span>
+                        <span className="text-ayria-muted text-[10px]">{v.generated_at?.slice(0, 10)}</span>
+                        {v.status !== 'active' && (
+                          <button
+                            onClick={() => onRollback(v.version)}
+                            disabled={almaWorking}
+                            className="text-[10px] px-2 py-0.5 rounded font-bold text-white"
+                            style={{ background: 'rgba(99,102,241,0.6)' }}
+                          >
+                            ↩ Rollback
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+
+              {/* Notas do admin */}
+              <div className="rounded-xl overflow-hidden text-xs" style={{ background: '#0a0a0a', border: '1px solid rgba(168,85,247,0.25)' }}>
+                <div
+                  className="px-3 py-2 flex items-center gap-2 font-bold"
+                  style={{ background: 'rgba(168,85,247,0.06)' }}
+                >
+                  📋 Notas do admin ({notes.length})
+                </div>
+                {notesLoading ? (
+                  <div className="p-3 text-ayria-muted">Carregando…</div>
+                ) : notes.length === 0 ? (
+                  <div className="p-3 text-ayria-muted italic">
+                    Nenhuma nota ainda. Clique "🤖 Analisar com IA" no header pra começar.
+                  </div>
+                ) : (
+                  <div className="p-3 space-y-2">
+                    {notes.map((n) => (
+                      <div
+                        key={n.id}
+                        className="rounded p-2"
+                        style={{ background: '#141420', border: '1px solid #1E1E2E' }}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-ayria-text">{n.title}</span>
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded font-bold uppercase"
+                            style={{
+                              background: n.kind === 'analysis' ? 'rgba(168,85,247,0.2)'
+                                : n.kind === 'observation' ? 'rgba(59,130,246,0.2)'
+                                : 'rgba(245,158,11,0.2)',
+                              color: n.kind === 'analysis' ? '#C084FC'
+                                : n.kind === 'observation' ? '#60A5FA'
+                                : '#FCD34D',
+                            }}
+                          >
+                            {n.kind}
+                          </span>
+                          <span className="ml-auto text-[10px] text-ayria-muted">
+                            {n.created_at?.slice(0, 10)} · {n.admin_email || 'admin'}
+                          </span>
+                          <button
+                            onClick={() => onDeleteNote(n.id)}
+                            className="text-[10px] px-2 py-0.5 rounded text-white"
+                            style={{ background: 'rgba(239,68,68,0.5)' }}
+                          >
+                            apagar
+                          </button>
+                        </div>
+                        <div className="text-ayria-muted line-clamp-3 whitespace-pre-wrap">{n.content}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }

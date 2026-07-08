@@ -431,3 +431,62 @@ class AyriaPromptConfig(Base):
     updated_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+# ============================================================
+# 15. USER_ALMA (sub-alma individual por usuário — 08/07/2026)
+# Camada 2 da alma: modula a constituição base por user.
+# Plano: 01_Memories/AYRIA_SUB_ALMA_PLANO_08072026.md
+# ============================================================
+class UserAlma(Base):
+    """Sub-alma individual do usuário.
+
+    Diferente de `ayria_prompt_config` (que é a constituição GLOBAL do produto),
+    esta tabela guarda a alma INDIVIDUAL por user. Nascida no fim do onboarding,
+    regenerável pelo admin, editável pela IA com base em sinais.
+    """
+    __tablename__ = "user_alma"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    version = Column(Integer, nullable=False)  # 1, 2, 3... por user
+    status = Column(String(20), nullable=False, default="draft", index=True)  # draft|active|superseded|archived
+
+    content = Column(Text, nullable=False)  # markdown estruturado
+    signals_used = Column(JSONB, nullable=False, default=dict)  # auditoria
+    trigger = Column(String(50), nullable=False)  # onboarding_complete|admin_manual|periodic|preference_signal|...
+    model_used = Column(String(100), nullable=False)
+
+    generated_at = Column(DateTime(timezone=True), server_default=func.now())
+    approved_at = Column(DateTime(timezone=True))
+    approved_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))  # null se for auto
+    expires_at = Column(DateTime(timezone=True))  # draft que expira em X dias
+    manual_lock = Column(JSONB, nullable=False, default=dict)  # campos travados contra regeneração
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'version', name='user_alma_user_version_uq'),
+    )
+
+
+# ============================================================
+# 16. USER_SUPERVISOR_NOTES (notas/análises manuais do admin sobre um user)
+# ============================================================
+class UserSupervisorNote(Base):
+    """Notas/análises manuais que o admin grava após conversar com a IA
+    trancada em um user específico. Diferente de `SupervisorAnalysis`
+    (automático, 1 por msg), esta é manual e 1 por sessão de análise.
+    """
+    __tablename__ = "user_supervisor_notes"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    admin_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    kind = Column(String(20), nullable=False, default="analysis")  # analysis|observation|action
+    title = Column(Text)
+    content = Column(Text, nullable=False)
+    conversation = Column(JSONB, nullable=False, default=list)  # histórico do chat
+    model_used = Column(String(100), nullable=False)
+    signals_used = Column(JSONB, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

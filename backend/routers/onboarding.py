@@ -373,6 +373,27 @@ async def calcular_perfil_completo_background(user_id: str, attrs: Dict[str, Any
                     f"✅ Perfil completo salvo para {user.email}: "
                     f"num={'OK' if mapa_num else 'NÃO'} ast={'OK' if mapa_ast else 'NÃO'}"
                 )
+
+        # 4. 🆕 08/07/2026 — Auto-gerar 1ª SUB-ALMA do user (individual)
+        # Roda em background, AUTO-APROVADA (é só rascunho inicial).
+        try:
+            from services.sub_alma_service import generate_user_sub_alma
+            async with AsyncSessionLocal() as db:
+                # Verifica se já existe (safety — não duplica)
+                from sqlalchemy import select as _sel, and_ as _and
+                exists_res = await db.execute(
+                    _sel(models.UserAlma).where(models.UserAlma.user_id == uuid.UUID(user_id))
+                )
+                if not exists_res.scalar_one_or_none():
+                    await generate_user_sub_alma(
+                        db,
+                        user_id=uuid.UUID(user_id),
+                        trigger="onboarding_complete",
+                        created_by=None,  # auto
+                        auto_approve=True,
+                    )
+        except Exception as _e:
+            logger.error(f"❌ Falha ao gerar sub-alma inicial do user {user_id}: {_e}")
     except Exception as e:
         logger.error(f"❌ Erro crítico no background de perfil: {e}")
         async with AsyncSessionLocal() as db:

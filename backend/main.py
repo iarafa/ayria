@@ -84,7 +84,8 @@ async def lifespan(app: FastAPI):
             if migration_stats["applied"]:
                 print(f"   🔄 Migrations aplicadas: {migration_stats['applied']}")
             else:
-                print(f"   ✅ Migrations: {len(migration_stats['skipped'])} já aplicadas, nenhuma pendente")
+                skipped = len(migration_stats.get('skipped_existing', [])) + len(migration_stats.get('skipped_recorded', []))
+                print(f"   ✅ Migrations: {skipped} já aplicadas, nenhuma pendente")
     except Exception as e:
         print(f"   ❌ ERRO nas migrations: {e}")
         # Falha nas migrations é CRÍTICA — não sobe o backend sem banco consistente
@@ -274,6 +275,8 @@ async def info():
 
 # Routers
 from routers import auth, onboarding, chats, chat, admin, memory, training, credits, supervisor, spiritual, debug_log
+# 🆕 08/07/2026 — sub-alma por user + análise admin por user
+from routers import admin_alma, admin_analysis
 app.include_router(auth.router)
 app.include_router(onboarding.router)
 app.include_router(chats.router)
@@ -285,6 +288,8 @@ app.include_router(training.router)
 app.include_router(credits.router)
 app.include_router(supervisor.router)
 app.include_router(spiritual.router)
+app.include_router(admin_alma.router)
+app.include_router(admin_analysis.router)
 
 
 if __name__ == "__main__":
