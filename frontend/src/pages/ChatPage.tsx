@@ -26,7 +26,7 @@ import { useAutoScroll } from '../hooks/useAutoScroll'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 
 export function ChatPage() {
-  const { messages, sending, sendMessage, loadChats } = useChat()
+  const { messages, sending, sendMessage, loadChats, loadMessages, currentChatId, chats } = useChat()
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [editProfileOpen, setEditProfileOpen] = useState(false)
@@ -50,6 +50,17 @@ export function ChatPage() {
   useEffect(() => {
     loadChats()
   }, [])
+
+  // 🆕 08/07/2026: depois do loadChats, se tem histórico e nenhum chat selecionado,
+  // abre o mais recente. Evita criar chat vazio só pra "ter algo aberto".
+  useEffect(() => {
+    // Espera loadChats terminar (loading=false) + ter chats + nenhum selecionado
+    if (!currentChatId && chats.length > 0) {
+      // Backend retorna ordenado por last_message_at desc (mais recente primeiro)
+      const maisRecente = chats[0]
+      loadMessages(maisRecente.id)
+    }
+  }, [chats, currentChatId, loadMessages])
 
   // === Autoscroll inteligente ===
   const messagesContainerRef = useRef<HTMLDivElement>(null)

@@ -3,18 +3,21 @@
  *
  * Fluxo de login:
  * 1. Usuário entra email + senha
- * 2. Se sucesso: cria chat NOVO (vazio) e navega pra /chat
- * 3. Chat anteriores aparecem na sidebar (escolha opcional)
+ * 2. Se sucesso: navega pra /chat
+ * 3. ChatPage decide o que mostrar:
+ *    - Tem chats anteriores? → abre o mais recente
+ *    - Sem chats? → mostra tela de boas-vindas (user clica "+ Novo Tema" pra começar)
+ *
+ * (Antes: sempre criava chat novo vazio no login. Rafael pediu pra mudar em 08/07/2026
+ * — o user já tem conversas, ele quer cair nelas, não em chat em branco.)
  */
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../store/auth'
-import { useChat } from '../store/chat'
 import { LogoIcon } from '../components/Logo'
 
 export function LoginPage() {
   const { login, loading, error } = useAuth()
-  const { createChat } = useChat()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const navigate = useNavigate()
@@ -23,8 +26,7 @@ export function LoginPage() {
     e.preventDefault()
     const ok = await login(email, password)
     if (ok) {
-      // Cria chat novo e já entra nele (vazio, sem tema)
-      await createChat()
+      // Sem createChat() — ChatPage vai carregar a lista e abrir o chat mais recente (08/07/2026)
       navigate('/chat')
     }
   }
