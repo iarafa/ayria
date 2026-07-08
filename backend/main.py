@@ -1,6 +1,51 @@
 """
 AYRIA - FastAPI Application Principal
 """
+import logging
+import os
+import sys
+from logging.handlers import RotatingFileHandler
+
+# 🆕 Configuração central de logging (07/07/2026)
+# Garante que TODOS os logs (uvicorn, routers, error handlers) vão pro arquivo persistente
+LOG_DIR = os.getenv("AYRIA_LOG_DIR", "/app/logs")
+LOG_FILE = os.path.join(LOG_DIR, "ayria.log")
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# Formato
+_FMT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+_DATEFMT = "%Y-%m-%d %H:%M:%S"
+
+# Root logger (captura tudo)
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+
+# Handler arquivo (10MB x 5 backups)
+file_handler = RotatingFileHandler(LOG_FILE, maxBytes=10_000_000, backupCount=5, encoding="utf-8")
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(logging.Formatter(_FMT, _DATEFMT))
+
+# Handler stdout (também aparece em logs do Coolify)
+stdout_handler = logging.StreamHandler(sys.stdout)
+stdout_handler.setLevel(logging.INFO)
+stdout_handler.setFormatter(logging.Formatter(_FMT, _DATEFMT))
+
+# Remove handlers duplicados (caso reload)
+root_logger.handlers.clear()
+root_logger.addHandler(file_handler)
+root_logger.addHandler(stdout_handler)
+
+# Força logs do uvicorn a passar pelo nosso handler
+logging.getLogger("uvicorn").handlers = root_logger.handlers
+logging.getLogger("uvicorn.error").handlers = root_logger.handlers
+logging.getLogger("uvicorn.access").handlers = root_logger.handlers
+logging.getLogger("fastapi").handlers = root_logger.handlers
+
+logger = logging.getLogger(__name__)
+logger.info("=" * 60)
+logger.info("🌙 AYRIA iniciando - sistema de log ativo em %s", LOG_FILE)
+logger.info("=" * 60)
+
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -85,6 +130,66 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 🆕 Request logger middleware (07/07/2026)
+# Loga TODA requisição: método, path, status, duração, user_id (se autenticado)
+import time
+import uuid as _uuid
+from fastapi import Request
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class RequestLoggerMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request_id = str(_uuid.uuid4())[:8]
+        start = time.time()
+        method = request.method
+        path = request.url.path
+        # Captura user_id do JWT se presente
+        user_id = "anon"
+        auth = request.headers.get("authorization", "")
+        if auth.lower().startswith("bearer "):
+            try:
+                from jose import jwt as _jwt
+                from database import settings as _s
+                payload = _jwt.get_unverified_claims(auth.split(" ", 1)[1])
+                user_id = str(payload.get("sub", "anon"))[:12]
+            except Exception:
+                pass
+        try:
+            response = await call_next(request)
+            duration_ms = int((time.time() - start) * 1000)
+            status = response.status_code
+            level = logging.WARNING if status >= 400 else logging.INFO
+            logging.getLogger("ayria.request").log(
+                level,
+                f"[{request_id}] {method} {path} → {status} ({duration_ms}ms) user={user_id}",
+            )
+            response.headers["X-Request-ID"] = request_id
+            return response
+        except Exception as exc:
+            duration_ms = int((time.time() - start) * 1000)
+            logging.getLogger("ayria.request").exception(
+                f"[{request_id}] {method} {path} → EXCEPTION ({duration_ms}ms) user={user_id}: {type(exc).__name__}: {exc}"
+            )
+            raise
+
+app.add_middleware(RequestLoggerMiddleware)
+
+# 🆕 Exception handler global (07/07/2026)
+# Garante que QUALQUER exceção não tratada apareça no log
+from fastapi.responses import JSONResponse as _JSONResponse
+
+@app.exception_handler(Exception)
+async def _global_exception_handler(request: Request, exc: Exception):
+    rid = getattr(request.state, "request_id", "?")
+    logging.getLogger("ayria.error").exception(
+        f"❌ UNCAUGHT [{rid}] {request.method} {request.url.path}: {type(exc).__name__}: {exc}"
+    )
+    return _JSONResponse(
+        status_code=500,
+        content={"detail": f"Erro interno do servidor: {type(exc).__name__}: {str(exc)[:200]}"},
+        headers={"X-Request-ID": rid},
+    )
 
 # Audit middleware (registra acoes no audit_log)
 from middleware.audit import AuditMiddleware

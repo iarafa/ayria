@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ .
-RUN mkdir -p /app/uploads
+RUN mkdir -p /app/uploads /app/logs
 
 FROM nginx:alpine AS frontend
 COPY frontend/dist /usr/share/nginx/html

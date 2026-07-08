@@ -2,9 +2,10 @@
 set -e
 
 # Sobe uvicorn em background e nginx em foreground (pid 1)
+mkdir -p /app/logs
 cd /app
 echo "[start.sh] Subindo uvicorn na 127.0.0.1:8000..."
-uvicorn main:app --host 127.0.0.1 --port 8000 > /var/log/uvicorn.log 2>&1 &
+uvicorn main:app --host 127.0.0.1 --port 8000 >> /app/logs/ayria.log 2>&1 &
 
 UVI_PID=$!
 echo "[start.sh] uvicorn pid=$UVI_PID"
@@ -17,7 +18,7 @@ for i in $(seq 1 60); do
     fi
     if ! kill -0 $UVI_PID 2>/dev/null; then
         echo "[start.sh] uvicorn MORREU. Logs:"
-        tail -50 /var/log/uvicorn.log
+        tail -50 /app/logs/ayria.log
         exit 1
     fi
     sleep 1
