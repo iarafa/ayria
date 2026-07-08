@@ -276,7 +276,7 @@ async def info():
 # Routers
 from routers import auth, onboarding, chats, chat, admin, memory, training, credits, supervisor, spiritual, debug_log
 # 🆕 08/07/2026 — sub-alma por user + análise admin por user
-from routers import admin_alma, admin_analysis
+from routers import admin_alma, admin_analysis, admin_backfill
 app.include_router(auth.router)
 app.include_router(onboarding.router)
 app.include_router(chats.router)
@@ -290,6 +290,7 @@ app.include_router(supervisor.router)
 app.include_router(spiritual.router)
 app.include_router(admin_alma.router)
 app.include_router(admin_analysis.router)
+app.include_router(admin_backfill.router)
 
 
 if __name__ == "__main__":

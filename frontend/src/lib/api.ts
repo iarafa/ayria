@@ -308,6 +308,11 @@ export const adminApi = {
     api.delete(`/api/admin/prompt/module/${module_key}`),
 
   // ===== 🆕 08/07/2026 — SUB-ALMA POR USER =====
+  // Backfill: gera pra todos os users sem sub-alma (skip admin). Retorna summary.
+  backfillAllAlmas: () =>
+    api.post('/api/admin/almas/backfill-all'),
+
+  // Regenera nova versão (vai pra DRAFT, precisa aprovação)
   // Regenera nova versão (vai pra DRAFT, precisa aprovação)
   regenerateUserAlma: (userId: string) =>
     api.post(`/api/admin/users/${userId}/alma/regenerate`),
