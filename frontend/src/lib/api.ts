@@ -269,6 +269,10 @@ export const adminApi = {
   deletePromptRag: (data: { source: string }) =>
     api.post('/api/admin/prompt/rag/delete', data),
 
+  // Debug — log do backend (admin only)
+  debugLog: (params: { lines?: number; filter?: string } = {}) =>
+    api.get('/api/admin/debug/log', { params, responseType: 'text' }),
+
   // Prompt Chat — admin conversa COM contexto do MD carregado
   promptChat: (data: { key: string; user_message: string; history?: any[]; initial_context?: string }) =>
     api.post('/api/admin/prompt/chat', data),

@@ -152,12 +152,13 @@ async def info():
 
 
 # Routers
-from routers import auth, onboarding, chats, chat, admin, memory, training, credits, supervisor, spiritual
+from routers import auth, onboarding, chats, chat, admin, memory, training, credits, supervisor, spiritual, debug_log
 app.include_router(auth.router)
 app.include_router(onboarding.router)
 app.include_router(chats.router)
 app.include_router(chat.router)
 app.include_router(admin.router)
+app.include_router(debug_log.router)
 app.include_router(memory.router)
 app.include_router(training.router)
 app.include_router(credits.router)
