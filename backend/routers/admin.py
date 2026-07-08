@@ -1888,6 +1888,9 @@ async def prompt_chat(
     messages.append({"role": "user", "content": payload.user_message})
 
     # 4. Chama LLM
+    import time as _time
+    _t0 = _time.time()
+    logger.info(f"[prompt_chat:{key}] iniciando - {len(payload.user_message)} chars do user, contexto {len(current_content)} chars, {len(messages)} msgs no histórico")
     try:
         # Temperatura baixa (0.3) e mais tokens — escrita estruturada exige determinismo
         response = await ai_service.chat(
@@ -1895,6 +1898,8 @@ async def prompt_chat(
             temperature=0.3,
             max_tokens=4000,
         )
+        _t1 = _time.time()
+        logger.info(f"[prompt_chat:{key}] LLM respondeu em {_t1-_t0:.1f}s")
         ai_response = response.choices[0].message.content
         ai_model = response.model
 
@@ -1907,8 +1912,9 @@ async def prompt_chat(
         from services.text_sanitizer import sanitize_response
         ai_response, _ = sanitize_response(ai_response, source=f"prompt_chat:{key}")
     except Exception as e:
-        logger.error(f"Erro no prompt_chat: {e}")
-        raise HTTPException(status_code=503, detail=f"Erro no LLM: {str(e)}")
+        _t1 = _time.time()
+        logger.exception(f"[prompt_chat:{key}] LLM falhou após {_t1-_t0:.1f}s: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=503, detail=f"Erro no LLM: {type(e).__name__}: {str(e)[:300]}")
 
     return {
         "ok": True,
