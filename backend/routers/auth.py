@@ -11,6 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from datetime import datetime, timedelta
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel, EmailStr, Field
 from database import get_db, settings
@@ -61,7 +64,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 # Proteção contra criação em massa agora é por email único + captcha/validação no front.
 
 
-@router.post("/register", response_model=schemas.TokenResponse, status_code=201)
+@router.post("/register", response_model=schemas.RegisterResponse, status_code=201)
 async def register(payload: schemas.UserRegister, request: Request, db: AsyncSession = Depends(get_db)):
     """Registra novo usuário + concede créditos do plano escolhido"""
     # Verifica email duplicado
@@ -126,16 +129,177 @@ async def register(payload: schemas.UserRegister, request: Request, db: AsyncSes
     await db.commit()
     await db.refresh(user)
 
-    # Gera token
-    access_token = create_access_token({"sub": str(user.id), "role": user.role})
-    refresh_token = create_refresh_token(str(user.id), user.role)
+    # ============ Email verification (07/07/2026) ============
+    # Gera token de verificação + dispara email. NÃO retorna access_token.
+    # Só após o user clicar no link é que a conta é ativada.
+    import secrets as _secrets
+    from datetime import timezone
+    from services.email_turbo import get_email_client, EmailServiceError
+    from services.email_templates import verification_email_html, verification_email_text
+    from utils.url_detector import build_verification_url
 
-    return schemas.TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer",
-        expires_in=settings.JWT_EXPIRE_MINUTES * 60,
+    verification_token = _secrets.token_urlsafe(32)
+    user.verification_token = verification_token
+    user.verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+    user.verification_sent_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(user)
+
+    verify_url = build_verification_url(verification_token)
+    email_error: str | None = None
+    try:
+        client = get_email_client()
+        await client.send_email(
+            to_email=user.email,
+            subject="Confirme seu email — AYRIA ✨",
+            body_html=verification_email_html(user.full_name, verify_url),
+            body_text=verification_email_text(user.full_name, verify_url),
+        )
+    except EmailServiceError as e:
+        logger.error(f"Falha ao enviar email de verificação: {e}")
+        email_error = str(e)
+    except Exception as e:
+        logger.exception("Erro inesperado ao enviar email de verificação")
+        email_error = str(e)
+
+    return schemas.RegisterResponse(
         user=await _user_to_response(user, db),
+        message=(
+            "Conta criada! Enviamos um email de confirmação para "
+            f"{user.email}. Clique no link pra ativar."
+        ),
+        verification_sent=email_error is None,
+        email_error=email_error,
+    )
+
+
+@router.get("/verify-email", response_model=schemas.VerifyEmailResponse)
+async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
+    """
+    🆕 Verifica email via token (07/07/2026).
+    GET /api/auth/verify-email?token=...
+    Ativa a conta se token for válido e não expirado.
+    """
+    from datetime import timezone
+
+    if not token or len(token) < 16:
+        raise HTTPException(status_code=400, detail="Token inválido")
+
+    result = await db.execute(
+        select(models.User).where(models.User.verification_token == token)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="Token não encontrado. O link pode ter expirado ou já foi usado.",
+        )
+
+    if user.is_verified:
+        return schemas.VerifyEmailResponse(
+            success=True,
+            message="Email já verificado. Você já pode fazer login.",
+            already_verified=True,
+        )
+
+    if (
+        not user.verification_token_expires_at
+        or user.verification_token_expires_at < datetime.now(timezone.utc)
+    ):
+        raise HTTPException(
+            status_code=410,
+            detail="Token expirado. Solicite o reenvio da verificação.",
+        )
+
+    # Ativa conta
+    user.is_verified = True
+    user.verified_at = datetime.now(timezone.utc)
+    user.verification_token = None  # single-use
+    user.verification_token_expires_at = None
+    await db.commit()
+
+    logger.info(f"✅ Email verificado: {user.email}")
+
+    return schemas.VerifyEmailResponse(
+        success=True,
+        message="Email confirmado! Você já pode fazer login.",
+        already_verified=False,
+    )
+
+
+class ResendVerificationRequest(BaseModel):
+    email: str
+
+
+@router.post("/resend-verification", response_model=schemas.ResendVerificationResponse)
+async def resend_verification(
+    payload: ResendVerificationRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    🆕 Reenvia email de verificação (07/07/2026).
+    Rate-limit: 1 reenvio por minuto por user.
+    """
+    from datetime import timezone
+    import secrets as _secrets
+    from services.email_turbo import get_email_client, EmailServiceError
+    from services.email_templates import verification_email_html, verification_email_text
+    from utils.url_detector import build_verification_url
+
+    result = await db.execute(
+        select(models.User).where(models.User.email == payload.email)
+    )
+    user = result.scalar_one_or_none()
+
+    # Não revela se email existe ou não (segurança)
+    if not user:
+        return schemas.ResendVerificationResponse(
+            sent=True,
+            message="Se o email existir, uma nova verificação será enviada.",
+        )
+
+    if user.is_verified:
+        return schemas.ResendVerificationResponse(
+            sent=True,
+            message="Email já verificado. Você já pode fazer login.",
+            already_verified=True,
+        )
+
+    # Rate-limit: 60s entre reenvios
+    if (
+        user.verification_sent_at
+        and (datetime.now(timezone.utc) - user.verification_sent_at).total_seconds() < 60
+    ):
+        raise HTTPException(
+            status_code=429,
+            detail="Aguarde 60 segundos antes de pedir outro reenvio.",
+        )
+
+    # Gera novo token
+    new_token = _secrets.token_urlsafe(32)
+    user.verification_token = new_token
+    user.verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+    user.verification_sent_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    verify_url = build_verification_url(new_token)
+    try:
+        client = get_email_client()
+        await client.send_email(
+            to_email=user.email,
+            subject="Confirme seu email — AYRIA ✨ (reenvio)",
+            body_html=verification_email_html(user.full_name, verify_url),
+            body_text=verification_email_text(user.full_name, verify_url),
+        )
+    except EmailServiceError as e:
+        logger.error(f"Falha ao reenviar verificação: {e}")
+        raise HTTPException(status_code=502, detail="Falha ao enviar email. Tente novamente.")
+
+    return schemas.ResendVerificationResponse(
+        sent=True,
+        message="Email de verificação reenviado.",
     )
 
 
@@ -153,9 +317,17 @@ async def login(payload: schemas.UserLogin, request: Request, db: AsyncSession =
     
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Email ou senha inválidos")
-    
+
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Usuário desativado")
+
+    # 🆕 Bloqueia login se email não foi verificado (07/07/2026)
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Confirme seu email antes de fazer login. Verifique sua caixa de entrada.",
+            headers={"X-Email-Verified": "false"},
+        )
     
     # Atualiza last_login
     user.last_login_at = datetime.utcnow()

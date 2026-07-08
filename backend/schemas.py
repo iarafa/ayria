@@ -32,6 +32,29 @@ class TokenResponse(BaseModel):
     user: "UserResponse"
 
 
+# ============ Email Verification (07/07/2026) ============
+
+class RegisterResponse(BaseModel):
+    """Resposta do /register após verificação de email implementada.
+    NÃO retorna access_token — só após user clicar no link do email."""
+    user: "UserResponse"
+    message: str
+    verification_sent: bool
+    email_error: Optional[str] = None
+
+
+class VerifyEmailResponse(BaseModel):
+    success: bool
+    message: str
+    already_verified: bool = False
+
+
+class ResendVerificationResponse(BaseModel):
+    sent: bool
+    message: str
+    already_verified: bool = False
+
+
 class UserResponse(BaseModel):
     id: uuid.UUID
     email: str

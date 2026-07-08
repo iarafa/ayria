@@ -103,6 +103,22 @@ KEYWORDS = {
         r"\bpropósito profissional\b",
         r"\bpedir demiss\w+", r"\bme demit\w+", r"\bdemitir\b",
     ],
+    "logs": [
+        # Termos que indicam relato de erro / bug
+        r"\bdeu erro\b", r"\bdeu pau\b", r"\btravou\b", r"\bcaiu\b",
+        r"\bnão funciona\b", r"\bnão tá funcionando\b", r"\bnão carrega\b",
+        r"\bbug\b", r"\bbugou\b", r"\bfalho[u]?\b", r"\bfalha\b",
+        r"\btimeout\b", r"\btempo esgotado\b",
+        r"\bexceç\w+\b", r"\bexception\b", r"\berr[oa] 500\b", r"\berr[oa] 404\b",
+        r"\berr[oa] 401\b", r"\berr[oa] 403\b", r"\berr[oa] 429\b",
+        r"\bstatus 5\d{2}\b", r"\bstatus 4\d{2}\b",
+        r"\bstack ?trace\b", r"\btraceback\b",
+        r"\bnão conseguiu\b", r"\bnão consegue\b",
+        r"\bnão consigo\b", r"\bdeu ruim\b",
+        r"\bpantalla (azul|preta)\b", r"\btela azul\b", r"\btela preta\b",
+        r"\b(instável|instavel)\b", r"\blentidão\b", r"\bdemorou (muito|demais)\b",
+        r"❌", r"⚠️",
+    ],
 }
 
 
@@ -220,6 +236,7 @@ def classify(
         ("carreira", "carreira"),
         ("luto", "luto"),
         ("religiao", "religião"),
+        ("logs", "erros/bugs"),
     ]
     for mod_key, label in tema_checks:
         if _matches_any(user_message, KEYWORDS[mod_key]):
@@ -247,6 +264,9 @@ def load_modules(module_keys: list[str], db_overrides: dict = None) -> list[str]
     Carrega o conteúdo dos módulos solicitados.
     Ordem: na ordem de module_keys.
     db_overrides: dict {key: content} se admin editou o módulo no banco.
+
+    Módulos especiais:
+      - "logs": injeta dinamicamente o conteúdo do .md + últimos erros do sistema
     """
     db_overrides = db_overrides or {}
     contents = []
@@ -264,7 +284,60 @@ def load_modules(module_keys: list[str], db_overrides: dict = None) -> list[str]
         p = p_supervisor if p_supervisor.exists() else p_normal
 
         if p.exists():
-            contents.append(p.read_text(encoding="utf-8"))
+            content = p.read_text(encoding="utf-8")
+
+            # MÓDULO ESPECIAL: LOGS — anexa últimos erros do sistema em tempo real
+            if key == "logs":
+                content = _inject_recent_errors(content)
+
+            contents.append(content)
         else:
             contents.append(f"# === MÓDULO: {key.upper()} ===\n\n(módulo não encontrado)")
     return contents
+
+
+def _inject_recent_errors(module_content: str) -> str:
+    """
+    Anexa os últimos N erros do log do sistema ao módulo `logs`.
+    Se o arquivo de log não existir (backend ainda não gravou nada),
+    deixa só o conteúdo do .md.
+    """
+    try:
+        import os
+        import glob
+        import re
+        from datetime import datetime, timezone
+
+        log_dir = os.getenv("AYRIA_LOG_DIR", "/app/logs")
+        files = sorted(glob.glob(os.path.join(log_dir, "ayria.log*")), key=os.path.getmtime, reverse=True)
+        if not files:
+            return module_content + "\n\n## LOGS DO SISTEMA (tempo real)\n\n_Nenhum log encontrado ainda em `" + log_dir + "` — backend ainda não gravou nada._\n"
+
+        main_log = files[0]
+        with open(main_log, "r", encoding="utf-8", errors="replace") as f:
+            content = f.readlines()
+
+        # Detecta erros (mesma regex do endpoint /debug/errors)
+        patterns = [
+            r"\bERROR\b", r"\bEXCEPTION\b", r"\bTraceback\b", r"\bUNCAUGHT\b",
+            r"❌", r"\bFailed\b", r"status: \d{3}.*[45]\d{2}",
+        ]
+        regex = re.compile("|".join(patterns), re.IGNORECASE)
+        errors = [ln.rstrip() for ln in content if regex.search(ln)]
+        last_errors = errors[-20:]  # últimos 20
+
+        size = os.path.getsize(main_log)
+        mod_time = datetime.fromtimestamp(os.path.getmtime(main_log), timezone.utc).isoformat()
+
+        injection = (
+            "\n\n## LOGS DO SISTEMA (tempo real — lido agora)\n\n"
+            f"- **Arquivo:** `{main_log}` ({size:,} bytes)\n"
+            f"- **Última modificação:** {mod_time}\n"
+            f"- **Erros nas últimas linhas:** {len(last_errors)} (mostrando até 20)\n\n"
+            "```\n"
+            + ("\n".join(last_errors) if last_errors else "_(nenhum erro recente)_")
+            + "\n```\n"
+        )
+        return module_content + injection
+    except Exception as e:
+        return module_content + f"\n\n## LOGS DO SISTEMA\n\n_⚠️ Falha ao ler log: {e}_\n"

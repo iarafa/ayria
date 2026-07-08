@@ -2,6 +2,7 @@
  * AYRIA - API Client (axios)
  */
 import axios from 'axios'
+import { logError } from './logClient'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
@@ -84,6 +85,20 @@ api.interceptors.response.use(
         window.location.href = '/login'
         return Promise.reject(refreshErr)
       }
+    }
+
+    // 🆕 LOG AUTOMÁTICO: erros 4xx/5xx vão pro log do backend
+    // (exceto /api/admin/log/event — evita loop se o próprio log falha)
+    if (
+      error.response?.status &&
+      error.response.status >= 400 &&
+      !original.url?.includes('/api/admin/log/event')
+    ) {
+      logError('axios', `${error.config?.method?.toUpperCase()} ${original.url}`, `HTTP ${error.response.status}`, {
+        status: error.response.status,
+        data: error.response.data,
+        params: error.config?.params,
+      })
     }
 
     return Promise.reject(error)
@@ -270,8 +285,9 @@ export const adminApi = {
     api.post('/api/admin/prompt/rag/delete', data),
 
   // Debug — log do backend (admin only)
-  debugLog: (params: { lines?: number; filter?: string } = {}) =>
+  debugLog: (params: { lines?: number; filter?: string; level?: string } = {}) =>
     api.get('/api/admin/debug/log', { params, responseType: 'text' }),
+  debugLogInfo: () => api.get('/api/admin/debug/log/info'),
 
   // Prompt Chat — admin conversa COM contexto do MD carregado
   promptChat: (data: { key: string; user_message: string; history?: any[]; initial_context?: string }) =>

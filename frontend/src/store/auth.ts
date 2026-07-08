@@ -105,6 +105,16 @@ export const useAuth = create<AuthState>((set) => ({
         full_name: fullName,
         plan_slug: planSlug,
       })
+
+      // 🆕 Email verification (07/07/2026):
+      // Backend retorna RegisterResponse (SEM access_token).
+      // User precisa verificar email antes de logar.
+      if (!data.access_token) {
+        set({ loading: false })
+        return true  // sucesso, mas sem logar
+      }
+
+      // Fallback: backend antigo (sem verificação) ainda retorna token
       const newToken = data.access_token
 
       const oldToken = localStorage.getItem('ayria_token')
@@ -116,7 +126,6 @@ export const useAuth = create<AuthState>((set) => ({
         return false
       }
 
-      // ✅ FIX: limpa chat store antes de setar novo user
       try { useChat.getState().reset() } catch {}
 
       localStorage.setItem('ayria_token', newToken)

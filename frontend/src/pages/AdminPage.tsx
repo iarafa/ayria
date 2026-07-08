@@ -8,12 +8,13 @@ import { adminApi, api } from '../lib/api'
 import { LogoIcon } from '../components/Logo'
 import { Users, FileText, Settings, LogOut, UserPlus, X, Shield, Wallet, Plus, Tag, Edit3, Eye, ChevronDown, ChevronRight, Calendar, MapPin, Star, Heart, Briefcase, Sparkles, ExternalLink, Cpu, CheckCircle2, AlertCircle, Database, Cloud, Activity, AlertTriangle, MessageCircle, MessageSquare, Receipt, User, Clock, Calculator, ClipboardList } from 'lucide-react'
 import { AlmaTab } from '../components/AlmaTab'
+import { LogsTab } from '../components/LogsTab'
 import { SupervisorPromptModal } from '../components/SupervisorPromptModal'
 import { SupervisorKeywordsViewer } from '../components/SupervisorKeywordsViewer'
 import { BlockUserModal } from '../components/BlockUserModal'
 import { AdminChangePasswordModal } from '../components/AdminChangePasswordModal'
 
-type Tab = 'users' | 'plans' | 'credits' | 'knowledge' | 'onboarding' | 'attributes' | 'settings' | 'supervision' | 'alma'
+type Tab = 'users' | 'plans' | 'credits' | 'knowledge' | 'onboarding' | 'attributes' | 'settings' | 'supervision' | 'alma' | 'logs'
 
 export function AdminPage() {
   const { user, logout } = useAuth()
@@ -180,6 +181,7 @@ export function AdminPage() {
             { id: 'knowledge', label: 'Conhecimento', icon: FileText },
             { id: 'supervision', label: 'Supervisão', icon: Activity },
             { id: 'alma', label: 'ALMA', icon: Sparkles },
+            { id: 'logs', label: 'Logs', icon: AlertTriangle },
             { id: 'settings', label: 'Configurações', icon: Cpu },
           ].map((t) => (
             <button
@@ -402,6 +404,7 @@ export function AdminPage() {
 
         {/* SETTINGS / CONFIGURAÇÕES DO SISTEMA */}
         {tab === 'settings' && <SystemSettingsTab />}
+        {tab === 'logs' && <LogsTab />}
 
         {/* SUPERVISÃO - monitoramento de risco */}
         {tab === 'supervision' && <SupervisionTab />}

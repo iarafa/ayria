@@ -964,11 +964,6 @@ function RagStatusPanel() {
   const [loading, setLoading] = useState(true)
   const [working, setWorking] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
-  const [logOpen, setLogOpen] = useState(false)
-  const [logContent, setLogContent] = useState<string>('')
-  const [logLoading, setLogLoading] = useState(false)
-  const [logFilter, setLogFilter] = useState('')
-
   const load = async () => {
     setLoading(true)
     try {
@@ -1051,24 +1046,6 @@ function RagStatusPanel() {
     }
   }
 
-  const openLog = async () => {
-    setLogOpen(true)
-    await refreshLog()
-  }
-
-  const refreshLog = async () => {
-    setLogLoading(true)
-    try {
-      // Chama endpoint /api/admin/debug/log e recebe texto puro
-      const { data } = await adminApi.debugLog({ lines: 300, filter: logFilter })
-      setLogContent(typeof data === 'string' ? data : JSON.stringify(data, null, 2))
-    } catch (e: any) {
-      setLogContent(formatError(e, 'carregar log'))
-    } finally {
-      setLogLoading(false)
-    }
-  }
-
   if (loading) return <div className="text-ayria-muted py-12 text-center">Carregando status RAG...</div>
   if (!status) return null
 
@@ -1105,14 +1082,6 @@ function RagStatusPanel() {
         >
           <RefreshCw size={14} className={working === 'all' ? 'animate-spin' : ''} />
           {working === 'all' ? 'Reindexando...' : 'Reindexar tudo'}
-        </button>
-        <button
-          onClick={openLog}
-          className="px-4 py-2 rounded-lg font-semibold text-white flex items-center gap-2"
-          style={{ background: '#1E1E2E' }}
-          title="Ver log do backend em tempo real"
-        >
-          📋 LOG
         </button>
       </div>
 
@@ -1195,51 +1164,7 @@ function RagStatusPanel() {
         </div>
       )}
 
-      {/* Modal de LOG */}
-      {logOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.7)' }}
-          onClick={() => setLogOpen(false)}
-        >
-          <div
-            className="w-full max-w-4xl max-h-[80vh] flex flex-col rounded-2xl overflow-hidden"
-            style={{ background: '#0a0a0a', border: '1px solid #1E1E2E' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid #1E1E2E' }}>
-              <h3 className="text-lg font-bold text-ayria-text">📋 Log do Backend</h3>
-              <button onClick={() => setLogOpen(false)} className="text-ayria-muted hover:text-ayria-text text-xl">×</button>
-            </div>
-            <div className="p-3 flex gap-2 items-center" style={{ borderBottom: '1px solid #1E1E2E' }}>
-              <input
-                type="text"
-                placeholder="Filtrar (ex: reindex, qdrant, error)"
-                value={logFilter}
-                onChange={(e) => setLogFilter(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') refreshLog() }}
-                className="flex-1 px-3 py-1.5 rounded text-sm text-ayria-text outline-none"
-                style={{ background: '#111', border: '1px solid #1E1E2E' }}
-              />
-              <button
-                onClick={refreshLog}
-                disabled={logLoading}
-                className="px-3 py-1.5 rounded text-sm text-white disabled:opacity-50"
-                style={{ background: '#6366F1' }}
-              >
-                {logLoading ? 'Carregando...' : 'Atualizar'}
-              </button>
-            </div>
-            <pre
-              className="flex-1 p-4 text-xs overflow-auto"
-              style={{ fontFamily: 'ui-monospace, monospace', color: '#E5E5E5', maxHeight: '60vh' }}
-            >
-              {logContent || '(vazio - clique Atualizar)'}
-            </pre>
-          </div>
-        </div>
-      )}
-    </div>
+      </div>
   )
 }
 

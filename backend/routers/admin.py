@@ -2517,3 +2517,54 @@ async def restore_supervisor_prompt_default(
         "deactivated": res.rowcount or 0,
         "message": "Prompt do supervisor restaurado pro padrão.",
     }
+
+
+# ============================================================
+# FRONTEND ERROR INGEST — recebe erros do frontend e grava no log
+# ============================================================
+import traceback as _tb
+
+_frontend_logger = logging.getLogger("ayria.frontend")
+
+
+class FrontendLogEvent(BaseModel):
+    """Evento de erro reportado pelo frontend."""
+    level: str = "error"  # error | warn | info
+    source: Optional[str] = None  # ex: "AdminPage", "ChatPage"
+    context: Optional[str] = None  # ex: "loadUsers", "sendMessage"
+    message: str
+    data: Optional[dict] = None
+    url: Optional[str] = None
+    user_agent: Optional[str] = None
+
+
+@router.post("/log/event", status_code=201)
+async def ingest_frontend_log(
+    event: FrontendLogEvent,
+    request: Request,
+    admin: models.User = Depends(require_admin),
+):
+    """
+    Recebe evento de erro do frontend e grava no log do backend.
+    Assim o módulo `logs` vê erros do frontend também.
+    """
+    ip = request.client.host if request.client else "?"
+    payload = {
+        "source": event.source,
+        "context": event.context,
+        "message": event.message,
+        "data": event.data,
+        "url": event.url,
+        "ip": ip,
+        "user_agent": event.user_agent,
+    }
+    msg = f"[FRONTEND] {event.source or '?'}/{event.context or '?'} | {event.message}"
+
+    if event.level == "error":
+        _frontend_logger.error("%s | %s", msg, json.dumps(payload, ensure_ascii=False, default=str))
+    elif event.level == "warn":
+        _frontend_logger.warning("%s | %s", msg, json.dumps(payload, ensure_ascii=False, default=str))
+    else:
+        _frontend_logger.info("%s | %s", msg, json.dumps(payload, ensure_ascii=False, default=str))
+
+    return {"ok": True, "logged": event.level}

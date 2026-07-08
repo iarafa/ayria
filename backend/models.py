@@ -32,6 +32,11 @@ class User(Base):
     role = Column(String(20), default="user", index=True)  # user | admin | SUPER_ADMIN
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
+    # ============ Email verification (07/07/2026) ============
+    verification_token = Column(String(64), index=True)  # single-use, expira em 24h
+    verification_token_expires_at = Column(DateTime(timezone=True))
+    verification_sent_at = Column(DateTime(timezone=True))  # rate-limit reenvio
+    verified_at = Column(DateTime(timezone=True))  # quando clicou no link
     numerology_data = Column(JSONB)  # mapa numerológico calculado
     astrology_data = Column(JSONB)  # mapa astral completo (sol, lua, asc, planetas, casas)
     profile_status = Column(String(50), default="pending")  # pending|calculating|ready|failed

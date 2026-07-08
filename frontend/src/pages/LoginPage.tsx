@@ -77,6 +77,13 @@ export function LoginPage() {
               style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}
             >
               {error}
+              {error.includes('Confirme seu email') && (
+                <div className="mt-2">
+                  <Link to="/register" className="underline text-ayria-primary">
+                    Reenviar email de verificação
+                  </Link>
+                </div>
+              )}
             </div>
           )}
 

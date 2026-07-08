@@ -16,7 +16,7 @@ from fastapi.responses import PlainTextResponse
 
 from utils.security import require_admin
 
-router = APIRouter()
+router = APIRouter(prefix="/api/admin", tags=["debug"])
 logger = logging.getLogger(__name__)
 
 # Caminhos padrão de log (configurável via env)
