@@ -246,8 +246,8 @@ export function PromptChatModal({
                   }`}
                 >
                   {m.content}
-                  {/* 🆕 BOTÃO INLINE: SEMPRE na última msg assistant (com ou sem bloco markdown detectado) */}
-                  {isLastAssistant && m.content.length > 200 && (
+                  {/* 🆕 BOTÃO INLINE: só aparece se houver proposedContent detectado */}
+                  {isLastAssistant && proposedContent && proposedContent.length > 0 && (
                     <div
                       className="mt-3 p-3 rounded-xl border-2 flex items-center justify-between gap-2"
                       style={{
