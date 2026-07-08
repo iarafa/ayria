@@ -53,6 +53,7 @@ SCHEMA_MARKERS = {
     "011_prompt_unique_fix.sql":  "INDEX idx_ayria_prompt_active_key",
     "012_user_block.sql":         "COLUMN users.blocked_until",
     "013_email_verification.sql": "COLUMN users.verification_token",
+    "014_backfill_verified.sql": "is_verified_users_backfilled",
 }
 
 
@@ -89,6 +90,17 @@ async def _check_marker(db: AsyncSession, marker: str | None) -> bool:
                 WHERE indexname = :name LIMIT 1
             """), {"name": target})
             return result.scalar() is not None
+
+        # Marcadores especiais (não-ANSI)
+        elif marker == "is_verified_users_backfilled":
+            # Considera aplicada se NÃO existe nenhum user com is_verified=FALSE E verification_token IS NULL
+            # (esses são os "antigos sem verificar" que precisam do backfill)
+            result = await db.execute(text("""
+                SELECT 1 FROM users
+                WHERE is_verified = FALSE AND verification_token IS NULL
+                LIMIT 1
+            """))
+            return result.scalar() is None
 
     except Exception as e:
         logger.warning(f"   ⚠️ Erro ao verificar marca {marker}: {e}")
