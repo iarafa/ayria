@@ -550,6 +550,47 @@ async def send_message(
     )
     db.add(user_msg)
 
+    # 🆕 08/07/2026 — DETECÇÃO DE PREFERENCE SIGNAL (orelha da sub-alma)
+    # Se user pedir mudança de tom/estilo/apelido, regenera a sub-alma
+    # dele em BACKGROUND (auto-merge → active direto, conforme plano §5).
+    # Não bloqueia a resposta da IA — corre em paralelo.
+    try:
+        from services.preference_signal import detect_preference_signal, describe_signal
+        from services.sub_alma_service import generate_user_sub_alma
+        from database import AsyncSessionLocal
+
+        signal = detect_preference_signal(payload.content)
+        if signal:
+            async def _regenerate_from_signal():
+                try:
+                    async with AsyncSessionLocal() as bg_db:
+                        await generate_user_sub_alma(
+                            bg_db,
+                            user_id=user.id,
+                            trigger="preference_signal",
+                            created_by=None,
+                            auto_approve=True,  # auto-merge — vai pra active direto
+                        )
+                    # Invalida cache da sub-alma pra próxima msg já pegar a nova
+                    if hasattr(user, "id"):
+                        cache_key = f"_user_sub_alma_cache_{user.id}"
+                        if cache_key in globals():
+                            del globals()[cache_key]
+                    logger.info(
+                        f"📝 Preference signal regenerou sub-alma: user={user.email} "
+                        f"signal={describe_signal(signal)}"
+                    )
+                except Exception as _e:
+                    logger.error(f"❌ Falha ao regenerar sub-alma após preference signal: {_e}")
+
+            background_tasks.add_task(_regenerate_from_signal)
+            logger.info(
+                f"🎯 Preference signal detectado: user={user.email} "
+                f"signal={describe_signal(signal)}"
+            )
+    except Exception as _e:
+        logger.warning(f"Falha no detector de preference signal: {_e}")
+
     # 2.0 SISTEMA 2 — Detecta se a mensagem do user responde uma pergunta pendente
     # Quando user responde no campo de chat normal e a resposta é válida, marca como answered automaticamente
     try:
