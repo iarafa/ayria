@@ -9,9 +9,9 @@
  * quem decide se bloqueia ou não na tela de Supervisão.
  */
 import { useEffect, useState } from 'react'
-import { Eye, EyeOff, Loader2, FileText, AlertCircle, Shield, Edit3 } from 'lucide-react'
+import { Eye, EyeOff, Loader2, FileText, AlertCircle, Shield, Sparkles } from 'lucide-react'
 import { adminApi } from '../lib/api'
-import { KeywordsEditorModal } from './KeywordsEditorModal'
+import { KeywordBlockChatModal } from './KeywordBlockChatModal'
 
 interface KeywordCategory {
   key: string
@@ -28,8 +28,14 @@ export function SupervisorKeywordsViewer() {
     categorias: KeywordCategory[]
   } | null>(null)
   const [loading, setLoading] = useState(true)
-  const [editorOpen, setEditorOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  // 🆕 08/07/2026 — chat trancado por bloco
+  const [blockChat, setBlockChat] = useState<{
+    category: string
+    label: string
+    color: string
+    current: string[]
+  } | null>(null)
   const [openCats, setOpenCats] = useState<Record<string, boolean>>({
     N1: true,
     N2: false,
@@ -89,19 +95,18 @@ export function SupervisorKeywordsViewer() {
           <div className="text-[10px] text-ayria-muted hidden sm:block">
             Fonte: <code className="font-mono">{data.source?.split('/').pop()}</code>
           </div>
-          <button
-            onClick={() => setEditorOpen(true)}
-            className="text-xs px-2.5 py-1 rounded-lg flex items-center gap-1 font-semibold transition-all hover:opacity-90"
+          <span
+            className="text-[10px] px-2 py-0.5 rounded font-bold flex items-center gap-1"
             style={{
-              background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(20,184,166,0.15))',
-              color: '#6EE7B7',
-              border: '1px solid rgba(16,185,129,0.3)',
+              background: 'rgba(99,102,241,0.12)',
+              color: '#A5B4FC',
+              border: '1px solid rgba(99,102,241,0.3)',
             }}
-            title="Editar arquivo keywords_crise.md (hot-reload)"
+            title="A edição é por bloco. Clique em 'Editar com IA' em cada categoria abaixo."
           >
-            <Edit3 size={12} />
-            Editar
-          </button>
+            <Sparkles size={10} />
+            editar por bloco
+          </span>
         </div>
       </div>
 
@@ -148,6 +153,30 @@ export function SupervisorKeywordsViewer() {
                   {cat.count} {cat.count === 1 ? 'padrão' : 'padrões'}
                 </span>
               </button>
+              {/* 🆕 Botão dedicado: Editar com IA (contexto trancado neste bloco) */}
+              <div className="px-3 pb-2 flex justify-end">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setBlockChat({
+                      category: cat.key,
+                      label: cat.label,
+                      color: cat.color,
+                      current: cat.patterns,
+                    })
+                  }}
+                  className="text-[11px] px-2.5 py-1 rounded-md flex items-center gap-1 font-bold transition-all hover:opacity-90"
+                  style={{
+                    background: `linear-gradient(135deg, ${cat.color}, ${cat.color}cc)`,
+                    color: '#0A0A0A',
+                    border: `1px solid ${cat.color}`,
+                  }}
+                  title={`Chat trancado nesta categoria (${cat.count} keywords) — só a IA vê este bloco`}
+                >
+                  <Sparkles size={11} />
+                  ✏️ Editar com IA
+                </button>
+              </div>
 
               {open && (
                 <div
@@ -191,11 +220,15 @@ export function SupervisorKeywordsViewer() {
         </span>
       </div>
 
-      {/* Modal de edição */}
-      <KeywordsEditorModal
-        open={editorOpen}
-        onClose={() => setEditorOpen(false)}
-        onSaved={() => setReloadKey((k) => k + 1)}
+      {/* 🆕 Modal de chat trancado por categoria (08/07/2026) */}
+      <KeywordBlockChatModal
+        open={!!blockChat}
+        category={blockChat?.category ?? null}
+        categoryLabel={blockChat?.label ?? ''}
+        categoryColor={blockChat?.color ?? '#94A3B8'}
+        currentKeywords={blockChat?.current ?? []}
+        onClose={() => setBlockChat(null)}
+        onApplied={() => setReloadKey((k) => k + 1)}
       />
     </div>
   )

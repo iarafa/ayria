@@ -14,7 +14,7 @@ from datetime import datetime, date, timedelta
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc, and_, or_
 from pydantic import BaseModel, Field
@@ -22,6 +22,8 @@ import logging
 
 from database import get_db
 from utils.security import require_admin
+from services.ai_service import ai_service
+from services.supervisor_service import SupervisorService
 import models
 
 router = APIRouter(prefix="/api/admin/supervisor", tags=["supervisor"])
@@ -707,3 +709,290 @@ async def get_user_timeline(
         "open_alerts": open_alerts,
         "daily_history": daily,
     }
+
+
+# ============================================================
+# 🆕 CHAT PRA EDITAR 1 BLOCO DE KEYWORDS (08/07/2026)
+# - POST /api/admin/supervisor/keywords/{category}/chat   → fala com IA focada só naquela categoria
+# - POST /api/admin/supervisor/keywords/{category}/apply  → aplica {add, remove} no MD
+# ============================================================
+from pydantic import BaseModel as _BB
+from typing import List as _LL
+
+
+class _ChatMsg(_BB):
+    role: str  # 'user' | 'assistant' | 'system'
+    content: str
+
+
+class _ChatReq(_BB):
+    messages: _LL[_ChatMsg]  # histórico (vai começar com 1 system prompt injetado automaticamente)
+
+
+class _ApplyReq(_BB):
+    keywords_to_add: _LL[str] = []
+    keywords_to_remove: _LL[str] = []
+
+
+# Ordem das categorias válidas + descrição fixa (bloqueia IA de inventar conteúdo).
+_KEYWORD_CATEGORIES = {
+    "N1": "Risco imediato à VIDA (suicídio, autolesão, homicídio). Era: bloqueava chat. Hoje: gera alerta URGÊNCIA.",
+    "N2": "Crimes / violência doméstica / ameaças concretas. Era: bloqueava chat. Hoje: gera alerta URGÊNCIA.",
+    "N3": "Vícios / compulsões (álcool, drogas, jogos). Hoje: gera alerta ATENÇÃO (admin decide).",
+    "ATENCAO": "Sinais moderados de sofrimento emocional (tristeza profunda, desespero, isolamento). Hoje: gera alerta ATENÇÃO (admin decide).",
+    "SLIGHT": "Verbos soltos (matar/morrer/morrendo) que viram risco SÓ em contexto (ex: \"morreu de rir\"). Anulável por NEGATIVE.",
+    "NEGATIVE": "Palavras/frases que ANULAM um match positivo (ex: \"morreu de rir\", \"morto de cansaco\"). Falsos positivos comuns.",
+}
+
+
+def _build_block_chat_system_prompt(category: str, current_keywords: list) -> str:
+    """System prompt com contexto completo da categoria pro chat de bloco.
+
+    A IA fica TRANCADA nesta categoria: só pode sugerir keywords pra ela,
+    sabe o que ela significa, vê a lista atual, sabe o formato exato (- "frase").
+    """
+    import json
+    if category not in _KEYWORD_CATEGORIES:
+        raise HTTPException(status_code=400, detail=f"Categoria '{category}' inválida. Válidas: {list(_KEYWORD_CATEGORIES.keys())}")
+    cat_desc = _KEYWORD_CATEGORIES[category]
+    current_kw_list = current_keywords[:]
+    return f"""Você é um assistente especialista em curadoria de keywords do sistema supervisor da AYRIA.
+Você está EXCLUSIVAMENTE trabalhando na categoria `{category}`.
+
+# O QUE É ESTA CATEGORIA
+{cat_desc}
+
+# SEU ESCOPO — REGRA INEGOCIÁVEL
+- Você SÓ pode sugerir keywords pra esta categoria `{category}`.
+- Você NÃO pode sugerir keywords pra outras categorias (N1/N2/N3/ATENCAO/SLIGHT/NEGATIVE têm propósitos diferentes).
+- Você NÃO pode falar sobre usuários, chats, ou qualquer outro tema.
+- Se o admin pedir algo fora do escopo, recuse educadamente e peça pra focar nesta categoria.
+
+# FORMATO DE SAÍDA (importante!)
+Quando o admin pedir pra adicionar/remover keywords, responda **EXCLUSIVAMENTE** com este JSON (sem markdown, sem explicações):
+
+{{"add": ["frase 1", "frase 2", ...], "remove": ["frase antiga 1", ...]}}
+
+Regras do JSON:
+- "add": keywords NOVAS a serem adicionadas (sem aspas internas; lowercase; sem acentos se possível pra aumentar match)
+- "remove": keywords ATUAIS que devem sair (use a grafia EXATA da lista atual)
+- Se não houver mudanças, retorne: {{"add": [], "remove": []}}
+- Pode usar "explicacao" opcional se quiser mostrar uma frase curta ANTES do JSON, ex: "Adicionei 5 termos novos focados em métodos letais." seguido do JSON
+
+# KEYWORDS ATUAIS NESTA CATEGORIA ({len(current_kw_list)} total):
+{json.dumps(current_kw_list, ensure_ascii=False, indent=2)}
+
+# DICAS DE BOA CURRÍCULA
+- Prefira frases/termos CURTOS (1-4 palavras). "quero morrer" > "na verdade eu gostaria de morrer"
+- Não adicione frases com gíria regional extrema (vai dar match só em 1 região)
+- Evite keywords redundantes com as já existentes (não duplica!)
+- Em NEGATIVE/SLIGHT, foque em expressões idiomáticas que ANULAM ou atenuam um match (ex: "de fome", "de rir", "morto de cansaco")
+
+Quando o admin só pedir uma OPINIÃO sobre a lista atual (sem mudança), responda em texto livre, sem JSON.
+"""
+
+
+@router.post("/keywords/{category}/chat")
+async def keyword_block_chat(
+    category: str,
+    payload: _ChatReq,
+    request: Request,
+    admin: models.User = Depends(require_admin),
+):
+    """Chat TRANCADO numa categoria específica de keywords.
+
+    Fluxo:
+    1. Admin envia 1..N mensagens (sem system prompt — backend injeta)
+    2. Backend carrega keywords atuais da categoria
+    3. Backend monta system prompt com contexto EXCLUSIVO desta categoria
+    4. IA responde focada, em JSON estruturado ({add, remove}) ou texto livre
+
+    NÃO consome créditos do admin (não passa por /api/chat/message).
+    """
+    from services.supervisor_service import SupervisorService
+    import json as _json
+
+    # Contexto dinâmico: keywords atuais
+    current = SupervisorService._load_keywords_from_md().get(category, [])
+    # `current` é lista de regex compilados; pegar os patterns (txt)
+    txt_patterns = [p.pattern.replace("\\b", "") for p in current]
+
+    system_prompt = _build_block_chat_system_prompt(category, txt_patterns)
+
+    msgs = [{"role": m.role, "content": m.content} for m in payload.messages]
+    try:
+        resp = await ai_service.chat(
+            messages=msgs,
+            system_prompt=system_prompt,
+            temperature=0.4,
+            max_tokens=1500,
+        )
+        content = resp.choices[0].message.content or ""
+        return {
+            "category": category,
+            "message": {"role": "assistant", "content": content},
+            "current_keywords": txt_patterns,
+            "model": ai_service.model,
+        }
+    except Exception as e:
+        logger.error(f"❌ Erro no chat de keywords/{category}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro na IA: {e}")
+
+
+@router.post("/keywords/{category}/apply")
+async def keyword_block_apply(
+    category: str,
+    payload: _ApplyReq,
+    request: Request,
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Aplica {add, remove} no arquivo keywords_crise.md da categoria.
+
+    Faz merge inteligente:
+    - Remove keywords da lista atual que estão em `remove` (case-insensitive)
+    - Adiciona keywords novas do `add` (com deduplicação, ignora as que já existem)
+    - Re-escreve o arquivo .md preservando o resto das categorias intacto
+    - Backup automático (.bak.<ts>)
+    """
+    import re as _re
+    from pathlib import Path
+    from services.supervisor_service import SupervisorService
+
+    admin_email = admin.email  # capturar cedo
+
+    if category not in _KEYWORD_CATEGORIES:
+        raise HTTPException(status_code=400, detail=f"Categoria '{category}' inválida")
+
+    # Pega o conteúdo cru
+    raw = SupervisorService._load_keywords_from_md()
+    p = raw.get("_source")
+    if not p:
+        raise HTTPException(status_code=404, detail="keywords_crise.md não encontrado")
+    pf = Path(p)
+    if not pf.exists():
+        raise HTTPException(status_code=404, detail="Arquivo inexistente")
+
+    content = pf.read_text(encoding="utf-8")
+    lines = content.splitlines()
+
+    # Mapas auxiliares
+    add_set = {(_re.sub(r"\s+", " ", k.strip().lower()).strip('"\'')) for k in payload.keywords_to_add if k.strip()}
+    remove_set = {(_re.sub(r"\s+", " ", k.strip().lower()).strip('"\'')) for k in payload.keywords_to_remove if k.strip()}
+
+    new_lines = []
+    in_target_cat = False
+    added_now = []
+    removed_now = []
+    pre_existing_in_cat = set()
+
+    for line in lines:
+        stripped = line.strip()
+        # Detectar início de categoria
+        if stripped.startswith("##"):
+            head = stripped.lstrip("#").strip().upper()
+            # Map head → category key (N1, N2, N3, ATENCAO, SLIGHT, NEGATIVE)
+            target_upper = category.upper()
+            if head.startswith(target_upper) or head == target_upper:
+                in_target_cat = True
+                new_lines.append(line)
+                continue
+            # SLIGHT/NEGATIVE têm tratamento especial
+            if target_upper == "NEGATIVE" and head.startswith("NEGATIVE"):
+                in_target_cat = True
+                new_lines.append(line); continue
+            if target_upper == "SLIGHT" and head.startswith("SLIGHT"):
+                in_target_cat = True
+                new_lines.append(line); continue
+            in_target_cat = False
+            new_lines.append(line)
+            continue
+
+        # Se estamos na categoria alvo
+        if in_target_cat and (stripped.startswith("-") or stripped.startswith('"') or stripped.startswith("'")):
+            txt_full = line.lstrip("- ").strip()
+            txt_clean = txt_full.split("#", 1)[0].strip().strip('"\'').lower()
+            txt_norm = _re.sub(r"\s+", " ", txt_clean)
+
+            # já existe, ignora adição duplicada
+            pre_existing_in_cat.add(txt_norm)
+
+            # Remover?
+            if txt_norm in remove_set or txt_clean in remove_set:
+                removed_now.append(txt_clean)
+                continue  # pula essa linha (remove)
+
+            new_lines.append(line)
+            continue
+
+        new_lines.append(line)
+
+    # Adicionar keywords novas no FINAL da categoria alvo (se tiverem conteúdo novo)
+    if add_set:
+        # Encontrar o índice da PRÓXIMA categoria (## ...) depois do bloco alvo
+        # Inserir antes dela
+        insert_idx = None
+        for idx, line in enumerate(new_lines):
+            s = line.strip()
+            if s.startswith("##") and not _is_category_open(s, category):
+                insert_idx = idx
+                break
+        if insert_idx is None:
+            insert_idx = len(new_lines)
+
+        # Itens a inserir (deduplicados contra pre_existing_in_cat)
+        to_insert = []
+        for kw in sorted(add_set):
+            if kw in pre_existing_in_cat:
+                continue
+            to_insert.append(f'- "{kw}"')
+            added_now.append(kw)
+
+        if to_insert:
+            new_lines.insert(insert_idx, "\n".join(to_insert))
+
+    new_content = "\n".join(new_lines)
+    if not new_content.endswith("\n"):
+        new_content += "\n"
+
+    # Backup antes de salvar
+    import time as _time
+    backup_dir = pf.parent
+    backup_name = f"{pf.name}.bak.{int(_time.time())}"
+    backup_path = backup_dir / backup_name
+    try:
+        backup_path.write_text(content, encoding="utf-8")
+    except Exception as e:
+        logger.warning(f"⚠️ Falha ao fazer backup: {e}")
+
+    # Salvar
+    pf.write_text(new_content, encoding="utf-8")
+
+    # Log
+    logger.info(
+        f"📝 keywords_crise.md aplicado por admin={admin_email} "
+        f"categoria={category} added={len(added_now)} removed={len(removed_now)} backup={backup_path}"
+    )
+
+    # Forçar reload do cache (hot-reload via mtime — basta salvar o arquivo)
+    SupervisorService._keywords_cache = None
+    SupervisorService._keywords_mtime = None
+
+    return {
+        "category": category,
+        "added": added_now,
+        "removed": removed_now,
+        "backup": str(backup_path),
+        "keywords_after": len(pre_existing_in_cat) + len(added_now) - len(removed_now),
+    }
+
+
+def _is_category_open(line_stripped: str, target_key: str) -> bool:
+    head = line_stripped.lstrip("#").strip().upper()
+    t = target_key.upper()
+    if head.startswith(t) or head == t:
+        return True
+    if t == "NEGATIVE" and head.startswith("NEGATIVE"): return True
+    if t == "SLIGHT" and head.startswith("SLIGHT"): return True
+    if t in ("N1", "N2", "N3") and head.startswith(t + " "): return True
+    return False

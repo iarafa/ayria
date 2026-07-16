@@ -24,14 +24,9 @@ export function VerifyEmailPage() {
   const [status, setStatus] = useState<Status>('loading')
   const [errorMsg, setErrorMsg] = useState('')
 
-  // 🆕 UX fix 08/07/2026: redirect automático após 2s pro /login nos casos de sucesso.
-  // Substitui o "tem que clicar no botão". Limpa timer se componente desmontar antes.
-  useEffect(() => {
-    if (status === 'success' || status === 'already') {
-      const t = window.setTimeout(() => navigate('/login', { replace: true }), 2000)
-      return () => window.clearTimeout(t)
-    }
-  }, [status, navigate])
+  // 🆕 UX fix 15/07/2026: remove auto-redirect 2s — user pediu botão "OK" manual.
+  // (Antes redirecionava sozinho; agora fica na tela até o user clicar.)
+  // useEffect(() => { if (status === 'success' || status === 'already') { ... } }, [status, navigate])
 
   useEffect(() => {
     if (!token) {
@@ -94,9 +89,13 @@ export function VerifyEmailPage() {
             <p className="text-ayria-muted">
               Sua conta foi ativada com sucesso.
             </p>
-            <p className="text-sm text-ayria-muted opacity-70">
-              Redirecionando pro login...
-            </p>
+            <button
+              onClick={() => navigate('/login', { replace: true })}
+              className="inline-block px-6 py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90"
+              style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+            >
+              OK, ir pro login
+            </button>
           </>
         )}
 
@@ -112,9 +111,13 @@ export function VerifyEmailPage() {
             <p className="text-ayria-muted">
               Sua conta já está ativa. Pode fazer login.
             </p>
-            <p className="text-sm text-ayria-muted opacity-70">
-              Redirecionando pro login...
-            </p>
+            <button
+              onClick={() => navigate('/login', { replace: true })}
+              className="inline-block px-6 py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90"
+              style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+            >
+              OK, ir pro login
+            </button>
           </>
         )}
 

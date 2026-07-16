@@ -24,3 +24,6 @@ frontend/dist/
 
 # backend logs (gerados em runtime)
 backend/logs/
+
+graphify-out/
+.graphify_*.json

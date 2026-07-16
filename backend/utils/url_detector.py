@@ -63,6 +63,11 @@ def get_public_base_url() -> str:
 
 
 def build_verification_url(token: str) -> str:
-    """Monta URL completa de verificação de email."""
+    """Monta URL completa de verificação de email.
+
+    IMPORTANTE (15/07/2026): frontend usa HashRouter, então o caminho React
+    é lido pelo hash. Sem '#', o React Router cai em '/' → '/chat' (PrivateRoute
+    sem token) → '/login'. Adicionando '#/' garante que a URL vai pra rota certa.
+    """
     base = get_public_base_url()
-    return f"{base}/verify-email?token={token}"
+    return f"{base}/#/verify-email?token={token}"

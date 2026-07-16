@@ -1,6 +1,15 @@
 #!/bin/sh
 set -e
 
+# Carrega secrets auxiliares (secrets em .env são passados via docker run -e)
+# Esse arquivo .turbo-secrets.env fica em /app/ (copiado via volume no docker run)
+if [ -f /app/.turbo-secrets.env ]; then
+    echo "[start.sh] Carregando /app/.turbo-secrets.env"
+    set -a
+    . /app/.turbo-secrets.env
+    set +a
+fi
+
 # Sobe uvicorn em background e nginx em foreground (pid 1)
 mkdir -p /app/logs
 cd /app
