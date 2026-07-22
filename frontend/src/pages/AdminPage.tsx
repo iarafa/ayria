@@ -171,33 +171,50 @@ export function AdminPage() {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-ayria-border">
-          {[
-            { id: 'users', label: 'Usuários', icon: Users },
-            { id: 'plans', label: 'Planos', icon: Tag },
-            { id: 'credits', label: 'Créditos', icon: Wallet },
-            { id: 'knowledge', label: 'Conhecimento', icon: FileText },
-            { id: 'supervision', label: 'Supervisão', icon: Activity },
-            { id: 'alma', label: 'ALMA', icon: Sparkles },
-            { id: 'logs', label: 'Logs', icon: AlertTriangle },
-            { id: 'settings', label: 'Configurações', icon: Cpu },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id as Tab)}
-              className={`px-4 py-3 text-sm flex items-center gap-2 border-b-2 transition-colors ${
-                tab === t.id
-                  ? 'border-ayria-admin text-ayria-text'
-                  : 'border-transparent text-ayria-muted hover:text-ayria-text'
-              }`}
-            >
-              <t.icon size={14} />
-              {t.label}
-            </button>
-          ))}
-        </div>
+      {/* Layout 2-coluna: SIDEBAR à esquerda + CONTEÚDO à direita (Rafael 22/07 20:32) */}
+      <div className="max-w-7xl mx-auto px-6 py-6 flex gap-6">
+        {/* Sidebar fixa lateral esquerda — 240px */}
+        <aside
+          className="w-60 shrink-0 glass rounded-2xl p-3 sticky top-6 self-start"
+          style={{ maxHeight: 'calc(100vh - 3rem)' }}
+        >
+          <nav className="flex flex-col gap-1">
+            {[
+              { id: 'users', label: 'Usuários', icon: Users },
+              { id: 'plans', label: 'Planos', icon: Tag },
+              { id: 'credits', label: 'Créditos', icon: Wallet },
+              { id: 'knowledge', label: 'Conhecimento', icon: FileText },
+              { id: 'supervision', label: 'Supervisão', icon: Activity },
+              { id: 'alma', label: 'ALMA', icon: Sparkles },
+              { id: 'logs', label: 'Logs', icon: AlertTriangle },
+              { id: 'settings', label: 'Configurações', icon: Cpu },
+            ].map((t) => {
+              const isActive = tab === t.id
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id as Tab)}
+                  className={`w-full px-3 py-2.5 text-sm flex items-center gap-3 rounded-xl transition-colors text-left ${
+                    isActive
+                      ? 'bg-ayria-admin/20 text-ayria-text font-medium'
+                      : 'text-ayria-muted hover:bg-[#1a1a1a] hover:text-ayria-text'
+                  }`}
+                  style={
+                    isActive
+                      ? { borderLeft: '3px solid #6366F1', background: 'rgba(99, 102, 241, 0.15)' }
+                      : { borderLeft: '3px solid transparent' }
+                  }
+                >
+                  <t.icon size={16} />
+                  <span>{t.label}</span>
+                </button>
+              )
+            })}
+          </nav>
+        </aside>
+
+        {/* Conteúdo principal */}
+        <main className="flex-1 min-w-0">
 
         {/* Content */}
         {loading && <div className="text-ayria-muted">Carregando...</div>}
@@ -405,13 +422,14 @@ export function AdminPage() {
         {/* SETTINGS / CONFIGURAÇÕES DO SISTEMA */}
         {tab === 'settings' && <SystemSettingsTab />}
         {tab === 'logs' && <LogsTab />}
+        </main>
+      </div>
 
         {/* SUPERVISÃO - monitoramento de risco */}
         {tab === 'supervision' && <SupervisionTab />}
 
         {/* ALMA - editor do system prompt da Ayria */}
         {tab === 'alma' && <AlmaTab />}
-      </div>
 
       {/* MODAL: Criar usuário */}
       {showCreateModal && (
