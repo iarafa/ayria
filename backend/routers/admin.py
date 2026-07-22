@@ -42,11 +42,14 @@ logger = logging.getLogger(__name__)
 async def list_users(
     admin: models.User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
+    role: Optional[str] = None,  # filtro opcional: 'user' | 'admin' | 'SUPER_ADMIN'
 ):
-    """Lista todos os usuários (admin) - inclui plano + saldo de créditos"""
-    res = await db.execute(
-        select(models.User).order_by(models.User.created_at.desc())
-    )
+    """Lista todos os usuários (admin) - inclui plano + saldo de créditos.
+    ?role=admin filtra só admins (usado pela aba 'Administradores')."""
+    stmt = select(models.User).order_by(models.User.created_at.desc())
+    if role:
+        stmt = stmt.where(models.User.role == role)
+    res = await db.execute(stmt)
     users = res.scalars().all()
 
     result = []
@@ -477,6 +480,92 @@ async def admin_change_password(
     )
 
 
+@router.put("/users/{user_id}/role", response_model=schemas.AdminUserResponse)
+async def update_user_role(
+    user_id: uuid.UUID,
+    payload: schemas.AdminRoleUpdate,
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """🆕 22/07 20:38 — Troca role de um usuário. APENAS SUPER_ADMIN pode promover/rebaixar admins.
+    - Promove user → admin ou SUPER_ADMIN
+    - Rebaixa admin → user
+    - SUPER_ADMIN não pode rebaixar a si mesmo (perde acesso)
+    - Não pode rebaixar o último SUPER_ADMIN
+    """
+    # 1) Só SUPER_ADMIN pode mexer em roles (admin comum não pode)
+    if admin.role != "SUPER_ADMIN":
+        raise HTTPException(
+            status_code=403,
+            detail="Apenas SUPER_ADMIN pode alterar roles",
+        )
+
+    # 2) Validação de role
+    if payload.new_role not in ("user", "admin", "SUPER_ADMIN"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Role inválida: {payload.new_role}",
+        )
+
+    # 3) Carrega user alvo
+    res = await db.execute(select(models.User).where(models.User.id == user_id))
+    user = res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    old_role = user.role
+    if old_role == payload.new_role:
+        return user  # nada a fazer
+
+    # 4) SUPER_ADMIN não pode rebaixar a si mesmo (segurança)
+    if user_id == admin.id and payload.new_role != "SUPER_ADMIN":
+        raise HTTPException(
+            status_code=400,
+            detail="Você não pode rebaixar a si mesmo",
+        )
+
+    # 5) Não pode rebaixar o último SUPER_ADMIN
+    if old_role == "SUPER_ADMIN" and payload.new_role != "SUPER_ADMIN":
+        res_count = await db.execute(
+            select(func.count(models.User.id)).where(models.User.role == "SUPER_ADMIN")
+        )
+        super_count = res_count.scalar() or 0
+        if super_count <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Não é possível rebaixar o último SUPER_ADMIN",
+            )
+
+    # 6) Aplica
+    user.role = payload.new_role
+    user.updated_at = datetime.now(timezone.utc)
+
+    # 7) Audit log (model usa user_id + action + details)
+    audit = models.AuditLog(
+        user_id=admin.id,
+        action="role_change",
+        details={
+            "actor_user_id": str(admin.id),
+            "actor_email": admin.email,
+            "target_user_id": str(user.id),
+            "target_email": user.email,
+            "old_role": old_role,
+            "new_role": payload.new_role,
+            "reason": payload.reason or "",
+        },
+    )
+    db.add(audit)
+
+    await db.commit()
+    await db.refresh(user)
+
+    logger.info(
+        f"✅ Role de {user.email} alterada: {old_role} → {payload.new_role} por {admin.email}"
+    )
+
+    return user
+
+
 @router.delete("/users/{user_id}", status_code=204)
 async def delete_user(
     user_id: uuid.UUID,
@@ -501,6 +590,25 @@ async def delete_user(
     user = res.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+    # 🆕 22/07 20:38 — só SUPER_ADMIN pode excluir outros admins (proteção contra admin deletar admin)
+    if user.role in ("admin", "SUPER_ADMIN") and admin.role != "SUPER_ADMIN":
+        raise HTTPException(
+            status_code=403,
+            detail="Apenas SUPER_ADMIN pode excluir outros administradores",
+        )
+    # SUPER_ADMIN não pode ser excluído por ninguém (nem por si mesmo via outro SUPER_ADMIN) —
+    # sempre tem que ter pelo menos 1 SUPER_ADMIN no sistema
+    if user.role == "SUPER_ADMIN":
+        res_count = await db.execute(
+            select(func.count(models.User.id)).where(models.User.role == "SUPER_ADMIN")
+        )
+        super_count = res_count.scalar() or 0
+        if super_count <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Não é possível excluir o último SUPER_ADMIN do sistema",
+            )
 
     deleted_summary = {"pg": {}, "qdrant": 0}
 

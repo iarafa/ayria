@@ -389,6 +389,12 @@ class UserUpdate(BaseModel):
     # NÃO inclui role — promoção não permitida pela UI
 
 
+class AdminRoleUpdate(BaseModel):
+    """Troca role de um usuário. APENAS SUPER_ADMIN pode usar (endpoint protegido)."""
+    new_role: str  # 'user' | 'admin' | 'SUPER_ADMIN'
+    reason: Optional[str] = None  # motivo (auditoria)
+
+
 class AdminPlanUpdate(BaseModel):
     """Admin edita um plano (nome, créditos, preço, ativo). NÃO muda slug (identidade)."""
     name: Optional[str] = Field(default=None, min_length=1, max_length=80)

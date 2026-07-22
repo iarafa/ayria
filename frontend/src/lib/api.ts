@@ -211,7 +211,7 @@ export const chatApi = {
 }
 
 export const adminApi = {
-  listUsers: () => api.get('/api/admin/users'),
+  listUsers: (params?: { role?: string }) => api.get('/api/admin/users', { params }),
   createUser: (data: { email: string; password: string; full_name?: string; role?: string; plan_slug?: string }) =>
     api.post('/api/admin/users', data),
   updateUser: (userId: string, data: { full_name?: string; is_active?: boolean; selected_plan_slug?: string }) =>
