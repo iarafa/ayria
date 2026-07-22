@@ -116,8 +116,15 @@ export default function App() {
           </PrivateRoute>
         }
       />
-      <Route path="/" element={<Navigate to="/chat" replace />} />
-      <Route path="*" element={<Navigate to="/chat" replace />} />
+      <Route path="/" element={<RootRedirect />} />
+      <Route path="*" element={<RootRedirect />} />
     </Routes>
   )
+}
+
+// 🛡️ ADMIN vai direto pro dashboard (Rafael 22/07 17:30)
+function RootRedirect() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'admin'
+  return <Navigate to={isAdmin ? '/admin' : '/chat'} replace />
 }

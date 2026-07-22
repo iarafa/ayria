@@ -47,6 +47,13 @@ export function ChatPage() {
 
 
 
+  // 🛡️ ADMIN não usa chat como user comum (Rafael 22/07 17:30) — redireciona pro dashboard
+  useEffect(() => {
+    if (user?.role === 'SUPER_ADMIN' || user?.role === 'admin') {
+      navigate('/admin', { replace: true })
+    }
+  }, [user, navigate])
+
   useEffect(() => {
     loadChats()
   }, [])

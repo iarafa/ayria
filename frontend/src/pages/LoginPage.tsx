@@ -26,8 +26,11 @@ export function LoginPage() {
     e.preventDefault()
     const ok = await login(email, password)
     if (ok) {
-      // Sem createChat() — ChatPage vai carregar a lista e abrir o chat mais recente (08/07/2026)
-      navigate('/chat')
+      // 🛡️ ADMIN vai direto pro dashboard (Rafael 22/07 17:30)
+      // Admin não usa chat como user comum — só usa pra verificar conversa de user.
+      const u = useAuth.getState().user
+      const isAdmin = u?.role === 'SUPER_ADMIN' || u?.role === 'admin'
+      navigate(isAdmin ? '/admin' : '/chat', { replace: true })
     }
   }
 
