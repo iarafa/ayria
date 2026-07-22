@@ -4,7 +4,10 @@
 import axios from 'axios'
 import { logError } from './logClient'
 
-const API_URL = import.meta.env.VITE_API_URL || ''
+// Fallback '/' garante que axios usa path RELATIVO (resolvido pelo origin do navegador).
+// Sem isso, baseURL='' faz ERR_INVALID_URL em alguns casos e configura de forma estranha
+// em outros. '/' é o mais seguro: front no mesmo host que o Vite proxy → backend.
+const API_URL = (import.meta.env.VITE_API_URL || '/').replace(/\/$/, '') || '/'
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -114,15 +117,13 @@ export interface User {
   role: string
   onboarding_status: string
   numerology_data?: any
-  billing_status?: string | null
-  billing_provider?: string | null
+  billing_status?: string | null  // billing_not_enabled | active | trialing | past_due | canceled | unpaid
+  billing_provider?: string | null  // 'stripe' | null
+  credit_balance?: number
+  selected_plan_slug?: string | null  // basico | intermediario | premium
+  selected_plan_name?: string | null
   external_customer_id?: string | null
   external_subscription_id?: string | null
-  is_verified?: boolean
-  is_active?: boolean
-  selected_plan_id?: string | null
-  credit_balance?: number
-  blocked_until?: string | null
 }
 
 export interface Chat {
@@ -211,13 +212,48 @@ export const chatApi = {
 }
 
 export const adminApi = {
-  listUsers: () => api.get('/api/admin/users'),
+  listUsers: (params?: {
+    search?: string
+    status?: 'all' | 'active' | 'inactive' | 'blocked' | 'pending'
+    role_filter?: 'users_only' | 'all'  // 'users_only' default — aba Usuários NÃO mostra admins
+    page?: number
+    page_size?: number
+  }) => api.get('/api/admin/users', { params }),
   createUser: (data: { email: string; password: string; full_name?: string; role?: string; plan_slug?: string }) =>
     api.post('/api/admin/users', data),
   updateUser: (userId: string, data: { full_name?: string; is_active?: boolean; selected_plan_slug?: string }) =>
     api.put(`/api/admin/users/${userId}`, data),
   deleteUser: (userId: string) =>
     api.delete(`/api/admin/users/${userId}`),
+
+  // ===== Administradores do Sistema (19/07/2026) =====
+  // CRUD completo em /api/admin/admins — separado dos clientes.
+  listAdmins: () => api.get('/api/admin/admins'),
+  createAdmin: (data: { email: string; password: string; full_name?: string }) =>
+    api.post('/api/admin/admins', data),
+  updateAdmin: (adminId: string, data: { full_name?: string; email?: string }) =>
+    api.put(`/api/admin/admins/${adminId}`, data),
+  deleteAdmin: (adminId: string) => api.delete(`/api/admin/admins/${adminId}`),
+  resetAdminPassword: (adminId: string, new_password: string, reason?: string) =>
+    api.post(`/api/admin/admins/${adminId}/password`, { new_password, reason }),
+
+  // ===== Configuração de IA (19/07/2026) =====
+  updateAiConfig: (data: {
+    provider?: string
+    model?: string
+    base_url?: string
+    api_key?: string
+    reset_to_env?: boolean
+  }) => api.put('/api/admin/config/ai', data),
+
+  // ===== Manutenção do Banco (19/07/2026) =====
+  dbStatus: () => api.get('/api/admin/db/status'),
+  dbBackup: () => api.post('/api/admin/db/backup'),
+  dbBackupCloud: () => api.post('/api/admin/db/backup-cloud'),
+  dbVacuum: () => api.post('/api/admin/db/vacuum'),
+  dbTrimAudit: (days: number) => api.post('/api/admin/db/trim-audit', { days }),
+  dbBackups: () => api.get('/api/admin/db/backups'),
+  dbRestore: (file: string, dry_run = true) => api.post('/api/admin/db/restore', { file, dry_run }),
   blockUser: (userId: string, data: { duration: '1h' | '24h' | 'permanent' | 'unblock'; reason?: string }) =>
     api.post(`/api/admin/users/${userId}/block`, data),
   changeUserPassword: (userId: string, data: { new_password: string; reason?: string }) =>
@@ -367,186 +403,129 @@ export const adminApi = {
   // Apagar nota
   deleteUserAnalysisNote: (userId: string, noteId: string) =>
     api.delete(`/api/admin/users/${userId}/analysis/notes/${noteId}`),
-
-  // ============== ADMINS (SystemAdminsTab) ==============
-  listAdmins: () => api.get('/api/admin/admins'),
-  createAdmin: (data: { email: string; password: string; full_name?: string; role?: string }) =>
-    api.post('/api/admin/admins', data),
-  updateAdmin: (adminId: string, data: { email?: string; full_name?: string; role?: string; is_active?: boolean }) =>
-    api.put(`/api/admin/admins/${adminId}`, data),
-  deleteAdmin: (adminId: string) =>
-    api.delete(`/api/admin/admins/${adminId}`),
-  resetAdminPassword: (adminId: string, data: { new_password: string }) =>
-    api.post(`/api/admin/admins/${adminId}/password`, data),
 }
 
-// ============================================================
-//  STRIPE — Checkout, Portal, Webhook
-// ============================================================
+
+// ===== Stripe / Billing (19/07/2026) =====
 export interface StripePlan {
   slug: string
   name: string
-  credits: number
-  tokens?: number
+  tokens: number
   price_brl: number
-  price_id?: string
+  price_id: string
 }
 
 export interface StripeConfig {
   publishable_key: string
+  trial_credits: number
   app_url: string
   plans: StripePlan[]
 }
 
-export interface StripeActiveSubscription {
-  id: string
-  plan_slug: string
-  plan_name: string
-  status: string
-  current_period_end: string | null
-  cancel_at_period_end: boolean
-  stripe_subscription_id: string
-}
-
-export interface StripeMySubscription {
-  user_id: string
-  billing_status: string
-  billing_provider: string | null
-  blocked_until: string | null
-  credit_balance: number
-  active_subscription: StripeActiveSubscription | null
-  history: Array<{
-    id: string
-    plan_slug: string
-    plan_name: string
-    status: string
-    created_at: string
-  }>
-}
-
-export const stripeApi = {
-  // GET /api/stripe/config — lista planos (público)
-  getConfig: () => api.get<StripeConfig>('/api/stripe/config'),
-
-  // GET /api/stripe/me — assinatura ativa do user logado
-  getMySubscription: () =>
-    api.get<StripeMySubscription>('/api/stripe/me'),
-
-  // POST /api/stripe/create-checkout-session
-  createCheckoutSession: (planSlug: string, couponCode?: string | null) =>
-    api.post<{ session_id: string; url: string; plan_slug: string }>(
-      '/api/stripe/create-checkout-session',
-      { plan_slug: planSlug, coupon_code: couponCode || null },
-    ),
-
-  // POST /api/stripe/create-portal-session — gerenciar assinatura
-  createPortalSession: () =>
-    api.post<{ url: string }>('/api/stripe/create-portal-session'),
-}
-
-// ============================================================
-//  COUPONS & PARTNERS
-// ============================================================
-export interface CouponValidateResponse {
-  valid: boolean
-  coupon_id?: string | null
-  code?: string | null
-  name?: string | null
-  discount_type?: 'percent' | 'fixed' | null
-  discount_value?: number | null
-  applicable_plan_slug?: string | null
-  duration_months?: number | null
-  partner_name?: string | null
-  preview?: { original_cents: number; discount_cents: number; final_cents: number } | null
-  error?: string | null
-}
-
-export interface PartnerResponse {
-  id: string
-  name: string
-  email: string
-  phone?: string | null
-  document_type?: string | null
-  document_number?: string | null
-  pix_key?: string | null
-  commission_pct?: number | null
-  notes?: string | null
-  active: boolean
-  created_at: string
-  coupons_count: number
-  total_commission_cents: number
-}
-
-export interface CouponResponse {
+// ===== Cupons (20/07/2026 22:58) — AYRIA =====
+export interface Coupon {
   id: string
   code: string
   stripe_coupon_id: string
-  partner_id?: string | null
-  partner_name?: string | null
-  name?: string | null
+  partner_id: string | null
+  partner_name: string | null
+  name: string
   discount_type: 'percent' | 'fixed'
   discount_value: number
   applicable_plan_slug: string
   duration_months: number
   commission_pct: number
-  max_redemptions?: number | null
+  max_redemptions: number | null
   current_redemptions: number
-  expires_at?: string | null
+  expires_at: string | null
   active: boolean
   created_at: string
 }
 
-export interface CommissionReport {
-  items: Array<{
-    id: string
-    coupon_code?: string | null
-    partner_name?: string | null
-    user_email?: string | null
-    plan_slug: string
-    original_amount_cents: number
-    discount_amount_cents: number
-    final_amount_cents: number
-    commission_pct?: number | null
-    commission_amount_cents?: number | null
-    payout_status: string
-    payout_at?: string | null
-    created_at: string
-  }>
-  total_pending_cents: number
-  total_paid_cents: number
-  period_start?: string | null
-  period_end?: string | null
+export interface CouponValidateResponse {
+  valid: boolean
+  coupon_id: string | null
+  code: string | null
+  name: string | null
+  discount_type: string | null
+  discount_value: number | null
+  applicable_plan_slug: string | null
+  duration_months: number | null
+  partner_name: string | null
+  preview: { original_cents: number; discount_cents: number; final_cents: number; currency: string } | null
+  error: string | null
+}
+
+export interface Partner {
+  id: string
+  name: string
+  email: string
+  phone: string | null
+  document: string | null
+  pix_key: string | null
+  commission_pct: number | null
+  active: boolean
+  created_at: string
+  coupons_count?: number
+  total_commission_cents?: number
 }
 
 export const couponsApi = {
-  // POST /api/coupons/validate — público autenticado, valida cupom
-  validate: (code: string, planSlug?: string) =>
-    api.post<CouponValidateResponse>('/api/coupons/validate', {
-      code,
-      plan_slug: planSlug || null,
-    }),
+  validate: (code: string, plan_slug: string) =>
+    api.post<CouponValidateResponse>('/api/coupons/validate', { code, plan_slug }),
+}
 
-  // ====== ADMIN ======
-  listPartners: () =>
-    api.get<PartnerResponse[]>('/api/admin/partners'),
-  createPartner: (data: Partial<PartnerResponse>) =>
-    api.post<PartnerResponse>('/api/admin/partners', data),
-  updatePartner: (partnerId: string, data: Partial<PartnerResponse>) =>
-    api.patch<PartnerResponse>(`/api/admin/partners/${partnerId}`, data),
-  deletePartner: (partnerId: string) =>
-    api.delete(`/api/admin/partners/${partnerId}`).then(() => true),
+export const adminCouponsApi = {
+  listPartners: () => api.get<Partner[]>('/api/admin/partners'),
+  createPartner: (data: Partial<Partner>) => api.post<Partner>('/api/admin/partners', data),
+  updatePartner: (id: string, data: Partial<Partner>) => api.patch<Partner>(`/api/admin/partners/${id}`, data),
+  deletePartner: (id: string) => api.delete(`/api/admin/partners/${id}`),
 
-  listCoupons: () =>
-    api.get<CouponResponse[]>('/api/admin/coupons'),
-  createCoupon: (data: any) =>
-    api.post<CouponResponse>('/api/admin/coupons', data),
-  updateCoupon: (couponId: string, data: any) =>
-    api.patch<CouponResponse>(`/api/admin/coupons/${couponId}`, data),
-  deactivateCoupon: (couponId: string) =>
-    api.post<CouponResponse>(`/api/admin/coupons/${couponId}/deactivate`),
+  listCoupons: () => api.get<Coupon[]>('/api/admin/coupons'),
+  createCoupon: (data: Partial<Coupon>) => api.post<Coupon>('/api/admin/coupons', data),
+  updateCoupon: (id: string, data: Partial<Coupon>) => api.patch<Coupon>(`/api/admin/coupons/${id}`, data),
+  deactivateCoupon: (id: string) => api.post(`/api/admin/coupons/${id}/deactivate`),
 
-  listCommissions: (params?: { status?: string }) =>
-    api.get<CommissionReport>('/api/admin/commissions', { params }),
-  payCommission: (redemptionId: string) =>
-    api.post(`/api/admin/commissions/${redemptionId}/pay`),
+  listCommissions: () => api.get<{
+    items: any[]; total_pending_cents: number; total_paid_cents: number; period_start: string|null; period_end: string|null
+  }>('/api/admin/commissions'),
+  payCommission: (id: string, notes?: string) =>
+    api.post(`/api/admin/commissions/${id}/pay${notes ? `?notes=${encodeURIComponent(notes)}` : ''}`),
+}
+
+export const stripeApi = {
+  // PÚBLICO — sem auth
+  getConfig: () => api.get<StripeConfig>('/api/stripe/config'),
+
+  // AUTH — assinatura do user
+  getMySubscription: () => api.get('/api/stripe/me'),
+
+  // AUTH — criar checkout
+  createCheckoutSession: (plan_slug: string, coupon_code?: string) =>
+    api.post<{ session_id: string; url: string; plan_slug: string }>(
+      '/api/stripe/create-checkout-session',
+      { plan_slug, ...(coupon_code ? { coupon_code } : {}) },
+    ),
+
+  // AUTH — abrir Customer Portal (gerenciar assinatura)
+  createPortalSession: () =>
+    api.post<{ url: string }>('/api/stripe/create-portal-session'),
+}
+
+// ===== RATE LIMIT (Segurança) — 19/07/2026 =====
+export const securityApi = {
+  rateLimitStatus: () => api.get('/api/admin/security/rate-limit/status'),
+  rateLimitActive: () => api.get('/api/admin/security/rate-limit/active'),
+  rateLimitAlert: () => api.get('/api/admin/security/rate-limit/alert'),
+  rateLimitEvents: (params?: { limit?: number; only_failures?: boolean }) =>
+    api.get('/api/admin/security/rate-limit/events', { params }),
+  rateLimitUnblock: (ip: string, endpoint?: string) =>
+    api.post('/api/admin/security/rate-limit/unblock', { ip, endpoint }),
+  rateLimitInject: (data: { ip: string; endpoint?: string; failures?: number; blocked?: boolean }) =>
+    api.post('/api/admin/security/rate-limit/_inject', data),
+  rateLimitConfig: () => api.get('/api/admin/security/rate-limit/config'),
+  blacklistList: () => api.get('/api/admin/security/blacklist'),
+  blacklistAdd: (data: { ip: string; reason?: string; expires_at?: string }) =>
+    api.post('/api/admin/security/blacklist', data),
+  blacklistRemove: (ip: string) => api.delete(`/api/admin/security/blacklist/${encodeURIComponent(ip)}`),
 }

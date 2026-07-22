@@ -11,7 +11,7 @@ Regras de negócio:
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Tuple
 import logging
 import uuid
@@ -51,52 +51,27 @@ async def grant_initial_credits(
     reference_id: Optional[str] = None,
 ) -> bool:
     """
-    Concede créditos iniciais do plano. IDEMPOTENTE.
+    Registra o plano escolhido no cadastro (memória do plano).
+    Para planos PAGOS: NÃO credita aqui — crédito vem via webhook Stripe depois do pagamento.
+    Idempotente: se user já tem plan_selected_at, não sobrescreve.
 
-    Se o user já tem plan_selected_at e selected_plan_id preenchidos
-    E já existe uma credit_transaction do tipo 'grant_initial_plan' pra ele,
-    retorna False sem fazer nada.
-
-    Retorna True se concedeu agora, False se já tinha sido concedido.
+    Retorna True se registrou agora, False se já tinha plano.
     """
-    # Idempotência: se já tem plano + grant_initial_plan, não faz nada
+    # Idempotência: se já tem plano selecionado, não sobrescreve
     if user.selected_plan_id and user.plan_selected_at:
-        existing = await db.execute(
-            select(models.CreditTransaction)
-            .where(
-                models.CreditTransaction.user_id == user.id,
-                models.CreditTransaction.type == "grant_initial_plan",
-                models.CreditTransaction.reference_type == reference_type,
-            )
-            .limit(1)
-        )
-        if existing.scalar_one_or_none():
-            logger.info(f"Grant inicial já existente pro user {user.id} — pulando")
-            return False
+        logger.info(f"Plano já selecionado pro user {user.id} — pulando")
+        return False
 
-    # Concede
-    balance_before = user.credit_balance or 0
+    # Apenas REGISTRA o plano. NÃO credita créditos — webhook Stripe cuida disso.
     user.selected_plan_id = plan.id
-    user.credit_balance = balance_before + plan.credits
-    user.credit_status = "active" if user.credit_balance > 0 else "exhausted"
+    user.plan_selected_at = datetime.now(timezone.utc)
+    # billing_status continua 'billing_not_enabled' até Stripe webhook ativar
     user.billing_status = user.billing_status or "billing_not_enabled"
-    user.plan_selected_at = user.plan_selected_at or datetime.utcnow()
-    user.credits_last_granted_at = datetime.utcnow()
 
-    tx = models.CreditTransaction(
-        id=uuid.uuid4(),
-        user_id=user.id,
-        type="grant_initial_plan",
-        amount=plan.credits,
-        balance_before=balance_before,
-        balance_after=user.credit_balance,
-        description=description or f"Créditos iniciais concedidos conforme plano {plan.name}",
-        reference_type=reference_type,
-        reference_id=reference_id or str(user.id),
+    logger.info(
+        f"✅ Plano registrado no cadastro: user={user.id} plano={plan.slug} "
+        f"(créditos virão via webhook Stripe após pagamento)"
     )
-    db.add(tx)
-
-    logger.info(f"✅ Grant inicial: user={user.id} plano={plan.slug} +{plan.credits} → saldo={user.credit_balance}")
     return True
 
 
@@ -107,6 +82,7 @@ async def consume_credits(
     description: Optional[str] = None,
     reference_type: str = "chat_message",
     reference_id: Optional[str] = None,
+    action_type_id: Optional[uuid.UUID] = None,
 ) -> Tuple[bool, Optional[models.CreditTransaction]]:
     """
     Consome créditos. ATÔMICO — bloqueia se saldo insuficiente.
@@ -116,6 +92,11 @@ async def consume_credits(
     - Se onboarding incompleto: bypass (não consome, não registra) — onboarding é grátis
     - Se saldo < amount: retorna (False, None) SEM consumir
     - Caso contrário: desconta + registra transaction
+
+    Novidade (21/07/2026):
+    - `action_type_id` referencia a tabela action_types (custo variável: 1/2/5 créditos)
+    - description auto-gerado se não informado: "Consumo: <name> (<cost> cr)"
+    - credit_transaction guarda action_type_id pra rastreamento
 
     Retorna (success, transaction).
     """
@@ -129,15 +110,35 @@ async def consume_credits(
         logger.debug(f"User {user.id} onboarding incompleto — sem consumo")
         return True, None
 
+    # Se action_type_id foi passado, validar que existe e ajustar amount
+    action_name = None
+    if action_type_id:
+        from sqlalchemy import select
+        at_res = await db.execute(
+            select(models.ActionType).where(models.ActionType.id == action_type_id)
+        )
+        at = at_res.scalar_one_or_none()
+        if at:
+            amount = at.credits_cost  # sobrescreve com o custo do action_type
+            action_name = at.name
+            logger.debug(f"ActionType '{at.slug}' → custo={amount} cr")
+
     # Bloqueio por saldo
     if (user.credit_balance or 0) < amount:
         logger.warning(f"❌ User {user.id} sem saldo: {user.credit_balance} < {amount}")
         return False, None
 
-    # Consome
-    balance_before = user.credit_balance
+    # Consome (com proteção contra None — 21/07/2026)
+    balance_before = user.credit_balance or 0
     user.credit_balance = balance_before - amount
     user.credit_status = "active" if user.credit_balance > 0 else "exhausted"
+
+    # Description auto se não informado
+    if not description:
+        if action_name:
+            description = f"Consumo: {action_name} ({amount} crédito(s))"
+        else:
+            description = f"Consumo de {amount} crédito(s) por mensagem no chat"
 
     tx = models.CreditTransaction(
         id=uuid.uuid4(),
@@ -146,13 +147,16 @@ async def consume_credits(
         amount=-amount,  # negativo = consumo
         balance_before=balance_before,
         balance_after=user.credit_balance,
-        description=description or f"Consumo de {amount} crédito(s) por mensagem no chat",
+        description=description,
         reference_type=reference_type,
         reference_id=reference_id,
     )
     db.add(tx)
 
-    logger.info(f"💸 Consumo: user={user.id} -{amount} → saldo={user.credit_balance}")
+    logger.info(
+        f"💸 Consumo: user={user.id} -{amount} → saldo={user.credit_balance} "
+        f"action={action_name or 'padrão'}"
+    )
     return True, tx
 
 
@@ -186,7 +190,7 @@ async def admin_adjust_credits(
 
     target_user.credit_balance = new_balance
     target_user.credit_status = "active" if new_balance > 0 else "exhausted"
-    target_user.credits_last_granted_at = datetime.utcnow() if amount > 0 else target_user.credits_last_granted_at
+    target_user.credits_last_granted_at = datetime.now(timezone.utc) if amount > 0 else target_user.credits_last_granted_at
 
     tx = models.CreditTransaction(
         id=uuid.uuid4(),
@@ -236,6 +240,9 @@ async def get_transactions(
     """Lista transações de um user, paginadas (mais recentes primeiro)"""
     from sqlalchemy import func as sqlfunc
 
+    # Validação defensiva — 21/07/2026 (evita page negativa ou page_size abusivo)
+    page = max(1, page)
+    page_size = min(max(1, page_size), 100)
     offset = (page - 1) * page_size
 
     total_res = await db.execute(
@@ -253,3 +260,53 @@ async def get_transactions(
     )
     items = list(res.scalars().all())
     return items, total
+
+
+# ============================================================
+# grant_credits (19/07/2026) — função GENÉRICA pra Stripe webhook
+# Concede créditos sem idempotência (pode renovar mensalmente).
+# Diferente de grant_initial_credits que só roda 1x.
+# ============================================================
+async def grant_credits(
+    db: AsyncSession,
+    user: models.User,
+    amount: int,
+    description: str,
+    reference_type: str = "stripe",
+    reference_id: Optional[str] = None,
+    plan_slug: Optional[str] = None,  # 🆕 19/07/2026 — associa o plano se user não tiver
+) -> int:
+    """Concede créditos ao user. Retorna novo saldo.
+
+    🆕 19/07/2026 19:34 — Se plan_slug é passado E user ainda não tem plano,
+    o sistema seta `users.selected_plan_id` no user. Garante que o frontend
+    sempre saiba qual plano o user comprou (não adivinha dos créditos).
+    """
+    balance_before = user.credit_balance or 0
+    user.credit_balance = balance_before + amount
+    user.credit_status = "active" if user.credit_balance > 0 else "exhausted"
+    user.credits_last_granted_at = datetime.now(timezone.utc)
+
+    # 🆕 Atalho: associa plano se foi passado
+    if plan_slug and user.selected_plan_id is None:
+        from sqlalchemy import select
+        plan_row = await db.execute(select(models.Plan).where(models.Plan.slug == plan_slug))
+        plan_db = plan_row.scalars().first()
+        if plan_db:
+            user.selected_plan_id = plan_db.id
+            logger.info(f"User {user.email} plano setado via grant_credits → {plan_slug}")
+
+    tx = models.CreditTransaction(
+        id=uuid.uuid4(),
+        user_id=user.id,
+        type="grant",
+        amount=amount,
+        balance_before=balance_before,
+        balance_after=user.credit_balance,
+        description=description,
+        reference_type=reference_type,
+        reference_id=reference_id or "",
+    )
+    db.add(tx)
+    logger.info(f"Grant: user={user.id} +{amount} (ref={reference_type}/{reference_id}) → saldo={user.credit_balance}")
+    return user.credit_balance

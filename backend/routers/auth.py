@@ -7,9 +7,10 @@ PATCH /api/auth/me         (atualizar nome/avatar_url)
 POST /api/auth/me/avatar   (upload de foto)
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 import logging
 
@@ -67,28 +68,37 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 @router.post("/register", response_model=schemas.RegisterResponse, status_code=201)
 async def register(payload: schemas.UserRegister, request: Request, db: AsyncSession = Depends(get_db)):
     """Registra novo usuário + concede créditos do plano escolhido"""
+    # 🆕 19/07/2026 — Rate limit: 3 cadastros/hora por IP (anti-spam/bot)
+    from services.rate_limiter import log_event
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "")[:500]
+
     # Verifica email duplicado
     existing = await db.execute(
         select(models.User).where(models.User.email == payload.email)
     )
     if existing.scalar_one_or_none():
+        await log_event(client_ip, "/auth/register", False, payload.email, user_agent)
         raise HTTPException(status_code=400, detail="Email já cadastrado")
 
-    # Plan_slug é OBRIGATÓRIO para novos usuários (exceto admin criando via /admin/users)
-    if not payload.plan_slug:
-        raise HTTPException(
-            status_code=400,
-            detail="Escolha um plano (plan_slug: basico | intermediario | premium)",
-        )
-
-    # Busca plano
-    from services.credit_service import get_plan_by_slug, grant_initial_credits
-    plan = await get_plan_by_slug(db, payload.plan_slug)
-    if not plan:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Plano '{payload.plan_slug}' não encontrado ou inativo",
-        )
+    # 🆕 19/07/2026 19:16 — Plan_slug é OPCIONAL no signup. User vai escolher o plano
+    # DEPOIS, em /planos, após confirmar o email e logar.
+    # (Antes era obrigatório aqui, mas redundante porque /planos pede de novo.)
+    plan = None
+    if payload.plan_slug:
+        from services.credit_service import get_plan_by_slug, grant_initial_credits
+        plan = await get_plan_by_slug(db, payload.plan_slug)
+        if not plan:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Plano '{payload.plan_slug}' não encontrado ou inativo",
+            )
+        # Plano pago é OBRIGATÓRIO no signup se for escolhido — trial foi removido.
+        if not plan.price_brl or float(plan.price_brl) <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Plano '{plan.slug}' é gratuito e não pode ser escolhido no cadastro. Use /planos para ver opções pagas.",
+            )
 
     # Cria usuário (com campos de billing zerados — grant vai preencher)
     user = models.User(
@@ -116,15 +126,17 @@ async def register(payload: schemas.UserRegister, request: Request, db: AsyncSes
     )
     db.add(profile)
 
-    # Concede créditos do plano (idempotente — protege contra retry do front)
-    await grant_initial_credits(
-        db=db,
-        user=user,
-        plan=plan,
-        description=f"Créditos iniciais concedidos no cadastro conforme plano {plan.name}",
-        reference_type="user_register",
-        reference_id=str(user.id),
-    )
+    # Concede créditos do plano só se um plano foi escolhido no signup.
+    # (19/07/2026 — sem escolha de plano no cadastro; user escolhe em /planos depois.)
+    if plan:
+        await grant_initial_credits(
+            db=db,
+            user=user,
+            plan=plan,
+            description=f"Créditos iniciais concedidos no cadastro conforme plano {plan.name}",
+            reference_type="user_register",
+            reference_id=str(user.id),
+        )
 
     await db.commit()
     await db.refresh(user)
@@ -162,14 +174,35 @@ async def register(payload: schemas.UserRegister, request: Request, db: AsyncSes
         logger.exception("Erro inesperado ao enviar email de verificação")
         email_error = str(e)
 
+    # Rate-limit + audit (20/07/2026 — estava DEPOIS do return, nunca executava)
+    await log_event(client_ip, "/auth/register", True, payload.email, user_agent)
+
+    # Se email FALHOU, não retorna 201 mentiroso. Retorna 202 Accepted
+    # (conta foi criada, mas email de confirmação NÃO chegou).
+    if email_error:
+        # Frontend deve olhar verification_sent=False e mostrar aviso claro.
+        # Não devolve access_token (precisa confirmar email pra ativar de verdade).
+        return JSONResponse(
+            status_code=202,
+            content={
+                "user": (await _user_to_response(user, db)).model_dump(mode="json"),
+                "message": (
+                    "Conta criada, mas NÃO conseguimos enviar o email de confirmação agora. "
+                    "Use o botão 'Reenviar email' na próxima tela."
+                ),
+                "verification_sent": False,
+                "email_error": email_error,
+            },
+        )
+
     return schemas.RegisterResponse(
         user=await _user_to_response(user, db),
         message=(
             "Conta criada! Enviamos um email de confirmação para "
             f"{user.email}. Clique no link pra ativar."
         ),
-        verification_sent=email_error is None,
-        email_error=email_error,
+        verification_sent=True,
+        email_error=None,
     )
 
 
@@ -306,23 +339,33 @@ async def resend_verification(
 @router.post("/login", response_model=schemas.TokenResponse)
 async def login(payload: schemas.UserLogin, request: Request, db: AsyncSession = Depends(get_db)):
     """Login com email + senha"""
-    # ⚠️ RATE LIMIT REMOVIDO (Rafael cobrou: em produção, login nunca deve bloquear o user)
-    # O bloco abaixo estava implementando um rate-limit por IP que travava
-    # o desenvolvedor em testes. Login não deve ter rate-limit duro - cabe
-    # à infra (CDN / WAF / fail2ban) proteger contra brute-force.
+    from services.rate_limiter import log_event
+    from fastapi import Request as _Req
+
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "")[:500]
+
     result = await db.execute(
         select(models.User).where(models.User.email == payload.email)
     )
     user = result.scalar_one_or_none()
-    
+
     if not user or not verify_password(payload.password, user.password_hash):
+        # Loga apenas metadata, NUNCA a senha (LGPD/PII — 21/07/2026)
+        import logging
+        logging.warning(
+            f"[AUTH] login falhou p/ {payload.email} | user_found={bool(user)} | senha_len={len(payload.password)}"
+        )
+        await log_event(client_ip, "/auth/login", False, payload.email, user_agent)
         raise HTTPException(status_code=401, detail="Email ou senha inválidos")
 
     if not user.is_active:
+        await log_event(client_ip, "/auth/login", False, payload.email, user_agent)
         raise HTTPException(status_code=403, detail="Usuário desativado")
 
     # 🆕 Bloqueia login se email não foi verificado (07/07/2026)
     if not user.is_verified:
+        await log_event(client_ip, "/auth/login", False, payload.email, user_agent)
         raise HTTPException(
             status_code=403,
             detail="Confirme seu email antes de fazer login. Verifique sua caixa de entrada.",
@@ -330,9 +373,12 @@ async def login(payload: schemas.UserLogin, request: Request, db: AsyncSession =
         )
     
     # Atualiza last_login
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(user)
+
+    # 🆕 Sucesso de login: limpa contador do rate limit e loga
+    await log_event(client_ip, "/auth/login", True, payload.email, user_agent)
     
     access_token = create_access_token({"sub": str(user.id), "role": user.role})
     refresh_token = create_refresh_token(str(user.id), user.role)
@@ -412,7 +458,7 @@ async def update_me(
         user.full_name = payload.full_name.strip()[:255] if payload.full_name.strip() else None
     if payload.avatar_url is not None:
         user.avatar_url = payload.avatar_url.strip()[:500] if payload.avatar_url.strip() else None
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(user)
     return await _user_to_response(user, db)
@@ -443,7 +489,7 @@ async def change_my_password(
 
     # 3. Atualiza
     user.password_hash = hash_password(payload.new_password)
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
     await db.commit()
 
     return {"message": "Senha alterada com sucesso. Faça login novamente."}
@@ -463,9 +509,15 @@ async def upload_avatar(
             detail="Arquivo precisa ser uma imagem (JPEG, PNG, GIF, WebP)"
         )
 
-    # Limita tamanho (5MB)
+    # Limita tamanho ANTES de ler (evita OOM — 21/07/2026)
+    MAX_AVATAR_SIZE = 5 * 1024 * 1024  # 5MB
+    if file.size is not None and file.size > MAX_AVATAR_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Imagem deve ter no máximo {MAX_AVATAR_SIZE // (1024*1024)}MB",
+        )
     contents = await file.read()
-    if len(contents) > 5 * 1024 * 1024:
+    if len(contents) > MAX_AVATAR_SIZE:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail="Imagem deve ter no máximo 5MB"
@@ -488,7 +540,111 @@ async def upload_avatar(
         )
 
     user.avatar_url = avatar_url
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(user)
     return await _user_to_response(user, db)
+
+
+# ============================================================
+# 🆕 19/07/2026 — Fluxo "Esqueci minha senha" (Forgot password)
+#
+# POST /api/auth/forgot-password {email}
+#   → gera password_reset_token (válido 1h) + manda email TurboSMTP
+#   → SEMPRE retorna 200 (mesmo se email não existir — anti-enumeração)
+#
+# POST /api/auth/reset-password {token, new_password}
+#   → valida token (não expirou, não usado)
+#   → seta nova senha + invalida token (single-use)
+# ============================================================
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+@router.post("/forgot-password", status_code=200)
+async def forgot_password(payload: ForgotPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """Gera token + envia email de reset. Sempre 200 pra evitar enumeração de email."""
+    from services.email_turbo import get_email_client, EmailServiceError
+    from services.email_templates import password_reset_email_html, password_reset_email_text
+    from utils.url_detector import build_password_reset_url
+    from services.rate_limiter import log_event
+
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "")[:500]
+
+    res = await db.execute(select(models.User).where(models.User.email == payload.email))
+    user = res.scalars().first()
+    if not user:
+        # Não revela se email existe (anti-enum)
+        logger.info(f"forgot_password: email não cadastrado {payload.email}")
+        return {"message": "Se o email existir, você receberá as instruções de redefinição."}
+
+    # Rate-limit: não permite reenvio em menos de 60 segundos
+    if user.password_reset_sent_at and (datetime.now(timezone.utc) - user.password_reset_sent_at).total_seconds() < 60:
+        return {"message": "Se o email existir, você receberá as instruções de redefinição."}
+
+    # Gera token + expira em 1h
+    import secrets as _secrets
+    from datetime import timezone as _tz
+    token = _secrets.token_urlsafe(32)
+    user.password_reset_token = token
+    user.password_reset_token_expires_at = datetime.now(_tz.utc) + timedelta(hours=1)
+    user.password_reset_sent_at = datetime.now(_tz.utc)
+    await db.commit()
+    await db.refresh(user)
+
+    reset_url = build_password_reset_url(token)
+    html = password_reset_email_html(user.full_name, reset_url, expires_minutes=60)
+    text = password_reset_email_text(user.full_name, reset_url, expires_minutes=60)
+
+    try:
+        client = get_email_client()
+        resp = await client.send_email(
+            to_email=user.email,
+            subject="AYRIA — Redefinir sua senha",
+            body_html=html,
+            body_text=text,
+        )
+        logger.info(f"forgot_password enviado pra {user.email}: {resp}")
+    except EmailServiceError as e:
+        # Falha não é fatal — loga e responde 200 (não vaza info do server)
+        logger.error(f"Falha ao enviar email de reset pra {user.email}: {e}")
+    await log_event(client_ip, "/auth/forgot-password", True, payload.email, user_agent)
+    return {"message": "Se o email existir, você receberá as instruções de redefinição."}
+
+
+@router.post("/reset-password", status_code=200)
+async def reset_password(payload: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """Valida token + atualiza senha. Single-use."""
+    res = await db.execute(
+        select(models.User).where(models.User.password_reset_token == payload.token)
+    )
+    user = res.scalars().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Token inválido ou já utilizado. Solicite um novo.")
+
+    # Valida expiração (1h)
+    if not user.password_reset_token_expires_at or user.password_reset_token_expires_at < datetime.now(timezone.utc):
+        # Limpa pra não permitir tentar de novo
+        user.password_reset_token = None
+        user.password_reset_token_expires_at = None
+        await db.commit()
+        raise HTTPException(status_code=410, detail="Token expirado. Solicite um novo link de redefinição.")
+
+    # Atualiza senha
+    user.password_hash = hash_password(payload.new_password)
+    # Invalida token (single-use) — também limpa qualquer verification_token do user
+    user.password_reset_token = None
+    user.password_reset_token_expires_at = None
+    user.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(user)
+
+    logger.info(f"Senha redefinida com sucesso: user={user.id} email={user.email}")
+    return {"message": "Senha redefinida com sucesso! Você já pode fazer login com a nova senha."}

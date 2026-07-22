@@ -4,15 +4,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../store/auth'
-import { adminApi, api, couponsApi, CouponResponse, CommissionReport, PartnerResponse } from '../lib/api'
+import { adminApi, api } from '../lib/api'
 import { LogoIcon } from '../components/Logo'
-import { Users, FileText, Settings, LogOut, UserPlus, X, Shield, Wallet, Plus, Tag, Edit3, Eye, ChevronDown, ChevronRight, Calendar, MapPin, Star, Heart, Briefcase, Sparkles, ExternalLink, Cpu, CheckCircle2, AlertCircle, Database, Cloud, Activity, AlertTriangle, MessageCircle, MessageSquare, Receipt, User, Clock, Calculator, ClipboardList } from 'lucide-react'
+import { Users, FileText, Settings, LogOut, UserPlus, X, Shield, Wallet, Plus, Tag, Edit3, Eye, ChevronDown, ChevronRight, Calendar, MapPin, Star, Heart, Briefcase, Sparkles, DollarSign, ExternalLink, Cpu, CheckCircle2, AlertCircle, Database, Cloud, Activity, AlertTriangle, MessageCircle, MessageSquare, Receipt, User, Clock, Calculator, ClipboardList } from 'lucide-react'
 import { AlmaTab } from '../components/AlmaTab'
 import { LogsTab } from '../components/LogsTab'
 import { SupervisorPromptModal } from '../components/SupervisorPromptModal'
 import { SupervisorKeywordsViewer } from '../components/SupervisorKeywordsViewer'
 import { BlockUserModal } from '../components/BlockUserModal'
 import { AdminChangePasswordModal } from '../components/AdminChangePasswordModal'
+import { SystemAdminsTab } from '../components/SystemAdminsTab'
 
 type Tab = 'users' | 'plans' | 'credits' | 'knowledge' | 'onboarding' | 'attributes' | 'settings' | 'supervision' | 'alma' | 'logs' | 'partners' | 'coupons' | 'commissions'
 
@@ -21,6 +22,11 @@ export function AdminPage() {
   const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>('users')
   const [users, setUsers] = useState<any[]>([])
+  // Paginação + filtros (users) — 21/07/2026 (perdido no revert do dirty, restaurando)
+  const [userPagination, setUserPagination] = useState({ total: 0, page: 1, page_size: 25, total_pages: 0 })
+  const [userSearch, setUserSearch] = useState('')
+  const [userSearchDebounced, setUserSearchDebounced] = useState('')
+  const [userStatusFilter, setUserStatusFilter] = useState<'all'|'active'|'inactive'|'blocked'|'pending'>('all')
   const [docs, setDocs] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -48,11 +54,30 @@ export function AdminPage() {
     }
     if (tab === 'users') {
       setLoading(true)
-      adminApi.listUsers().then((r) => {
-        // Backend retorna paginado: {items: [...], total, page, page_size, total_pages}
-        setUsers(r.data?.items ?? r.data ?? [])
+      adminApi.listUsers({
+        search: userSearchDebounced || undefined,
+        status: userStatusFilter,
+        page: 1,
+        page_size: userPagination.page_size,
+      }).then((r) => {
+        // Backend paginado retorna {items, total, page, ...} — pega items; fallback array direto
+        setUsers(Array.isArray(r.data) ? r.data : (r.data.items ?? []))
+        if (!Array.isArray(r.data) && r.data?.total !== undefined) {
+          setUserPagination({
+            total: r.data.total, page: r.data.page,
+            page_size: r.data.page_size, total_pages: r.data.total_pages,
+          })
+        }
         setLoading(false)
-      })
+      }).catch(() => setLoading(false))
+    } else if (tab === 'credits') {
+      // Aba Créditos lista USUARIOS + saldo — puxa com page_size alto pra ver mais gente (21/07/2026)
+      setLoading(true)
+      adminApi.listUsers({ search: userSearchDebounced || undefined, status: userStatusFilter, page: 1, page_size: 100 })
+        .then((r) => {
+          setUsers(Array.isArray(r.data) ? r.data : (r.data.items ?? []))
+          setLoading(false)
+        }).catch(() => setLoading(false))
     } else if (tab === 'knowledge') {
       setLoading(true)
       adminApi.listDocuments().then((r) => {
@@ -60,12 +85,18 @@ export function AdminPage() {
         setLoading(false)
       })
     }
-  }, [tab, user])
+  }, [tab, user, userStatusFilter, userPagination.page_size, userSearchDebounced])
+
+  // Debounce do search (300ms) — não martelar API a cada tecla
+  useEffect(() => {
+    const t = setTimeout(() => setUserSearchDebounced(userSearch), 300)
+    return () => clearTimeout(t)
+  }, [userSearch])
 
   const reloadUsers = async () => {
     const { data } = await adminApi.listUsers()
-    // Backend retorna paginado: {items: [...], total, page, page_size, total_pages}
-    setUsers(data?.items ?? data ?? [])
+    // Backend paginado retorna {items, ...} — compatibilidade com array direto
+    setUsers(Array.isArray(data) ? data : (data.items ?? []))
   }
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -151,58 +182,96 @@ export function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#0A0A1A' }}>
-      {/* Header */}
-      <header className="glass px-6 py-4 flex items-center justify-between border-b border-ayria-border">
-        <div className="flex items-center gap-3">
-          <LogoIcon size={32} variant="circular" />
-          <span
-            className="px-2 py-1 rounded text-xs font-semibold"
-            style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B' }}
-          >
-            ADMIN
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/chat')} className="text-ayria-muted hover:text-ayria-text text-sm">
-            Ir pro Chat
-          </button>
-          <button onClick={logout} className="text-ayria-muted hover:text-red-400">
-            <LogOut size={18} />
-          </button>
-        </div>
-      </header>
-
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-ayria-border">
-          {[
-            { id: 'users', label: 'Usuários', icon: Users },
-            { id: 'plans', label: 'Planos', icon: Tag },
-            { id: 'credits', label: 'Créditos', icon: Wallet },
-            { id: 'knowledge', label: 'Conhecimento', icon: FileText },
-            { id: 'partners', label: 'Parceiros', icon: Briefcase },
-            { id: 'coupons', label: 'Cupons', icon: Receipt },
-            { id: 'commissions', label: 'Comissões', icon: Calculator },
-            { id: 'supervision', label: 'Supervisão', icon: Activity },
-            { id: 'alma', label: 'ALMA', icon: Sparkles },
-            { id: 'logs', label: 'Logs', icon: AlertTriangle },
-            { id: 'settings', label: 'Configurações', icon: Cpu },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id as Tab)}
-              className={`px-4 py-3 text-sm flex items-center gap-2 border-b-2 transition-colors ${
-                tab === t.id
-                  ? 'border-ayria-admin text-ayria-text'
-                  : 'border-transparent text-ayria-muted hover:text-ayria-text'
-              }`}
+    <div className="min-h-screen flex" style={{ background: '#0A0A1A' }}>
+      {/* Sidebar fixa 260px à esquerda — 21/07/2026 (era header horizontal, não cabiam mais abas) */}
+      <aside
+        className="w-[260px] flex-shrink-0 border-r border-ayria-border flex flex-col h-screen sticky top-0"
+        style={{ background: '#111111' }}
+      >
+        <div className="px-5 py-4 border-b border-ayria-border flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <LogoIcon size={28} variant="circular" />
+            <span
+              className="px-2 py-0.5 rounded text-xs font-semibold"
+              style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B' }}
             >
-              <t.icon size={14} />
-              {t.label}
-            </button>
-          ))}
+              ADMIN
+            </span>
+          </div>
+          <button onClick={logout} title="Sair" className="text-ayria-muted hover:text-red-400 transition-colors">
+            <LogOut size={16} />
+          </button>
         </div>
+
+        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
+          {[
+            {
+              grupo: 'Operação',
+              itens: [
+                { id: 'users', label: 'Usuários', icon: Users },
+                { id: 'credits', label: 'Créditos', icon: Wallet },
+                { id: 'plans', label: 'Planos', icon: Tag },
+                { id: 'coupons', label: 'Cupons', icon: Tag },
+                { id: 'partners', label: 'Parceiros', icon: Briefcase },
+                { id: 'commissions', label: 'Comissões', icon: DollarSign },
+              ],
+            },
+            {
+              grupo: 'Conhecimento',
+              itens: [
+                { id: 'knowledge', label: 'Base', icon: FileText },
+                { id: 'alma', label: 'ALMA', icon: Sparkles },
+                { id: 'supervision', label: 'Supervisão', icon: Activity },
+              ],
+            },
+            {
+              grupo: 'Sistema',
+              itens: [
+                { id: 'settings', label: 'Configurações', icon: Cpu },
+              ],
+            },
+            {
+              grupo: 'Debug',
+              itens: [
+                { id: 'logs', label: 'Logs', icon: AlertTriangle },
+              ],
+            },
+          ].map((grupo) => (
+            <div key={grupo.grupo}>
+              <div className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider uppercase text-ayria-muted/60">
+                {grupo.grupo}
+              </div>
+              <div className="space-y-0.5">
+                {grupo.itens.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTab(t.id as Tab)}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2.5 transition-colors ${
+                      tab === t.id ? '' : 'text-ayria-muted hover:text-ayria-text hover:bg-white/[0.03]'
+                    }`}
+                    style={
+                      tab === t.id
+                        ? { background: 'rgba(245, 158, 11, 0.12)', color: '#F59E0B' }
+                        : undefined
+                    }
+                  >
+                    <t.icon size={15} className="flex-shrink-0" />
+                    <span className="truncate">{t.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        <div className="px-4 py-3 border-t border-ayria-border text-[11px] text-ayria-muted/70 flex-shrink-0 truncate">
+          {user?.email ?? 'admin@ayria.local'}
+        </div>
+      </aside>
+
+      <main className="flex-1 min-w-0">
+        <div className="max-w-6xl mx-auto px-6 py-8">
+        {/* (Tabs horizontais removidas em 21/07/2026 — duplicavam a sidebar à esquerda) */}
 
         {/* Content */}
         {loading && <div className="text-ayria-muted">Carregando...</div>}
@@ -210,18 +279,52 @@ export function AdminPage() {
         {/* USERS */}
         {tab === 'users' && !loading && (
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
               <div className="text-sm text-ayria-muted">
-                {users.length} usuário(s) cadastrado(s)
+                {userPagination.total > 0 ? `${userPagination.total} usuário(s)` : `${users.length} usuário(s)`}
+                {userSearchDebounced && ` (busca: "${userSearchDebounced}")`}
               </div>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="px-4 py-2 rounded-xl text-white font-medium flex items-center gap-2 hover:opacity-90"
-                style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
-              >
-                <UserPlus size={16} />
-                Criar usuário
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="text"
+                  value={userSearch}
+                  onChange={e => setUserSearch(e.target.value)}
+                  placeholder="🔍 Buscar email ou nome..."
+                  className="px-3 py-2 rounded-lg text-sm text-ayria-text outline-none w-56"
+                  style={{ background: '#111111', border: '1px solid #1E1E2E' }}
+                />
+                <select
+                  value={userStatusFilter}
+                  onChange={e => setUserStatusFilter(e.target.value as any)}
+                  className="px-3 py-2 rounded-lg text-sm text-ayria-text outline-none"
+                  style={{ background: '#111111', border: '1px solid #1E1E2E' }}
+                >
+                  <option value="all">Todos status</option>
+                  <option value="active">Ativos</option>
+                  <option value="inactive">Inativos</option>
+                  <option value="pending">Pendentes</option>
+                  <option value="blocked">Bloqueados</option>
+                </select>
+                <select
+                  value={userPagination.page_size}
+                  onChange={e => setUserPagination(p => ({ ...p, page_size: Number(e.target.value) }))}
+                  className="px-3 py-2 rounded-lg text-sm text-ayria-text outline-none"
+                  style={{ background: '#111111', border: '1px solid #1E1E2E' }}
+                >
+                  <option value={10}>10/pág</option>
+                  <option value={25}>25/pág</option>
+                  <option value={50}>50/pág</option>
+                  <option value={100}>100/pág</option>
+                </select>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="px-4 py-2 rounded-xl text-white font-medium flex items-center gap-2 hover:opacity-90"
+                  style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                >
+                  <UserPlus size={16} />
+                  Criar usuário
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -315,10 +418,53 @@ export function AdminPage() {
               ))}
               {users.length === 0 && (
                 <div className="text-center text-ayria-muted py-8">
-                  Nenhum usuário cadastrado ainda.
+                  {userSearchDebounced ? `Nenhum resultado para "${userSearchDebounced}".` : 'Nenhum usuário cadastrado ainda.'}
                 </div>
               )}
             </div>
+
+            {/* Paginação — 21/07/2026 */}
+            {userPagination.total_pages > 1 && (
+              <div className="flex items-center justify-between mt-4 text-sm">
+                <div className="text-ayria-muted">
+                  Página {userPagination.page} de {userPagination.total_pages}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      const np = userPagination.page - 1
+                      if (np < 1) return
+                      setLoading(true)
+                      const r = await adminApi.listUsers({ search: userSearchDebounced || undefined, status: userStatusFilter, page: np, page_size: userPagination.page_size })
+                      setUsers(Array.isArray(r.data) ? r.data : (r.data.items ?? []))
+                      if (!Array.isArray(r.data)) setUserPagination({ total: r.data.total, page: r.data.page, page_size: r.data.page_size, total_pages: r.data.total_pages })
+                      setLoading(false)
+                    }}
+                    disabled={userPagination.page <= 1}
+                    className="px-3 py-1.5 rounded-lg text-ayria-muted hover:text-ayria-text disabled:opacity-30"
+                    style={{ background: '#111111', border: '1px solid #1E1E2E' }}
+                  >
+                    ← Anterior
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const np = userPagination.page + 1
+                      if (np > userPagination.total_pages) return
+                      setLoading(true)
+                      const r = await adminApi.listUsers({ search: userSearchDebounced || undefined, status: userStatusFilter, page: np, page_size: userPagination.page_size })
+                      setUsers(Array.isArray(r.data) ? r.data : (r.data.items ?? []))
+                      if (!Array.isArray(r.data)) setUserPagination({ total: r.data.total, page: r.data.page, page_size: r.data.page_size, total_pages: r.data.total_pages })
+                      setLoading(false)
+                    }}
+                    disabled={userPagination.page >= userPagination.total_pages}
+                    className="px-3 py-1.5 rounded-lg text-ayria-muted hover:text-ayria-text disabled:opacity-30"
+                    style={{ background: '#111111', border: '1px solid #1E1E2E' }}
+                  >
+                    Próxima →
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -332,6 +478,15 @@ export function AdminPage() {
             }}
           />
         )}
+
+        {/* CUPONS */}
+        {tab === 'coupons' && !loading && <CouponsTab />}
+
+        {/* PARCEIROS */}
+        {tab === 'partners' && !loading && <PartnersTab />}
+
+        {/* COMISSÕES */}
+        {tab === 'commissions' && !loading && <CommissionsTab />}
 
         {/* CRÉDITOS - visão comercial + ajuste manual */}
         {tab === 'credits' && !loading && (
@@ -410,11 +565,6 @@ export function AdminPage() {
         {/* SETTINGS / CONFIGURAÇÕES DO SISTEMA */}
         {tab === 'settings' && <SystemSettingsTab />}
         {tab === 'logs' && <LogsTab />}
-
-        {/* PARTNERS / COUPONS / COMMISSIONS */}
-        {tab === 'partners' && <PartnersTab />}
-        {tab === 'coupons' && <CouponsTab />}
-        {tab === 'commissions' && <CommissionsTab />}
 
         {/* SUPERVISÃO - monitoramento de risco */}
         {tab === 'supervision' && <SupervisionTab />}
@@ -653,6 +803,7 @@ export function AdminPage() {
         loading={detailsLoading}
         onClose={() => setDetailsUserId(null)}
       />
+      </main>
     </div>
   )
 }
@@ -1551,411 +1702,37 @@ function capitalize(s: string): string {
 
 
 // ============================================================
-// PARTNERS TAB - cadastro de parceiros (cupons)
-// ============================================================
-function PartnersTab() {
-  const [partners, setPartners] = useState<PartnerResponse[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', phone: '', document_number: '', pix_key: '', commission_pct: '', notes: '' })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function load() {
-    setLoading(true)
-    try {
-      const res = await couponsApi.listPartners()
-      setPartners(res.data || [])
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || e.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { load() }, [])
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
-    try {
-      await couponsApi.createPartner({
-        ...form,
-        commission_pct: form.commission_pct ? Number(form.commission_pct) : null,
-      })
-      setShowForm(false)
-      setForm({ name: '', email: '', phone: '', document_number: '', pix_key: '', commission_pct: '', notes: '' })
-      await load()
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || e.message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function toggleActive(p: PartnerResponse) {
-    try {
-      await couponsApi.updatePartner(p.id, { active: !p.active })
-      await load()
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || e.message)
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div>
-          <div className="text-lg font-semibold">Parceiros</div>
-          <div className="text-xs text-ayria-muted">Quem recebe comissão sobre cupons</div>
-        </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 rounded-lg text-sm flex items-center gap-2 text-white"
-          style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
-        >
-          <UserPlus size={14} /> Novo parceiro
-        </button>
-      </div>
-
-      {error && (
-        <div className="p-3 rounded-xl text-sm" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>
-          ❌ {error}
-        </div>
-      )}
-
-      {showForm && (
-        <form onSubmit={submit} className="p-4 rounded-xl space-y-3" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
-          <div className="grid grid-cols-2 gap-3">
-            <input placeholder="Nome" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="p-2 bg-ayria-bg rounded" />
-            <input placeholder="Email" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="p-2 bg-ayria-bg rounded" />
-            <input placeholder="Telefone (opcional)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="p-2 bg-ayria-bg rounded" />
-            <input placeholder="CPF/CNPJ (opcional)" value={form.document_number} onChange={(e) => setForm({ ...form, document_number: e.target.value })} className="p-2 bg-ayria-bg rounded" />
-            <input placeholder="Chave PIX (opcional)" value={form.pix_key} onChange={(e) => setForm({ ...form, pix_key: e.target.value })} className="p-2 bg-ayria-bg rounded col-span-2" />
-            <input placeholder="Comissão % (opcional, p/ cupom)" type="number" step="0.01" value={form.commission_pct} onChange={(e) => setForm({ ...form, commission_pct: e.target.value })} className="p-2 bg-ayria-bg rounded" />
-          </div>
-          <textarea placeholder="Observações" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="p-2 bg-ayria-bg rounded w-full" />
-          <div className="flex gap-2 justify-end">
-            <button type="button" onClick={() => setShowForm(false)} className="px-3 py-2 text-ayria-muted">Cancelar</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 rounded text-white" style={{ background: '#6366F1' }}>
-              {saving ? 'Salvando...' : 'Salvar'}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {loading ? (
-        <div className="text-ayria-muted">Carregando...</div>
-      ) : partners.length === 0 ? (
-        <div className="text-ayria-muted text-center py-12 rounded-xl" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
-          Nenhum parceiro cadastrado ainda.
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {partners.map((p) => (
-            <div key={p.id} className="p-4 rounded-xl flex items-center justify-between" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
-              <div>
-                <div className="font-semibold">{p.name}</div>
-                <div className="text-xs text-ayria-muted">{p.email} · {p.coupons_count} cupons · R$ {(p.total_commission_cents / 100).toFixed(2)} em comissões</div>
-                {p.pix_key && <div className="text-xs text-ayria-muted">PIX: {p.pix_key}</div>}
-              </div>
-              <button onClick={() => toggleActive(p)} className={`text-xs px-3 py-1 rounded ${p.active ? 'bg-green-900/30 text-green-300' : 'bg-gray-800 text-gray-400'}`}>
-                {p.active ? 'Ativo' : 'Inativo'}
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-
-// ============================================================
-// COUPONS TAB - cadastro de cupons (cria no Stripe + AYRIA)
-// ============================================================
-function CouponsTab() {
-  const [coupons, setCoupons] = useState<CouponResponse[]>([])
-  const [partners, setPartners] = useState<PartnerResponse[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [form, setForm] = useState({
-    code: '',
-    name: '',
-    partner_id: '',
-    discount_type: 'percent' as 'percent' | 'fixed',
-    discount_value: '',
-    applicable_plan_slug: 'premium',
-    duration_months: '1',
-    commission_pct: '',
-    max_redemptions: '',
-    expires_at: '',
-  })
-
-  async function load() {
-    setLoading(true)
-    try {
-      const [cr, pr] = await Promise.all([couponsApi.listCoupons(), couponsApi.listPartners()])
-      setCoupons(cr.data || [])
-      setPartners(pr.data || [])
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || e.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { load() }, [])
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
-    try {
-      const payload: any = {
-        code: form.code.toUpperCase().trim(),
-        name: form.name || null,
-        partner_id: form.partner_id || null,
-        discount_type: form.discount_type,
-        discount_value: Number(form.discount_value),
-        applicable_plan_slug: form.applicable_plan_slug,
-        duration_months: Number(form.duration_months),
-        commission_pct: Number(form.commission_pct || 0),
-      }
-      if (form.max_redemptions) payload.max_redemptions = Number(form.max_redemptions)
-      if (form.expires_at) payload.expires_at = new Date(form.expires_at).toISOString()
-      await couponsApi.createCoupon(payload)
-      setShowForm(false)
-      setForm({ code: '', name: '', partner_id: '', discount_type: 'percent', discount_value: '', applicable_plan_slug: 'premium', duration_months: '1', commission_pct: '', max_redemptions: '', expires_at: '' })
-      await load()
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || e.message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function deactivate(c: CouponResponse) {
-    if (!confirm(`Desativar cupom ${c.code}?`)) return
-    try {
-      await couponsApi.deactivateCoupon(c.id)
-      await load()
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || e.message)
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div>
-          <div className="text-lg font-semibold">Cupons de desconto</div>
-          <div className="text-xs text-ayria-muted">Cria no Stripe + AYRIA. Parceiro recebe comissão configurada</div>
-        </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 rounded-lg text-sm flex items-center gap-2 text-white"
-          style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
-        >
-          <Plus size={14} /> Novo cupom
-        </button>
-      </div>
-
-      {error && (
-        <div className="p-3 rounded-xl text-sm" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>
-          ❌ {error}
-        </div>
-      )}
-
-      {showForm && (
-        <form onSubmit={submit} className="p-4 rounded-xl space-y-3" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
-          <div className="grid grid-cols-2 gap-3">
-            <input placeholder="Código (PROMO10)" required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} className="p-2 bg-ayria-bg rounded" />
-            <input placeholder="Nome descritivo" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="p-2 bg-ayria-bg rounded" />
-            <select value={form.partner_id} onChange={(e) => setForm({ ...form, partner_id: e.target.value })} className="p-2 bg-ayria-bg rounded">
-              <option value="">— Sem parceiro (cupom interno) —</option>
-              {partners.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} ({p.email})</option>
-              ))}
-            </select>
-            <select value={form.applicable_plan_slug} onChange={(e) => setForm({ ...form, applicable_plan_slug: e.target.value })} className="p-2 bg-ayria-bg rounded" required>
-              <option value="basico">Básico</option>
-              <option value="intermediario">Intermediário</option>
-              <option value="premium">Premium</option>
-            </select>
-            <select value={form.discount_type} onChange={(e) => setForm({ ...form, discount_type: e.target.value as any })} className="p-2 bg-ayria-bg rounded">
-              <option value="percent">% off</option>
-              <option value="fixed">R$ off</option>
-            </select>
-            <input placeholder={form.discount_type === 'percent' ? 'Percentual (10 = 10%)' : 'Valor R$ off'} type="number" step="0.01" required value={form.discount_value} onChange={(e) => setForm({ ...form, discount_value: e.target.value })} className="p-2 bg-ayria-bg rounded" />
-            <input placeholder="Duração (meses)" type="number" min="1" value={form.duration_months} onChange={(e) => setForm({ ...form, duration_months: e.target.value })} className="p-2 bg-ayria-bg rounded" />
-            <input placeholder="Comissão % parceiro" type="number" step="0.01" required value={form.commission_pct} onChange={(e) => setForm({ ...form, commission_pct: e.target.value })} className="p-2 bg-ayria-bg rounded" />
-            <input placeholder="Max resgates (vazio = ilimitado)" type="number" value={form.max_redemptions} onChange={(e) => setForm({ ...form, max_redemptions: e.target.value })} className="p-2 bg-ayria-bg rounded" />
-            <input placeholder="Expira em (AAAA-MM-DDTHH:MM)" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} className="p-2 bg-ayria-bg rounded" />
-          </div>
-          <div className="flex gap-2 justify-end">
-            <button type="button" onClick={() => setShowForm(false)} className="px-3 py-2 text-ayria-muted">Cancelar</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 rounded text-white" style={{ background: '#6366F1' }}>
-              {saving ? 'Criando...' : 'Criar cupom'}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {loading ? (
-        <div className="text-ayria-muted">Carregando...</div>
-      ) : coupons.length === 0 ? (
-        <div className="text-ayria-muted text-center py-12 rounded-xl" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
-          Nenhum cupom criado ainda.
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {coupons.map((c) => (
-            <div key={c.id} className="p-4 rounded-xl flex items-center justify-between" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
-              <div>
-                <div className="font-semibold flex items-center gap-2">
-                  {c.code}
-                  {c.active ? <span className="text-[10px] px-2 py-0.5 rounded bg-green-900/30 text-green-300">ATIVO</span> : <span className="text-[10px] px-2 py-0.5 rounded bg-gray-800 text-gray-400">INATIVO</span>}
-                </div>
-                <div className="text-xs text-ayria-muted">
-                  {c.discount_type === 'percent' ? `${c.discount_value}% off` : `R$ ${c.discount_value} off`} no plano {c.applicable_plan_slug} · {c.current_redemptions}{c.max_redemptions ? `/${c.max_redemptions}` : ''} usos · {c.partner_name ? `parceiro ${c.partner_name}` : 'interno'} · comissão {c.commission_pct}%
-                </div>
-              </div>
-              {c.active && (
-                <button onClick={() => deactivate(c)} className="text-xs px-3 py-1 rounded text-red-300 hover:bg-red-900/20">
-                  Desativar
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-
-// ============================================================
-// COMMISSIONS TAB - relatório de comissões a pagar
-// ============================================================
-function CommissionsTab() {
-  const [data, setData] = useState<CommissionReport | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'pending' | 'paid' | 'all'>('pending')
-  const [error, setError] = useState<string | null>(null)
-
-  async function load() {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await couponsApi.listCommissions(filter === 'all' ? undefined : { status: filter })
-      setData(res.data)
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || e.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { load() }, [filter])
-
-  async function markPaid(id: string) {
-    if (!confirm('Marcar comissão como paga? (registra payout_status=paid)')) return
-    try {
-      await couponsApi.payCommission(id)
-      await load()
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || e.message)
-    }
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div>
-          <div className="text-lg font-semibold">Comissões</div>
-          <div className="text-xs text-ayria-muted">Repasses por cupom usado</div>
-        </div>
-        <div className="flex gap-2">
-          {(['pending', 'paid', 'all'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 text-xs rounded-lg ${filter === f ? 'bg-ayria-admin text-white' : 'text-ayria-muted hover:text-ayria-text'}`}
-            >
-              {f === 'pending' ? 'Pendentes' : f === 'paid' ? 'Pagas' : 'Todas'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {data && (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="p-4 rounded-xl" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
-            <div className="text-xs text-ayria-muted">Total pendente</div>
-            <div className="text-2xl font-bold">R$ {(data.total_pending_cents / 100).toFixed(2)}</div>
-          </div>
-          <div className="p-4 rounded-xl" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
-            <div className="text-xs text-ayria-muted">Total pago</div>
-            <div className="text-2xl font-bold text-green-400">R$ {(data.total_paid_cents / 100).toFixed(2)}</div>
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <div className="p-3 rounded-xl text-sm" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>
-          ❌ {error}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="text-ayria-muted">Carregando...</div>
-      ) : !data || data.items.length === 0 ? (
-        <div className="text-ayria-muted text-center py-12 rounded-xl" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
-          Nenhuma comissão {filter === 'pending' ? 'pendente' : filter === 'paid' ? 'paga' : ''}.
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {data.items.map((r: any) => (
-            <div key={r.id} className="p-4 rounded-xl flex items-center justify-between" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
-              <div>
-                <div className="font-semibold">{r.coupon_code || '—'} · {r.partner_name || 'interno'}</div>
-                <div className="text-xs text-ayria-muted">
-                  {r.user_email || '—'} · plano {r.plan_slug} · {new Date(r.created_at).toLocaleDateString('pt-BR')}
-                </div>
-                <div className="text-xs text-ayria-muted">
-                  R$ {(r.original_amount_cents / 100).toFixed(2)} − {(r.discount_amount_cents / 100).toFixed(2)} = {(r.final_amount_cents / 100).toFixed(2)} · comissão {r.commission_pct}%
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="text-right">
-                  <div className="text-lg font-bold">R$ {((r.commission_amount_cents || 0) / 100).toFixed(2)}</div>
-                  <div className={`text-[10px] px-2 py-0.5 rounded ${r.payout_status === 'paid' ? 'bg-green-900/30 text-green-300' : 'bg-yellow-900/30 text-yellow-300'}`}>
-                    {r.payout_status === 'paid' ? 'PAGO' : 'PENDENTE'}
-                  </div>
-                </div>
-                {r.payout_status !== 'paid' && (
-                  <button onClick={() => markPaid(r.id)} className="text-xs px-3 py-1.5 rounded text-white" style={{ background: '#6366F1' }}>
-                    Marcar paga
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-
-// ============================================================
 // SETTINGS TAB - Mostra QUAL IA está em uso + status sistema
 // ============================================================
 function SystemSettingsTab() {
+  const [subTab, setSubTab] = useState<'ai' | 'admins'>('ai')
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2 border-b border-ayria-border pb-2">
+        <SubTabButton active={subTab === 'ai'} onClick={() => setSubTab('ai')} label="IA & Sistema" />
+        <SubTabButton active={subTab === 'admins'} onClick={() => setSubTab('admins')} label="Administradores" />
+      </div>
+      {subTab === 'admins' ? <SystemAdminsTab /> : <SystemAiConfigTab />}
+    </div>
+  )
+}
+
+function SubTabButton({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+        active ? '' : 'text-ayria-muted hover:text-ayria-text hover:bg-white/[0.03]'
+      }`}
+      style={active ? { background: 'rgba(245, 158, 11, 0.12)', color: '#F59E0B' } : undefined}
+    >
+      {label}
+    </button>
+  )
+}
+
+function SystemAiConfigTab() {
   const [config, setConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -2907,3 +2684,215 @@ function SupervisionTab() {
   )
 }
 
+
+// ============================================================
+// CouponsTab - gestão de cupons
+// ============================================================
+function CouponsTab() {
+  const [coupons, setCoupons] = useState<any[]>([])
+  const [partners, setPartners] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ code: '', discount_type: 'percent', discount_value: 30, partner_id: '', applicable_plan_slug: '', duration_months: 1, commission_pct: 10, max_redemptions: 100 })
+
+  useEffect(() => {
+    Promise.all([adminApi.listCoupons?.() ?? api.get('/api/admin/coupons'), adminApi.listPartners?.() ?? api.get('/api/admin/partners')])
+      .then(([cr, pr]) => {
+        setCoupons(Array.isArray(cr.data) ? cr.data : (cr.data.items ?? []))
+        setPartners(Array.isArray(pr.data) ? pr.data : (pr.data.items ?? []))
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  const save = async () => {
+    try {
+      await api.post('/api/admin/coupons', form)
+      const r = await api.get('/api/admin/coupons')
+      setCoupons(Array.isArray(r.data) ? r.data : (r.data.items ?? []))
+      setShowForm(false)
+    } catch (e: any) {
+      alert('Erro: ' + (e.response?.data?.detail || e.message))
+    }
+  }
+
+  if (loading) return <div className="text-ayria-muted">Carregando...</div>
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <div className="text-sm text-ayria-muted">{coupons.length} cupons</div>
+        <button onClick={() => setShowForm(true)} className="px-4 py-2 rounded-xl text-white font-medium flex items-center gap-2 hover:opacity-90" style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}>
+          <Plus size={16} /> Novo cupom
+        </button>
+      </div>
+      <div className="rounded-xl overflow-hidden" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
+        <table className="w-full">
+          <thead className="bg-slate-900 text-xs uppercase text-slate-400">
+            <tr><th className="text-left px-4 py-3">Código</th><th className="text-left px-4 py-3">Desconto</th><th className="text-left px-4 py-3">Parceiro</th><th className="text-center px-4 py-3">Usos</th><th className="text-center px-4 py-3">Status</th></tr>
+          </thead>
+          <tbody>
+            {coupons.map((c: any) => (
+              <tr key={c.id} className="border-t border-slate-800">
+                <td className="px-4 py-3 font-mono text-amber-400">{c.code}</td>
+                <td className="px-4 py-3">{c.discount_type === 'percent' ? `${c.discount_value}%` : `R$ ${c.discount_value}`} ({c.duration_months}m)</td>
+                <td className="px-4 py-3 text-ayria-muted">{c.partner_id ? partners.find((p: any) => p.id === c.partner_id)?.name || '—' : '—'}</td>
+                <td className="px-4 py-3 text-center">{c.current_redemptions ?? 0}/{c.max_redemptions ?? '∞'}</td>
+                <td className="px-4 py-3 text-center">{c.active ? <span className="text-emerald-400">Ativo</span> : <span className="text-slate-500">Inativo</span>}</td>
+              </tr>
+            ))}
+            {coupons.length === 0 && <tr><td colSpan={5} className="text-center py-8 text-slate-500">Nenhum cupom</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}>
+          <div className="w-full max-w-md rounded-2xl p-6 space-y-4" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
+            <h3 className="text-lg font-semibold text-white">Novo cupom</h3>
+            <input placeholder="CÓDIGO" value={form.code} onChange={e => setForm({ ...form, code: e.target.value.toUpperCase() })} className="w-full px-3 py-2 rounded-lg bg-slate-900 text-white font-mono" />
+            <div className="grid grid-cols-2 gap-2">
+              <select value={form.discount_type} onChange={e => setForm({ ...form, discount_type: e.target.value })} className="px-3 py-2 rounded-lg bg-slate-900 text-white"><option value="percent">%</option><option value="fixed">R$ fixo</option></select>
+              <input type="number" placeholder="Valor" value={form.discount_value} onChange={e => setForm({ ...form, discount_value: +e.target.value })} className="px-3 py-2 rounded-lg bg-slate-900 text-white" />
+            </div>
+            <select value={form.partner_id} onChange={e => setForm({ ...form, partner_id: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-slate-900 text-white">
+              <option value="">— sem parceiro —</option>
+              {partners.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <div className="flex gap-2">
+              <button onClick={() => setShowForm(false)} className="flex-1 py-2 text-slate-300 hover:text-white">Cancelar</button>
+              <button onClick={save} className="flex-1 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500">Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// PartnersTab - gestão de parceiros
+// ============================================================
+function PartnersTab() {
+  const [partners, setPartners] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ name: '', email: '', phone: '', document_number: '', pix_key: '', commission_pct: 10 })
+
+  useEffect(() => {
+    (adminApi.listPartners?.() ?? api.get('/api/admin/partners')).then((r: any) => {
+      setPartners(Array.isArray(r.data) ? r.data : (r.data.items ?? []))
+    }).catch(() => {}).finally(() => setLoading(false))
+  }, [])
+
+  const save = async () => {
+    try {
+      await api.post('/api/admin/partners', form)
+      const r = await api.get('/api/admin/partners')
+      setPartners(Array.isArray(r.data) ? r.data : (r.data.items ?? []))
+      setShowForm(false)
+    } catch (e: any) {
+      alert('Erro: ' + (e.response?.data?.detail || e.message))
+    }
+  }
+
+  if (loading) return <div className="text-ayria-muted">Carregando...</div>
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <div className="text-sm text-ayria-muted">{partners.length} parceiros</div>
+        <button onClick={() => setShowForm(true)} className="px-4 py-2 rounded-xl text-white font-medium flex items-center gap-2 hover:opacity-90" style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}>
+          <Plus size={16} /> Novo parceiro
+        </button>
+      </div>
+      <div className="rounded-xl overflow-hidden" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
+        <table className="w-full">
+          <thead className="bg-slate-900 text-xs uppercase text-slate-400">
+            <tr><th className="text-left px-4 py-3">Nome</th><th className="text-left px-4 py-3">Email</th><th className="text-left px-4 py-3">PIX</th><th className="text-right px-4 py-3">Comissão</th><th className="text-center px-4 py-3">Status</th></tr>
+          </thead>
+          <tbody>
+            {partners.map((p: any) => (
+              <tr key={p.id} className="border-t border-slate-800">
+                <td className="px-4 py-3 text-white">{p.name}</td>
+                <td className="px-4 py-3 text-slate-300">{p.email || '—'}</td>
+                <td className="px-4 py-3 text-slate-400 font-mono text-xs">{p.pix_key || '—'}</td>
+                <td className="px-4 py-3 text-right text-amber-400">{p.commission_pct ?? 10}%</td>
+                <td className="px-4 py-3 text-center">{p.active ? <span className="text-emerald-400">Ativo</span> : <span className="text-slate-500">Inativo</span>}</td>
+              </tr>
+            ))}
+            {partners.length === 0 && <tr><td colSpan={5} className="text-center py-8 text-slate-500">Nenhum parceiro</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}>
+          <div className="w-full max-w-md rounded-2xl p-6 space-y-4" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
+            <h3 className="text-lg font-semibold text-white">Novo parceiro</h3>
+            <input placeholder="Nome" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-slate-900 text-white" />
+            <input placeholder="Email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-slate-900 text-white" />
+            <input placeholder="Telefone" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-slate-900 text-white" />
+            <input placeholder="CPF/CNPJ" value={form.document_number} onChange={e => setForm({ ...form, document_number: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-slate-900 text-white" />
+            <input placeholder="Chave PIX" value={form.pix_key} onChange={e => setForm({ ...form, pix_key: e.target.value })} className="w-full px-3 py-2 rounded-lg bg-slate-900 text-white" />
+            <div className="flex items-center gap-2"><label className="text-sm text-slate-400 w-24">Comissão %</label><input type="number" value={form.commission_pct} onChange={e => setForm({ ...form, commission_pct: +e.target.value })} className="flex-1 px-3 py-2 rounded-lg bg-slate-900 text-white" /></div>
+            <div className="flex gap-2">
+              <button onClick={() => setShowForm(false)} className="flex-1 py-2 text-slate-300 hover:text-white">Cancelar</button>
+              <button onClick={save} className="flex-1 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500">Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// CommissionsTab - visão de comissões pendentes/pagas
+// ============================================================
+function CommissionsTab() {
+  const [data, setData] = useState<any>({ pending: [], paid: [], total_pending: 0, total_paid: 0 })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    api.get('/api/admin/commissions').then(r => setData(r.data)).catch(() => {}).finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <div className="text-ayria-muted">Carregando...</div>
+
+  const fmt = (cents: number) => `R$ ${(cents / 100).toFixed(2)}`
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="p-5 rounded-xl" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
+          <div className="text-xs text-amber-400 uppercase tracking-wider">Pendentes</div>
+          <div className="text-3xl font-bold text-white mt-2">{fmt(data.total_pending_cents ?? 0)}</div>
+        </div>
+        <div className="p-5 rounded-xl" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
+          <div className="text-xs text-emerald-400 uppercase tracking-wider">Pagas</div>
+          <div className="text-3xl font-bold text-white mt-2">{fmt(data.total_paid_cents ?? 0)}</div>
+        </div>
+      </div>
+      <div>
+        <h3 className="text-sm font-semibold text-ayria-muted uppercase mb-2">Histórico recente</h3>
+        <div className="rounded-xl overflow-hidden" style={{ background: '#111111', border: '1px solid #1E1E2E' }}>
+          <table className="w-full">
+            <thead className="bg-slate-900 text-xs uppercase text-slate-400">
+              <tr><th className="text-left px-4 py-3">Parceiro</th><th className="text-left px-4 py-3">Cupom</th><th className="text-right px-4 py-3">Valor</th><th className="text-center px-4 py-3">Status</th></tr>
+            </thead>
+            <tbody>
+              {(data.items ?? data.recent ?? []).map((r: any, i: number) => (
+                <tr key={r.id ?? i} className="border-t border-slate-800">
+                  <td className="px-4 py-3 text-white">{r.partner_name ?? r.partner_id ?? '—'}</td>
+                  <td className="px-4 py-3 font-mono text-amber-400">{r.coupon_code ?? '—'}</td>
+                  <td className="px-4 py-3 text-right text-emerald-400">{fmt(r.commission_amount_cents ?? 0)}</td>
+                  <td className="px-4 py-3 text-center">{r.payout_status === 'paid' ? <span className="text-emerald-400">Pago</span> : <span className="text-amber-400">Pendente</span>}</td>
+                </tr>
+              ))}
+              {(!data.items && !data.recent) && <tr><td colSpan={4} className="text-center py-8 text-slate-500">Sem comissões registradas</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # Defaults hardcoded
 DEFAULT_PROD_URL = "https://ayria.tecia.app"
-DEFAULT_LOCAL_URL = "http://192.168.3.37:8093"
+DEFAULT_LOCAL_URL = "http://192.168.3.37:5173"
 
 
 def get_public_base_url() -> str:
@@ -71,3 +71,12 @@ def build_verification_url(token: str) -> str:
     """
     base = get_public_base_url()
     return f"{base}/#/verify-email?token={token}"
+
+
+def build_password_reset_url(token: str) -> str:
+    """Monta URL completa de redefinição de senha.
+
+    IMPORTANTE: mesma regra do HashRouter que build_verification_url.
+    """
+    base = get_public_base_url()
+    return f"{base}/#/reset-password?token={token}"

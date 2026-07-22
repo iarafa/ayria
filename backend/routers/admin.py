@@ -12,10 +12,10 @@ PUT    /api/admin/onboarding/config
 GET    /api/admin/attributes
 POST   /api/admin/attributes
 """
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form, BackgroundTasks
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File, Form, BackgroundTasks
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_, text
 import uuid
 import logging
 from datetime import datetime, timedelta, timezone
@@ -38,37 +38,83 @@ logger = logging.getLogger(__name__)
 # ============================================================
 # USERS
 # ============================================================
-@router.get("/users", response_model=list[schemas.AdminUserResponse])
+@router.get("/users", response_model=schemas.AdminUsersListResponse)
 async def list_users(
+    search: Optional[str] = Query(None, description="Busca em email e full_name (case-insensitive)"),
+    status: str = Query("all", description="Filtro de status: all | active | inactive | blocked | pending"),
+    role_filter: str = Query("users_only", description="Filtro de role: 'users_only' (exclui SUPER_ADMIN/admin — default da aba Usuários) | 'all' (inclui todos, usado pela aba Admin)"),
+    page: int = Query(1, ge=1, description="Página (1-based)"),
+    page_size: int = Query(25, ge=1, le=100, description="Itens por página (max 100)"),
     admin: models.User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Lista todos os usuários (admin) - inclui plano + saldo de créditos"""
-    res = await db.execute(
-        select(models.User).order_by(models.User.created_at.desc())
-    )
-    users = res.scalars().all()
+    """Lista usuários (admin) - com busca, filtros de status e paginação.
 
-    result = []
-    for u in users:
-        count_res = await db.execute(
-            select(func.count(models.Message.id)).where(models.Message.user_id == u.id)
+    Suporta:
+    - search:     substring em email OU full_name (case-insensitive, %LIKE%)
+    - status:     all | active (is_active=true) | inactive | blocked (blocked_until IS NOT NULL)
+                  | pending (onboarding_status='pending')
+    - role_filter: users_only (exclui admin/SUPER_ADMIN, default) | all (inclui todos)
+                   A aba 'Usuários' do admin só mostra clientes; admins ficam na aba 'Configurações'.
+    - page:       1-based, default 1
+    - page_size:  default 25, max 100
+    """
+    # ===== Query base =====
+    base_q = select(models.User)
+
+    # 19/07/2026: aba 'Usuários' do admin NÃO mostra administradores do sistema.
+    # Por padrão role_filter='users_only' — exclui SUPER_ADMIN e admin.
+    if role_filter == "users_only":
+        base_q = base_q.where(models.User.role == "user")
+    # role_filter='all' → sem filtro de role
+
+    if search:
+        pat = f"%{search.lower()}%"
+        base_q = base_q.where(
+            or_(
+                func.lower(models.User.email).like(pat),
+                func.lower(func.coalesce(models.User.full_name, "")).like(pat),
+            )
         )
-        count = count_res.scalar() or 0
 
-        # Carrega plano (se tiver)
+    if status == "active":
+        base_q = base_q.where(models.User.is_active.is_(True))
+    elif status == "inactive":
+        base_q = base_q.where(models.User.is_active.is_(False))
+    elif status == "blocked":
+        base_q = base_q.where(models.User.blocked_until.isnot(None))
+    elif status == "pending":
+        base_q = base_q.where(models.User.onboarding_status == "pending")
+    # 'all' = sem filtro
+
+    # ===== Count total =====
+    total = await db.scalar(
+        select(func.count()).select_from(base_q.subquery())
+    ) or 0
+
+    # ===== Page =====
+    offset = (page - 1) * page_size
+    page_q = base_q.order_by(models.User.created_at.desc()).offset(offset).limit(page_size)
+    users = (await db.execute(page_q)).scalars().all()
+
+    # ===== Hidrata plano + count pra cada user =====
+    items: list[schemas.AdminUserResponse] = []
+    for u in users:
+        msg_count = await db.scalar(
+            select(func.count(models.Message.id)).where(models.Message.user_id == u.id)
+        ) or 0
+
         plan = None
         if u.selected_plan_id:
-            plan_res = await db.execute(
+            plan = await db.scalar(
                 select(models.Plan).where(models.Plan.id == u.selected_plan_id)
             )
-            plan = plan_res.scalar_one_or_none()
 
-        result.append(schemas.AdminUserResponse(
+        items.append(schemas.AdminUserResponse(
             id=u.id, email=u.email, full_name=u.full_name, role=u.role,
             is_active=u.is_active, onboarding_status=u.onboarding_status or "pending",
             created_at=u.created_at, last_login_at=u.last_login_at,
-            message_count=count,
+            message_count=msg_count,
             selected_plan_id=u.selected_plan_id,
             selected_plan_slug=plan.slug if plan else None,
             selected_plan_name=plan.name if plan else None,
@@ -77,8 +123,19 @@ async def list_users(
             plan_selected_at=u.plan_selected_at,
             billing_status=u.billing_status or "billing_not_enabled",
             credits_last_granted_at=u.credits_last_granted_at,
+            blocked_until=u.blocked_until, blocked_at=u.blocked_at,
+            blocked_by=u.blocked_by, block_reason=u.block_reason,
         ))
-    return result
+
+    total_pages = (total + page_size - 1) // page_size  # ceil
+
+    return schemas.AdminUsersListResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
 
 
 @router.post("/users", response_model=schemas.AdminUserResponse, status_code=201)
@@ -515,20 +572,62 @@ async def delete_user(
         r = await db.execute(text("DELETE FROM user_attributes WHERE user_id = :uid"), {"uid": str(user_id)})
         deleted_summary["pg"]["user_attributes"] = r.rowcount
 
-        # 3. PostgreSQL: messages (via chats)
+        # 3. PostgreSQL: spiritual_preferences
+        r = await db.execute(text("DELETE FROM spiritual_preferences WHERE user_id = :uid"), {"uid": str(user_id)})
+        deleted_summary["pg"]["spiritual_preferences"] = r.rowcount
+
+        # 4. PostgreSQL: credit_transactions (FK → users)
+        r = await db.execute(text("DELETE FROM credit_transactions WHERE user_id = :uid"), {"uid": str(user_id)})
+        deleted_summary["pg"]["credit_transactions"] = r.rowcount
+
+        # 5. PostgreSQL: chat_question_skip (FK → users)
+        r = await db.execute(text("DELETE FROM chat_question_skip WHERE user_id = :uid"), {"uid": str(user_id)})
+        deleted_summary["pg"]["chat_question_skip"] = r.rowcount
+
+        # 6. PostgreSQL: messages (via chats)
         r = await db.execute(text("DELETE FROM messages WHERE chat_id IN (SELECT id FROM chats WHERE user_id = :uid)"), {"uid": str(user_id)})
         deleted_summary["pg"]["messages"] = r.rowcount
 
-        # 4. PostgreSQL: chats
+        # 7. PostgreSQL: chats
         r = await db.execute(text("DELETE FROM chats WHERE user_id = :uid"), {"uid": str(user_id)})
         deleted_summary["pg"]["chats"] = r.rowcount
 
-        # 5. Audit log: NULL user_id (preserva histórico, mas sem FK)
+        # 8. Supervisor: alerts (referencia user_id + acknowledged_by/resolved_by)
+        r = await db.execute(text("UPDATE supervisor_alerts SET user_id=NULL WHERE user_id=:uid"), {"uid": str(user_id)})
+        r = await db.execute(text("UPDATE supervisor_alerts SET acknowledged_by=NULL WHERE acknowledged_by=:uid"), {"uid": str(user_id)})
+        r = await db.execute(text("UPDATE supervisor_alerts SET resolved_by=NULL WHERE resolved_by=:uid"), {"uid": str(user_id)})
+        deleted_summary["pg"]["supervisor_alerts_anonymized"] = r.rowcount
+
+        # 9. Supervisor: analysis + daily_summary + notes (NULL user_id pra preservar histórico)
+        r = await db.execute(text("UPDATE supervisor_analysis SET user_id=NULL WHERE user_id=:uid"), {"uid": str(user_id)})
+        r = await db.execute(text("UPDATE supervisor_daily_summary SET user_id=NULL WHERE user_id=:uid"), {"uid": str(user_id)})
+        r = await db.execute(text("UPDATE user_supervisor_notes SET user_id=NULL WHERE user_id=:uid"), {"uid": str(user_id)})
+        r = await db.execute(text("UPDATE user_supervisor_notes SET admin_id=NULL WHERE admin_id=:uid"), {"uid": str(user_id)})
+        deleted_summary["pg"]["supervisor_anonymized"] = r.rowcount
+
+        # 10. user_alma (FK → users + created_by + approved_by)
+        r = await db.execute(text("DELETE FROM user_alma WHERE user_id=:uid"), {"uid": str(user_id)})
+        r = await db.execute(text("UPDATE user_alma SET created_by=NULL WHERE created_by=:uid"), {"uid": str(user_id)})
+        r = await db.execute(text("UPDATE user_alma SET approved_by=NULL WHERE approved_by=:uid"), {"uid": str(user_id)})
+
+        # 11. stripe_subscriptions + stripe_invoices (FK → users.ayria_user_id)
+        try:
+            r = await db.execute(text("DELETE FROM stripe_subscriptions WHERE ayria_user_id=:uid"), {"uid": str(user_id)})
+            deleted_summary["pg"]["stripe_subscriptions"] = r.rowcount
+        except Exception:
+            pass
+        try:
+            r = await db.execute(text("DELETE FROM stripe_invoices WHERE ayria_user_id=:uid"), {"uid": str(user_id)})
+            deleted_summary["pg"]["stripe_invoices"] = r.rowcount
+        except Exception:
+            pass
+
+        # 12. Audit log: NULL user_id (preserva histórico, mas sem FK)
         # Não deleta - auditoria deve permanecer (LGPD permite pra fins de segurança)
         r = await db.execute(text("UPDATE audit_log SET user_id = NULL WHERE user_id = :uid"), {"uid": str(user_id)})
         deleted_summary["pg"]["audit_log_anonymized"] = r.rowcount
 
-        # 6. Qdrant: TODAS as memórias do user
+        # 13. Qdrant: TODAS as memórias do user
         from services.vector_service import vector_service
         deleted_summary["qdrant"] = await vector_service.delete_user_memories(str(user_id))
 
@@ -550,6 +649,234 @@ async def delete_user(
             status_code=500,
             detail="Erro interno ao excluir usuário. Tente novamente ou contate o suporte."
         )
+
+
+# ============================================================
+# 🆕 ADMINS DO SISTEMA (19/07/2026)
+# Gerenciamento separado dos usuários clientes.
+# SUPER_ADMIN acessa em Configurações > Administradores do Sistema.
+# Não aparecem na aba Usuários (que lista apenas clientes).
+# ============================================================
+
+class AdminCreateRequest(BaseModel):
+    """Admin cria novo administrador (outro SUPER_ADMIN)."""
+    email: str
+    password: str = Field(..., min_length=8, description="Senha mínima 8 caracteres")
+    full_name: Optional[str] = None
+
+
+class AdminUpdateRequest(BaseModel):
+    """Admin edita nome / email de outro admin (não muda role)."""
+    full_name: Optional[str] = None
+    email: Optional[str] = None  # re-mail exige unicidade
+
+
+class AdminPasswordResetRequest(BaseModel):
+    """Admin reseta senha de outro admin."""
+    new_password: str = Field(..., min_length=8, description="Nova senha mínima 8 caracteres")
+    reason: Optional[str] = None
+
+
+@router.get("/admins", response_model=list[dict])
+async def list_admins(
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lista todos os administradores do sistema (SUPER_ADMIN).
+    Não inclui a si mesmo destacado de jeito nenhum — o admin pode ver quem mais é admin.
+    """
+    res = await db.execute(
+        select(models.User)
+        .where(models.User.role.in_(["admin", "SUPER_ADMIN"]))
+        .order_by(models.User.created_at.desc())
+    )
+    admins = res.scalars().all()
+    return [
+        {
+            "id": str(a.id),
+            "email": a.email,
+            "full_name": a.full_name,
+            "role": a.role,
+            "is_active": a.is_active,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+            "last_login_at": a.last_login_at.isoformat() if a.last_login_at else None,
+            "is_self": a.id == admin.id,  # destaque visual no frontend
+        }
+        for a in admins
+    ]
+
+
+@router.post("/admins", status_code=201, response_model=dict)
+async def create_admin(
+    payload: AdminCreateRequest,
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cria novo administrador do sistema (SUPER_ADMIN).
+    Admin criador não pode excluir a si mesmo, mas pode criar outros.
+    """
+    # Email único
+    existing = await db.execute(
+        select(models.User).where(func.lower(models.User.email) == payload.email.lower())
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Email já cadastrado")
+
+    new_admin = models.User(
+        id=uuid.uuid4(),
+        email=payload.email,
+        password_hash=hash_password(payload.password),
+        full_name=payload.full_name,
+        role="SUPER_ADMIN",
+        is_active=True,
+        is_verified=True,
+        onboarding_status="completed",
+    )
+    db.add(new_admin)
+    await db.commit()
+    await db.refresh(new_admin)
+
+    logger.info(
+        f"✅ Novo admin criado: {new_admin.email} (id={new_admin.id}) "
+        f"por admin {admin.email}"
+    )
+    return {
+        "id": str(new_admin.id),
+        "email": new_admin.email,
+        "full_name": new_admin.full_name,
+        "role": new_admin.role,
+        "is_active": new_admin.is_active,
+        "created_at": new_admin.created_at.isoformat(),
+    }
+
+
+@router.put("/admins/{admin_id}", response_model=dict)
+async def update_admin(
+    admin_id: uuid.UUID,
+    payload: AdminUpdateRequest,
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Edita nome / email de um administrador (não muda role).
+    Permite self-edit pra trocar email ou nome próprio.
+    """
+    res = await db.execute(
+        select(models.User).where(models.User.id == admin_id)
+    )
+    target = res.scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=404, detail="Administrador não encontrado")
+    if target.role not in ("admin", "SUPER_ADMIN"):
+        raise HTTPException(status_code=400, detail="Usuário não é administrador do sistema")
+
+    # Valida unicidade de email se mudou
+    if payload.email and payload.email.lower() != target.email.lower():
+        existing = await db.execute(
+            select(models.User).where(
+                func.lower(models.User.email) == payload.email.lower(),
+                models.User.id != admin_id,
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Email já em uso por outro usuário")
+        target.email = payload.email
+
+    if payload.full_name is not None:
+        target.full_name = payload.full_name
+
+    await db.commit()
+    await db.refresh(target)
+
+    logger.info(
+        f"✅ Admin atualizado: {target.email} (id={target.id}) por admin {admin.email}"
+    )
+    return {
+        "id": str(target.id),
+        "email": target.email,
+        "full_name": target.full_name,
+        "role": target.role,
+        "is_active": target.is_active,
+    }
+
+
+@router.delete("/admins/{admin_id}", status_code=204)
+async def delete_admin(
+    admin_id: uuid.UUID,
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove um administrador do sistema.
+    REGRAS DE SEGURANÇA:
+    - Admin não pode remover a si mesmo
+    - NÃO pode remover o último SUPER_ADMIN do sistema
+    """
+    if admin_id == admin.id:
+        raise HTTPException(status_code=400, detail="Você não pode remover a si mesmo")
+
+    res = await db.execute(
+        select(models.User).where(models.User.id == admin_id)
+    )
+    target = res.scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=404, detail="Administrador não encontrado")
+    if target.role not in ("admin", "SUPER_ADMIN"):
+        raise HTTPException(status_code=400, detail="Usuário não é administrador do sistema")
+
+    # Conta quantos SUPER_ADMIN restam (excluindo o alvo)
+    count_res = await db.execute(
+        select(func.count(models.User.id)).where(
+            models.User.role.in_(["admin", "SUPER_ADMIN"]),
+            models.User.id != admin_id,
+        )
+    )
+    remaining = count_res.scalar() or 0
+    if remaining == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Não é possível remover o último administrador do sistema. Crie outro antes."
+        )
+
+    await db.delete(target)
+    await db.commit()
+
+    logger.warning(
+        f"⚠️ Admin removido: {target.email} (id={target.id}) por admin {admin.email}. "
+        f"Restam {remaining} admin(s)."
+    )
+    return None
+
+
+@router.post("/admins/{admin_id}/password", response_model=dict)
+async def reset_admin_password(
+    admin_id: uuid.UUID,
+    payload: AdminPasswordResetRequest,
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reseta a senha de outro admin (auditoria: loga quem mudou + motivo).
+    Admin pode resetar própria senha também.
+    """
+    res = await db.execute(
+        select(models.User).where(models.User.id == admin_id)
+    )
+    target = res.scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=404, detail="Administrador não encontrado")
+    if target.role not in ("admin", "SUPER_ADMIN"):
+        raise HTTPException(status_code=400, detail="Usuário não é administrador do sistema")
+
+    target.password_hash = hash_password(payload.new_password)
+    await db.commit()
+
+    logger.warning(
+        f"🔐 Senha de admin resetada: {target.email} (id={target.id}) "
+        f"por admin {admin.email}. Motivo: {payload.reason or 'não informado'}"
+    )
+    return {
+        "id": str(target.id),
+        "email": target.email,
+        "message": "Senha atualizada com sucesso",
+    }
 
 
 # ============================================================
@@ -1200,11 +1527,14 @@ async def get_user_details(
 
 @router.get("/config/ai", response_model=dict)
 async def get_ai_config(admin=Depends(require_admin)):
-    """Retorna config da IA em uso (provider, modelo, URL, status da chave)."""
+    """Retorna config da IA em uso (provider, modelo, URL, status da chave).
+    19/07/2026: Agora usa DB > .env (RuntimeConfig). Mostra source de cada campo.
+    """
     from database import settings
     from services.ai_service import ai_service
+    runtime = await ai_service.get_runtime_status()
     return {
-        "ai": ai_service.get_status(),
+        "ai": runtime,
         "embedding_provider": "MiniMax (ou hash fallback se MiniMax não suportar embeddings)",
         "azure_storage": {
             "configured": bool(storage_service.sas_url),
@@ -1217,7 +1547,91 @@ async def get_ai_config(admin=Depends(require_admin)):
             "APENAS MiniMax (regra absoluta do sistema)",
             "OpenAI foi REMOVIDO COMPLETAMENTE",
             "Modelo padrão: MiniMax-M3",
+            "Valores em verde no painel = vindos do DB (editáveis)",
         ],
+    }
+
+
+class AIConfigUpdate(BaseModel):
+    """Update parcial da config de IA. Qualquer campo omitido mantém valor atual."""
+    provider: Optional[str] = Field(default=None, description="Ex: 'MiniMax'")
+    model: Optional[str] = Field(default=None, description="Ex: 'MiniMax-M3'")
+    base_url: Optional[str] = Field(default=None, description="URL base OpenAI-compat")
+    api_key: Optional[str] = Field(default=None, min_length=1, description="Chave de API (será persistida no DB)")
+    reset_to_env: Optional[bool] = Field(default=False, description="Se True, limpa DB e volta pro .env")
+
+
+@router.put("/config/ai", response_model=dict)
+async def update_ai_config(
+    payload: AIConfigUpdate,
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Edita a config de IA em runtime (sobrescreve .env).
+    Persistido no DB (tabela system_config). Aplicação imediata nas próximas requests.
+
+    Validações:
+    - API key: min 8 chars (validado na entrada)
+    - Base URL: deve começar com http(s)://
+    - Model: não vazio
+    - reset_to_env=True: apaga todas as chaves AI_* do DB
+    """
+    from services.runtime_config import rc
+    from services.ai_service import ai_service
+
+    if payload.reset_to_env:
+        # Limpa tudo do DB
+        for k in ("AI_PROVIDER", "AI_MODEL", "AI_BASE_URL", "AI_API_KEY"):
+            await rc.delete(db, k)
+        runtime = await ai_service.get_runtime_status()
+        return {
+            "ok": True,
+            "message": "Config resetada para o .env",
+            "ai": runtime,
+        }
+
+    updates = []
+    if payload.provider is not None:
+        if not payload.provider.strip():
+            raise HTTPException(status_code=400, detail="Provider não pode ser vazio")
+        await rc.set(db, "AI_PROVIDER", payload.provider.strip(),
+                     updated_by=admin.id,
+                     description="Provider da IA (MiniMax)")
+        updates.append("AI_PROVIDER")
+
+    if payload.model is not None:
+        if not payload.model.strip():
+            raise HTTPException(status_code=400, detail="Model não pode ser vazio")
+        await rc.set(db, "AI_MODEL", payload.model.strip(),
+                     updated_by=admin.id,
+                     description="Modelo da IA (ex: MiniMax-M3, MiniMax-M2.7)")
+        updates.append("AI_MODEL")
+
+    if payload.base_url is not None:
+        if not payload.base_url.startswith(("http://", "https://")):
+            raise HTTPException(status_code=400, detail="Base URL deve começar com http(s)://")
+        await rc.set(db, "AI_BASE_URL", payload.base_url.strip(),
+                     updated_by=admin.id,
+                     description="URL base OpenAI-compat")
+        updates.append("AI_BASE_URL")
+
+    if payload.api_key is not None:
+        if len(payload.api_key) < 8:
+            raise HTTPException(status_code=400, detail="API key deve ter pelo menos 8 caracteres")
+        await rc.set(db, "AI_API_KEY", payload.api_key,
+                     updated_by=admin.id,
+                     description="Chave de API da IA (NÃO compartilhar)")
+        updates.append("AI_API_KEY")
+
+    runtime = await ai_service.get_runtime_status()
+    logger.warning(
+        f"⚙️ AI config atualizada por admin {admin.email}: {updates}"
+    )
+    return {
+        "ok": True,
+        "message": f"Config atualizada: {', '.join(updates) if updates else 'nada'}",
+        "updated": updates,
+        "ai": runtime,
     }
 
 
@@ -1964,9 +2378,17 @@ async def prompt_chat_save(
         raise HTTPException(status_code=400, detail=f"key inválida: {key}")
 
     backup_path = None
+    backup_warning = None
     if file_path.exists():
         backup_path = file_path.with_suffix(file_path.suffix + ".bak")
-        shutil.copy2(file_path, backup_path)
+        try:
+            shutil.copy2(file_path, backup_path)
+        except (PermissionError, OSError) as e:
+            # 🆕 22/07/2026 — Backup é best-effort: .bak antigo do root ou diretório read-only
+            # NÃO pode bloquear save. Segue sem backup, mas avisa.
+            backup_warning = f"{type(e).__name__}: {e}"
+            backup_path = None
+            logger.warning(f"[prompt_chat_save:{key}] Backup falhou (não-bloqueante): {backup_warning}")
 
     # Salva no banco (config ativa) + arquivo
     await db.execute(
@@ -2009,6 +2431,7 @@ async def prompt_chat_save(
         "key": key,
         "file": str(file_path),
         "backup": str(backup_path) if backup_path else None,
+        "backup_warning": backup_warning,  # 🆕 22/07/2026 — best-effort backup
         "config_id": str(new_cfg.id),
         "reindexed": payload.reindex_rag,
         "content_length": len(new_content),
@@ -2520,6 +2943,491 @@ async def restore_supervisor_prompt_default(
 
 
 # ============================================================
+# 🆕 DB MAINTENANCE (19/07/2026)
+# Botões que admin dispara pela aba "Manutenção":
+# - GET   /api/admin/db/status         — stats em tempo real
+# - POST  /api/admin/db/backup         — roda backup script
+# - POST  /api/admin/db/vacuum         — vacuum + analyze + reindex
+# - POST  /api/admin/db/trim-audit     — trim audit_log antigo
+# - GET   /api/admin/db/backups        — lista backups existentes
+# - POST  /api/admin/db/restore        — restaura de um backup (dry_run opcional)
+# ============================================================
+import subprocess as _sp
+import os as _os
+
+BACKUP_DIR = "/home/peron/backups/ayria-db"
+
+
+@router.get("/db/status")
+async def db_status(admin: models.User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """Status do banco em tempo real + último backup."""
+    from database import settings as _s
+    import json as _json
+    from datetime import datetime as _dt
+
+    # Stats gerais
+    size = (await db.execute(text("SELECT pg_size_pretty(pg_database_size(current_database()))"))).scalar()
+    n_conn = (await db.execute(text("SELECT count(*) FROM pg_stat_activity"))).scalar() or 0
+
+    # Top 5 maiores tabelas
+    rows = (await db.execute(text("""
+        SELECT
+            t.schemaname || '.' || t.tablename AS tabela,
+            pg_size_pretty(pg_total_relation_size(t.schemaname || '.' || t.tablename)) AS tamanho,
+            pg_total_relation_size(t.schemaname || '.' || t.tablename) AS bytes,
+            s.n_live_tup AS linhas,
+            s.n_dead_tup AS mortas
+        FROM pg_tables t
+        JOIN pg_stat_user_tables s
+          ON s.schemaname = t.schemaname AND s.relname = t.tablename
+        WHERE t.schemaname = 'public'
+        ORDER BY pg_total_relation_size(t.schemaname || '.' || t.tablename) DESC
+        LIMIT 10
+    """))).all()
+
+    tables = [
+        {"tabela": r[0], "tamanho": r[1], "bytes": r[2], "linhas": r[3], "mortas": r[4]}
+        for r in rows
+    ]
+
+    # Último backup
+    last_pg = None
+    last_qdrant = None
+    if _os.path.isdir(BACKUP_DIR):
+        pg_files = sorted(_os.listdir(BACKUP_DIR)) if _os.path.exists(BACKUP_DIR) else []
+        pg_bks = sorted([f for f in pg_files if f.startswith("pg_")])
+        q_bks = sorted([f for f in pg_files if f.startswith("qdrant_")])
+        if pg_bks:
+            last_pg = {
+                "file": pg_bks[-1],
+                "size": _os.path.getsize(f"{BACKUP_DIR}/{pg_bks[-1]}"),
+                "modified": _dt.fromtimestamp(_os.path.getmtime(f"{BACKUP_DIR}/{pg_bks[-1]}")).isoformat(),
+            }
+        if q_bks:
+            last_qdrant = {
+                "file": q_bks[-1],
+                "size": _os.path.getsize(f"{BACKUP_DIR}/{q_bks[-1]}"),
+                "modified": _dt.fromtimestamp(_os.path.getmtime(f"{BACKUP_DIR}/{q_bks[-1]}")).isoformat(),
+            }
+
+    return {
+        "database": "ayria",
+        "size": size,
+        "active_connections": n_conn,
+        "tables": tables,
+        "backups": {
+            "dir": BACKUP_DIR,
+            "last_pg": last_pg,
+            "last_qdrant": last_qdrant,
+        },
+        "environment": _s.ENVIRONMENT,
+    }
+
+
+@router.post("/db/backup")
+async def db_backup(admin: models.User = Depends(require_admin)):
+    """Roda backup local + ZIP + upload Azure (igual /backup-cloud). 19/07/2026."""
+    from datetime import datetime as _dt
+    import zipfile as _zip
+
+    script = "/home/peron/bin/ayria-db-backup.sh"
+    if not _os.path.isfile(script):
+        raise HTTPException(404, f"Script não encontrado: {script}")
+
+    # 1. Roda backup local
+    try:
+        result = _sp.run(["bash", script], capture_output=True, text=True, timeout=300)
+        if result.returncode != 0:
+            return {
+                "ok": False,
+                "returncode": result.returncode,
+                "stdout": result.stdout[-3000:],
+                "stderr": result.stderr[-1000:] if result.stderr else "",
+                "cloud_ok": False,
+            }
+    except _sp.TimeoutExpired:
+        raise HTTPException(500, "Backup local demorou mais que 5min (timeout)")
+
+    # 2. ZIP + upload Azure
+    pg_files = sorted([f for f in _os.listdir(BACKUP_DIR) if f.startswith("pg_")])
+    qdrant_files = sorted([f for f in _os.listdir(BACKUP_DIR) if f.startswith("qdrant_")])
+    cloud_ok = False
+    cloud_url = None
+    cloud_path = None
+    zip_size = 0
+    zip_filename = None
+    if pg_files:
+        latest_pg = pg_files[-1]
+        # extrai timestamp do pg_20260719_HHMMSS.sql.gz pra usar no zip
+        import re as _re
+        _m = _re.search(r"pg_(\d{8}_\d{6})", latest_pg)
+        zip_ts = _m.group(1) if _m else _dt.now().strftime("%Y%m%d_%H%M%S")
+        files_to_zip = [f"{BACKUP_DIR}/{latest_pg}"]
+        if qdrant_files:
+            files_to_zip.append(f"{BACKUP_DIR}/{qdrant_files[-1]}")
+        zip_filename = f"ayria-backup-{zip_ts}.zip"
+        tmp_zip = f"/tmp/{zip_filename}"
+        with _zip.ZipFile(tmp_zip, "w", _zip.ZIP_DEFLATED, compresslevel=6) as zf:
+            for fpath in files_to_zip:
+                zf.write(fpath, arcname=_os.path.basename(fpath))
+        zip_size = _os.path.getsize(tmp_zip)
+        try:
+            from services.storage_service import storage_service as _ss
+            with open(tmp_zip, "rb") as f:
+                file_bytes = f.read()
+            upload_result = await _ss.upload(
+                file_bytes=file_bytes,
+                filename=zip_filename,
+                content_type="application/zip",
+                folder="backups",
+            )
+            cloud_ok = upload_result.get("storage") == "azure"
+            cloud_url = upload_result.get("url")
+            cloud_path = upload_result.get("path")
+        except Exception as e:
+            logger.error(f"❌ Upload Azure falhou (backup ainda tá local): {e}")
+        try:
+            _os.remove(tmp_zip)
+        except Exception:
+            pass
+
+    # 3. Cleanup Azure >30 dias
+    cleanup = {"deleted": 0}
+    if cloud_ok:
+        try:
+            from services.storage_service import storage_service as _ss
+            from datetime import timedelta as _td
+            container = _ss._azure_container
+            if container:
+                cutoff = _dt.utcnow() - _td(days=30)
+                for b in container.list_blobs(name_starts_with="backups/"):
+                    if b.last_modified and b.last_modified.replace(tzinfo=None) < cutoff:
+                        container.delete_blob(b.name)
+                        cleanup["deleted"] += 1
+        except Exception as e:
+            logger.warning(f"⚠️ Cleanup Azure falhou: {e}")
+
+    logger.warning(
+        f"📦 Backup disparado por admin {admin.email}: "
+        f"local+azure, zip={zip_size}B, cloud_ok={cloud_ok}, cleanup_deleted={cleanup['deleted']}"
+    )
+
+    return {
+        "ok": True,
+        "returncode": 0,
+        "stdout": result.stdout[-3000:],
+        "stderr": "",
+        "zip_filename": zip_filename,
+        "zip_size_bytes": zip_size,
+        "cloud_ok": cloud_ok,
+        "cloud_url": cloud_url,
+        "cloud_path": cloud_path,
+        "cleanup_deleted": cleanup["deleted"],
+        "retention_days": 30,
+    }
+
+
+
+@router.post("/db/backup-cloud")
+async def db_backup_cloud(admin: models.User = Depends(require_admin)):
+    """Backup local + zip + upload pro Azure Blob (folder backups/). Limpa Azure >30 dias. (19/07/2026)"""
+    from datetime import datetime as _dt
+    import zipfile
+    import tempfile as _tmp
+
+    script = "/home/peron/bin/ayria-db-backup.sh"
+    if not _os.path.isfile(script):
+        raise HTTPException(404, f"Script não encontrado: {script}")
+
+    # 1. Roda backup local
+    try:
+        result = _sp.run(["bash", script], capture_output=True, text=True, timeout=300)
+        if result.returncode != 0:
+            raise HTTPException(500, f"Backup local falhou: {result.stderr[:500]}")
+    except _sp.TimeoutExpired:
+        raise HTTPException(500, "Backup local demorou mais que 5min (timeout)")
+
+    # 2. Pega arquivos gerados (pg_*.sql.gz + qdrant_*.tar.gz)
+    pg_files = sorted([f for f in _os.listdir(BACKUP_DIR) if f.startswith("pg_")])
+    qdrant_files = sorted([f for f in _os.listdir(BACKUP_DIR) if f.startswith("qdrant_")])
+    if not pg_files:
+        raise HTTPException(500, "Nenhum backup local gerado")
+    latest_pg = pg_files[-1]
+    files_to_zip = [f"{BACKUP_DIR}/{latest_pg}"]
+    if qdrant_files:
+        files_to_zip.append(f"{BACKUP_DIR}/{qdrant_files[-1]}")
+
+    # 3. Zip tudo
+    import re as _re2
+    _m2 = _re2.search(r"pg_(\d{8}_\d{6})", latest_pg)
+    zip_ts = _m2.group(1) if _m2 else _dt.now().strftime("%Y%m%d_%H%M%S")
+    zip_filename = f"ayria-backup-{zip_ts}.zip"
+    tmp_zip = f"/tmp/{zip_filename}"
+    with zipfile.ZipFile(tmp_zip, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+        for fpath in files_to_zip:
+            zf.write(fpath, arcname=_os.path.basename(fpath))
+    zip_size = _os.path.getsize(tmp_zip)
+
+    # 4. Upload pro Azure
+    from services.storage_service import storage_service
+    try:
+        with open(tmp_zip, "rb") as f:
+            file_bytes = f.read()
+        upload_result = await storage_service.upload(
+            file_bytes=file_bytes,
+            filename=zip_filename,
+            content_type="application/zip",
+            folder="backups",
+        )
+        cloud_ok = upload_result.get("storage") == "azure"
+        cloud_url = upload_result.get("url")
+        cloud_path = upload_result.get("path")
+    except Exception as e:
+        logger.error(f"❌ Upload Azure falhou: {e}")
+        cloud_ok = False
+        cloud_url = None
+        cloud_path = None
+
+    # 5. Apagar ZIP temporário
+    try:
+        _os.remove(tmp_zip)
+    except Exception:
+        pass
+
+    # 6. Limpar Azure blobs >30 dias (cleanup retention)
+    cleanup = {"deleted": 0, "errors": 0}
+    if cloud_ok:
+        try:
+            from services.storage_service import storage_service as _ss
+            container = _ss._azure_container
+            if container:
+                from datetime import timedelta as _td
+                cutoff = _dt.utcnow() - _td(days=30)
+                blobs = container.list_blobs(name_starts_with="backups/")
+                for b in blobs:
+                    try:
+                        if b.last_modified and b.last_modified.replace(tzinfo=None) < cutoff:
+                            container.delete_blob(b.name)
+                            cleanup["deleted"] += 1
+                    except Exception:
+                        cleanup["errors"] += 1
+        except Exception as e:
+            logger.warning(f"⚠️ Cleanup Azure falhou: {e}")
+
+    logger.warning(
+        f"📦 Backup+Azure disparado por admin {admin.email}: "
+        f"local_files={len(files_to_zip)}, zip={zip_size}B, "
+        f"cloud_ok={cloud_ok}, deleted_old={cleanup['deleted']}"
+    )
+
+    return {
+        "ok": True,
+        "local_files": len(files_to_zip),
+        "local_files_list": [_os.path.basename(f) for f in files_to_zip],
+        "zip_filename": zip_filename,
+        "zip_size_bytes": zip_size,
+        "cloud_ok": cloud_ok,
+        "cloud_url": cloud_url,
+        "cloud_path": cloud_path,
+        "cleanup_deleted": cleanup["deleted"],
+        "cleanup_errors": cleanup["errors"],
+        "retention_days": 30,
+    }
+
+
+
+@router.post("/db/vacuum")
+async def db_vacuum(admin: models.User = Depends(require_admin)):
+    """Roda VACUUM ANALYZE + REINDEX (mesmo do maintenance semanal)."""
+    script = "/home/peron/bin/ayria-db-maintenance.sh"
+    if not _os.path.isfile(script):
+        raise HTTPException(404, f"Script não encontrado: {script}")
+
+    try:
+        result = _sp.run(
+            ["bash", script, "--audit-keep", "180"],
+            capture_output=True, text=True, timeout=900,  # 15min
+        )
+        logger.warning(f"🧹 Vacuum manual disparado por admin {admin.email}")
+        return {
+            "ok": result.returncode == 0,
+            "returncode": result.returncode,
+            "stdout": result.stdout[-3000:],
+            "stderr": result.stderr[-1000:] if result.stderr else "",
+        }
+    except _sp.TimeoutExpired:
+        raise HTTPException(500, "Vacuum demorou mais que 15min (timeout)")
+    except Exception as e:
+        raise HTTPException(500, f"Erro ao rodar vacuum: {e}")
+
+
+@router.post("/db/trim-audit")
+async def db_trim_audit(
+    payload: dict,
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Trim audit_log manual. payload = {days: int}"""
+    days = int(payload.get("days", 180))
+    if days < 30:
+        raise HTTPException(400, "Mínimo 30 dias (segurança)")
+
+    res = await db.execute(
+        text(f"DELETE FROM audit_log WHERE created_at < NOW() - INTERVAL '{days} days' RETURNING id")
+    )
+    deleted = len(res.all())
+    await db.commit()
+    logger.warning(
+        f"🗑️ Audit trim manual: {deleted} registros removidos (>{days} dias) por admin {admin.email}"
+    )
+    return {"ok": True, "deleted": deleted, "days": days}
+
+
+@router.get("/db/backups")
+async def db_backups_list(admin: models.User = Depends(require_admin)):
+    """Lista backups LOCAIS + AZURE (com status e URL). 19/07/2026."""
+    from datetime import datetime as _dt
+
+    # 1. Listar arquivos locais
+    files = []
+    if _os.path.isdir(BACKUP_DIR):
+        for fname in sorted(_os.listdir(BACKUP_DIR)):
+            fpath = f"{BACKUP_DIR}/{fname}"
+            if not _os.path.isfile(fpath) or fname.endswith(".log"):
+                continue
+            stat = _os.stat(fpath)
+            files.append({
+                "file": fname,
+                "size": stat.st_size,
+                "size_human": f"{stat.st_size / 1024:.1f} KB" if stat.st_size < 1024*1024 else f"{stat.st_size / 1024 / 1024:.2f} MB",
+                "modified": _dt.fromtimestamp(stat.st_mtime).isoformat(),
+                "type": "pg" if fname.startswith("pg_") else ("qdrant" if fname.startswith("qdrant_") else "other"),
+                "location": "local",
+                "azure_url": None,
+            })
+
+    # 2. Listar blobs Azure (folder backups/)
+    azure_blobs = []
+    from services.storage_service import storage_service as _ss
+    if _ss and _ss._azure_container:
+        try:
+            blobs = _ss._azure_container.list_blobs(name_starts_with="backups/")
+            sas_token = "?" + _ss.sas_url.split("?", 1)[1] if _ss.sas_url and "?" in _ss.sas_url else ""
+            for b in blobs:
+                if b.name.startswith("backups/"):
+                    bname = b.name.split("/", 1)[1]
+                    azure_blobs.append({
+                        "file": bname,
+                        "size": b.size or 0,
+                        "size_human": f"{(b.size or 0) / 1024 / 1024:.2f} MB" if (b.size or 0) >= 1024*1024 else f"{(b.size or 0) / 1024:.1f} KB",
+                        "modified": b.last_modified.isoformat() if b.last_modified else None,
+                        "type": "azure_zip",
+                        "azure_url": f"{_ss._azure_container.url}/{bname}{sas_token}",
+                        "etag": b.etag or None,
+                    })
+        except Exception as e:
+            logger.warning(f"⚠️ Falha ao listar Azure backups: {e}")
+
+    # 3. Fazer merge: marca cada arquivo local com `in_azure: bool` se existir um blob zip do mesmo timestamp
+    #    O blob no Azure é um ZIP único do par pg+qdrant do mesmo timestamp.
+    #    Match por timestamp YYYYMMDD_HHMMSS presente tanto nos files locais quanto no nome do zip.
+    import re as _re
+    ts_re = _re.compile(r"(\d{8}_\d{6})")
+    for b in azure_blobs:
+        m = ts_re.search(b["file"])
+        if not m:
+            continue
+        ts = m.group(1)
+        # Marca cada arquivo local que tem esse timestamp como `in_azure=True`
+        for local_file in files:
+            local_ts = ts_re.search(local_file["file"])
+            if local_ts and local_ts.group(1) == ts:
+                local_file["in_azure"] = True
+                local_file["azure_url"] = b["azure_url"]
+                local_file["location"] = "local+azure"
+
+    # Ordena por modified desc
+    files.sort(key=lambda x: x.get("modified") or "", reverse=True)
+    azure_blobs.sort(key=lambda x: x.get("modified") or "", reverse=True)
+
+    return {
+        "local": files,
+        "azure": azure_blobs,
+        "azure_dir": f"{_ss._azure_container.url}/backups" if _ss and _ss._azure_container else None,
+        "local_dir": BACKUP_DIR,
+        "local_total": len(files),
+        "azure_total": len(azure_blobs),
+        "retention_days": 30,
+    }
+
+
+
+@router.post("/db/restore")
+async def db_restore(
+    payload: dict,
+    admin: models.User = Depends(require_admin),
+):
+    from datetime import datetime as _dt
+    """Restaura um backup do Postgres. CUIDADO: sobrescreve banco atual.
+    payload = {file: 'pg_20260719_171603.sql.gz', dry_run: true/false}
+    Default dry_run=True (só mostra o que seria feito).
+    """
+    fname = payload.get("file")
+    dry_run = payload.get("dry_run", True)
+
+    if not fname or not fname.startswith("pg_") or not fname.endswith(".sql.gz"):
+        raise HTTPException(400, "file deve ser um backup pg_*.sql.gz")
+
+    fpath = f"{BACKUP_DIR}/{fname}"
+    if not _os.path.isfile(fpath):
+        raise HTTPException(404, f"Arquivo não encontrado: {fpath}")
+
+    pg_pass = (await db.execute(text("SELECT current_setting('postgres_password')"))).scalar() if False else None
+    # Pega senha do .env
+    import re as _re
+    env_text = open("/home/peron/projects/ayria/.env").read()
+    m = _re.search(r"^POSTGRES_PASSWORD=(.+)$", env_text, _re.M)
+    pg_pass = m.group(1).strip() if m else None
+    if not pg_pass:
+        raise HTTPException(500, "POSTGRES_PASSWORD não encontrada no .env")
+
+    if dry_run:
+        return {
+            "ok": True,
+            "dry_run": True,
+            "message": f"DRY RUN: backup {fname} seria restaurado em /dev/null (não modifica nada)",
+            "file": fname,
+            "size": _os.path.getsize(fpath),
+        }
+
+    # Restore real — CUIDADO!
+    logger.warning(
+        f"⚠️ RESTORE MANUAL disparado por admin {admin.email}: {fname} (BACKUP ATUAL SERÁ PERDIDO)"
+    )
+    # Mata conexões existentes
+    await db.execute(text("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'ayria' AND pid <> pg_backend_pid()"))
+    await db.commit()
+
+    try:
+        # gunzip + psql
+        cmd = f"gunzip -c {fpath} | PGPASSWORD='{pg_pass}' psql -h 127.0.0.1 -p 5434 -U ayria -d ayria"
+        result = _sp.run(
+            ["bash", "-c", cmd],
+            capture_output=True, text=True, timeout=600,  # 10min
+        )
+        return {
+            "ok": result.returncode == 0,
+            "dry_run": False,
+            "returncode": result.returncode,
+            "stderr": result.stderr[-2000:] if result.stderr else "",
+        }
+    except _sp.TimeoutExpired:
+        raise HTTPException(500, "Restore demorou mais que 10min (timeout)")
+    except Exception as e:
+        raise HTTPException(500, f"Erro no restore: {e}")
+
+
+# ============================================================
 # FRONTEND ERROR INGEST — recebe erros do frontend e grava no log
 # ============================================================
 import traceback as _tb
@@ -2568,3 +3476,235 @@ async def ingest_frontend_log(
         _frontend_logger.info("%s | %s", msg, json.dumps(payload, ensure_ascii=False, default=str))
 
     return {"ok": True, "logged": event.level}
+
+
+# ============================================================
+# 19/07/2026 — RATE LIMIT DASHBOARD (Security Tab)
+# ============================================================
+from sqlalchemy import text as _text
+import json as _json
+from datetime import datetime as _dt, timedelta as _td
+
+from services.rate_limiter import (
+    STORE, CONFIG, log_event as _log_event,
+    get_blacklist, add_blacklist, remove_blacklist,
+    lookup_geo as _lookup_geo,
+)
+from services.rate_limiter import is_blacklisted as _is_blacklisted
+
+
+@router.get("/security/rate-limit/status", response_model=schemas.RateLimitStatusResponse)
+async def rl_status(admin: models.User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """Resumo agregado: IPs bloqueados, em alerta, falhas 24h, blocks 24h."""
+    snap = STORE.snapshot()
+    blocked_now = len(snap["blocked"])
+    in_alert = len(snap["alert"])
+
+    # 24h stats do banco
+    result = await db.execute(_text("""
+        SELECT
+            SUM(CASE WHEN success = FALSE THEN 1 ELSE 0 END) AS failures_24h,
+            SUM(CASE WHEN success = TRUE THEN 1 ELSE 0 END) AS successes_24h
+        FROM rate_limit_events
+        WHERE occurred_at > NOW() - INTERVAL '24 hours'
+    """))
+    row = result.first()
+    total_failures_24h = (row[0] or 0) if row else 0
+
+    # blocks 24h = events whose ip ficou bloqueado (não temos este campo armazenado,
+    # então aproximamos: eventos falha com ip que aparece no snapshot blocked + os já liberados).
+    # Para simplicidade, contamos falhas com >5 ocorrências em 60s nos últimos 24h.
+    result2 = await db.execute(_text("""
+        SELECT COUNT(*) FROM (
+            SELECT ip, COUNT(*) AS cnt
+            FROM rate_limit_events
+            WHERE success = FALSE AND occurred_at > NOW() - INTERVAL '24 hours'
+            GROUP BY ip
+            HAVING COUNT(*) >= 5
+        ) t
+    """))
+    total_blocks_24h = result2.scalar() or 0
+
+    return schemas.RateLimitStatusResponse(
+        ips_blocked_now=blocked_now,
+        ips_in_alert=in_alert,
+        total_failures_24h=int(total_failures_24h),
+        total_blocks_24h=int(total_blocks_24h),
+        paused=False,
+    )
+
+
+@router.get("/security/rate-limit/active", response_model=schemas.RateLimitBlockedList)
+async def rl_active(admin: models.User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """IPs atualmente bloqueados em memória."""
+    import time as _t
+    snap = STORE.snapshot()
+    items = []
+    for entry in snap["blocked"]:
+        # Geo lookup assíncrono (fire and forget pra não bloquear)
+        geo = await _lookup_geo(entry["ip"])
+
+        # Tenta pegar o último email_attempted + user_agent do banco
+        result = await db.execute(_text("""
+            SELECT email_attempted, user_agent FROM rate_limit_events
+            WHERE ip = CAST(:ip AS INET)
+            ORDER BY occurred_at DESC LIMIT 1
+        """), {"ip": entry["ip"]})
+        last = result.first()
+        items.append(schemas.RateLimitBlockedIP(
+            ip=entry["ip"],
+            endpoint=entry["endpoint"],
+            geo=geo,
+            failures_in_window=entry["failures_in_window"],
+            retry_in_seconds=entry["retry_in_seconds"],
+            blocked_until_epoch=entry["blocked_until"],
+            blocked_until_iso=_dt.fromtimestamp(entry["blocked_until"]).isoformat(),
+            user_agent=last[1] if last else None,
+            last_email_attempted=last[0] if last else None,
+        ))
+    return schemas.RateLimitBlockedList(items=items, total=len(items))
+
+
+@router.get("/security/rate-limit/alert", response_model=schemas.RateLimitAlertList)
+async def rl_alert(admin: models.User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    """IPs com falhas recentes mas ainda não bloqueados."""
+    snap = STORE.snapshot()
+    items = []
+    for entry in snap["alert"]:
+        geo = await _lookup_geo(entry["ip"])
+        result = await db.execute(_text("""
+            SELECT user_agent FROM rate_limit_events
+            WHERE ip = CAST(:ip AS INET)
+            ORDER BY occurred_at DESC LIMIT 1
+        """), {"ip": entry["ip"]})
+        last = result.first()
+        items.append(schemas.RateLimitAlertIP(
+            ip=entry["ip"],
+            endpoint=entry["endpoint"],
+            geo=geo,
+            failures_in_window=entry["failures_in_window"],
+            user_agent=last[0] if last else None,
+        ))
+    return schemas.RateLimitAlertList(items=items, total=len(items))
+
+
+@router.get("/security/rate-limit/events", response_model=schemas.RateLimitEventsPage)
+async def rl_events(
+    admin: models.User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(50, ge=1, le=200),
+    only_failures: bool = Query(True),
+):
+    """Últimos eventos (terminal-like, scroll infinito)."""
+    where_clause = "WHERE success = FALSE" if only_failures else ""
+    result = await db.execute(_text(f"""
+        SELECT id, ip::text, endpoint, success, email_attempted,
+               user_agent, occurred_at
+        FROM rate_limit_events
+        {where_clause}
+        ORDER BY occurred_at DESC
+        LIMIT :lim
+    """), {"lim": limit})
+    items = []
+    for r in result.fetchall():
+        items.append({
+            "id": r[0], "ip": r[1], "endpoint": r[2], "success": r[3],
+            "email_attempted": r[4], "user_agent": r[5],
+            "occurred_at": r[6].isoformat() if r[6] else None,
+        })
+    total_q = await db.execute(_text(f"SELECT COUNT(*) FROM rate_limit_events {where_clause}"))
+    total = total_q.scalar() or 0
+    return schemas.RateLimitEventsPage(items=items, total=int(total))
+
+
+@router.post("/security/rate-limit/unblock")
+async def rl_unblock(
+    payload: schemas.RateLimitUnblockRequest,
+    admin: models.User = Depends(require_admin),
+):
+    """Desbloqueio manual de um IP."""
+    cleared = await STORE.unblock(payload.ip, payload.endpoint)
+    logger.info(f"admin {admin.email} desbloqueou ip={payload.ip} endpoint={payload.endpoint} cleared={cleared}")
+    return {"ok": True, "ip": payload.ip, "cleared_entries": cleared}
+
+
+@router.get("/security/blacklist", response_model=schemas.BlacklistResponse)
+async def rl_blacklist_list(admin: models.User = Depends(require_admin)):
+    items = await get_blacklist()
+    return schemas.BlacklistResponse(items=[schemas.BlacklistItem(**i) for i in items], total=len(items))
+
+
+@router.post("/security/blacklist")
+async def rl_blacklist_add(
+    payload: schemas.BlacklistAddRequest,
+    admin: models.User = Depends(require_admin),
+):
+    await add_blacklist(
+        ip=payload.ip,
+        reason=payload.reason or "Sem motivo",
+        added_by=admin.email,
+        expires_at=payload.expires_at,
+    )
+    logger.info(f"admin {admin.email} adicionou blacklist ip={payload.ip} reason={payload.reason}")
+    # Também limpa da memória pra forçar nova checagem
+    await STORE.unblock(payload.ip)
+    return {"ok": True, "ip": payload.ip}
+
+
+@router.delete("/security/blacklist/{ip:str}")
+async def rl_blacklist_remove(
+    ip: str,
+    admin: models.User = Depends(require_admin),
+):
+    rows = await remove_blacklist(ip)
+    logger.info(f"admin {admin.email} removeu blacklist ip={ip} rows={rows}")
+    return {"ok": True, "ip": ip, "removed": rows}
+
+
+@router.get("/security/rate-limit/config", response_model=schemas.RateLimitConfigResponse)
+async def rl_config(admin: models.User = Depends(require_admin)):
+    return schemas.RateLimitConfigResponse(
+        login={
+            "max_failures": CONFIG["/auth/login"].max_failures,
+            "window_seconds": CONFIG["/auth/login"].window_seconds,
+            "block_seconds": CONFIG["/auth/login"].block_seconds,
+        },
+        register={
+            "max_failures": CONFIG["/auth/register"].max_failures,
+            "window_seconds": CONFIG["/auth/register"].window_seconds,
+            "block_seconds": CONFIG["/auth/register"].block_seconds,
+        },
+        forgot_password={
+            "max_failures": CONFIG["/auth/forgot-password"].max_failures,
+            "window_seconds": CONFIG["/auth/forgot-password"].window_seconds,
+            "block_seconds": CONFIG["/auth/forgot-password"].block_seconds,
+        },
+    )
+
+
+# ============================================================
+# /api/admin/security/rate-limit/_inject — DEV/TEST ONLY (19/07/2026)
+# Admin pode injetar falhas em IP fictício pra ver o dashboard funcionar.
+# Em prod isso vira seed automático de logs reais.
+# ============================================================
+class RateLimitInjectRequest(BaseModel):
+    ip: str
+    endpoint: str = "/auth/login"
+    failures: int = 5
+    blocked: bool = True
+
+
+@router.post("/security/rate-limit/_inject")
+async def rl_inject(
+    payload: RateLimitInjectRequest,
+    admin: models.User = Depends(require_admin),
+):
+    """Dev only: injeta N falhas em IP fictício pra visualização no dashboard."""
+    ip = payload.ip
+    ep = payload.endpoint
+    for _ in range(payload.failures):
+        await STORE.record_failure(ip, ep)
+    cleared = 0
+    if not payload.blocked:
+        cleared = await STORE.unblock(ip, ep)
+    return {"ok": True, "ip": ip, "failures_injected": payload.failures, "blocked": payload.blocked, "cleared_entries": cleared}

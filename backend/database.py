@@ -22,7 +22,23 @@ class Settings(BaseSettings):
     AI_BASE_URL: str = "https://api.minimax.io/v1"
     AI_MODEL: str = "MiniMax-M3"
     AI_PROVIDER: str = "MiniMax"
-    
+
+    # Azure Blob Storage (19/07/2026: adicionado ao Settings p/ carregar do .env)
+    AZURE_STORAGE_SAS_URL: str = ""
+    AZURE_STORAGE_CONNECTION_STRING: str = ""
+    AZURE_STORAGE_CONTAINER: str = "ayria"
+    AZURE_STORAGE_LOCAL_FALLBACK: bool = False
+
+    # Stripe (19/07/2026) — Sandbox first
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_PUBLISHABLE_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRICE_BASIC: str = ""
+    STRIPE_PRICE_PREMIUM: str = ""
+    STRIPE_PRICE_GOLD: str = ""
+    STRIPE_TRIAL_CREDITS: int = 10
+    APP_URL: str = "http://localhost:5173"
+
     JWT_SECRET: str = "CHANGE_ME_AYRIA_DEV_ONLY"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 1440

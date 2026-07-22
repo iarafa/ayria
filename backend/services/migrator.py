@@ -55,6 +55,8 @@ SCHEMA_MARKERS = {
     "013_email_verification.sql": "COLUMN users.verification_token",
     "014_backfill_verified.sql": "is_verified_users_backfilled",
     "015_sub_alma_user.sql": "TABLE user_supervisor_notes",
+    "016_rate_limit.sql": "TABLE rate_limit_events",
+    "020_action_types_and_usage.sql": "TABLE action_types",
 }
 
 
