@@ -224,12 +224,27 @@ export function AdminPage() {
         {/* Content */}
         {loading && <div className="text-ayria-muted">Carregando...</div>}
 
-        {/* USERS */}
+        {/* USERS — exclui admins (admin/SUPER_ADMIN) — eles ficam na aba "Administradores" */}
         {tab === 'users' && !loading && (
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="text-sm text-ayria-muted">
-                {users.length} usuário(s) cadastrado(s)
+                <span className="text-ayria-text font-medium">
+                  {users.filter((u: any) => u.role === 'user').length}
+                </span>{' '}
+                usuário(s) comum(ns)
+                {users.filter((u: any) => u.role !== 'user').length > 0 && (
+                  <span className="ml-2 text-xs">
+                    • {users.filter((u: any) => u.role !== 'user').length} admin(s) na aba{' '}
+                    <a
+                      href="#"
+                      onClick={(e) => { e.preventDefault(); setTab('admins') }}
+                      className="text-indigo-400 hover:underline"
+                    >
+                      Administradores
+                    </a>
+                  </span>
+                )}
               </div>
               <button
                 onClick={() => setShowCreateModal(true)}
@@ -242,10 +257,10 @@ export function AdminPage() {
             </div>
 
             <ListWithControls
-              data={users}
+              data={users.filter((u: any) => u.role === 'user')}
               itemName="usuário"
-              searchPlaceholder="Buscar por email, nome ou role..."
-              emptyMessage="Nenhum usuário encontrado"
+              searchPlaceholder="Buscar por email, nome..."
+              emptyMessage="Nenhum usuário comum encontrado"
             >
               {(u) => (
                 <div
