@@ -9,6 +9,7 @@ import { LogoIcon } from '../components/Logo'
 import { Users, FileText, Settings, LogOut, UserPlus, X, Shield, Wallet, Plus, Tag, Edit3, Eye, ChevronDown, ChevronRight, Calendar, MapPin, Star, Heart, Briefcase, Sparkles, ExternalLink, Cpu, CheckCircle2, AlertCircle, Database, Cloud, Activity, AlertTriangle, MessageCircle, MessageSquare, Receipt, User, Clock, Calculator, ClipboardList, Trash2 } from 'lucide-react'
 import { AlmaTab } from '../components/AlmaTab'
 import { LogsTab } from '../components/LogsTab'
+import { ListWithControls } from '../components/ListWithControls'
 import { SupervisorPromptModal } from '../components/SupervisorPromptModal'
 import { SupervisorKeywordsViewer } from '../components/SupervisorKeywordsViewer'
 import { BlockUserModal } from '../components/BlockUserModal'
@@ -240,8 +241,13 @@ export function AdminPage() {
               </button>
             </div>
 
-            <div className="space-y-2">
-              {users.map((u) => (
+            <ListWithControls
+              data={users}
+              itemName="usuário"
+              searchPlaceholder="Buscar por email, nome ou role..."
+              emptyMessage="Nenhum usuário encontrado"
+            >
+              {(u) => (
                 <div
                   key={u.id}
                   className="p-4 rounded-xl flex items-center justify-between"
@@ -328,13 +334,8 @@ export function AdminPage() {
                     )}
                   </div>
                 </div>
-              ))}
-              {users.length === 0 && (
-                <div className="text-center text-ayria-muted py-8">
-                  Nenhum usuário cadastrado ainda.
-                </div>
               )}
-            </div>
+            </ListWithControls>
           </div>
         )}
 
@@ -2704,9 +2705,14 @@ function AdminsManagementTab() {
           <p>Nenhum administrador cadastrado</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {admins.map((a) => (
-            <div key={a.id} className="p-4 rounded-xl flex items-center justify-between" style={{ background: '#1a1a2e', border: '1px solid #2a2a3e' }}>
+        <ListWithControls
+          data={admins}
+          itemName="administrador"
+          searchPlaceholder="Buscar por email, nome ou role..."
+          emptyMessage="Nenhum administrador encontrado"
+        >
+          {(a) => (
+            <div className="p-4 rounded-xl flex items-center justify-between" style={{ background: '#1a1a2e', border: '1px solid #2a2a3e' }}>
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div
                   className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold shrink-0"
@@ -2752,8 +2758,8 @@ function AdminsManagementTab() {
                 </button>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        </ListWithControls>
       )}
 
       {/* MODAL: Criar administrador */}
