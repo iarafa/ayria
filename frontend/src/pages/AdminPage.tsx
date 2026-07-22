@@ -2532,6 +2532,7 @@ function AdminsManagementTab() {
   const [loading, setLoading] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [editTarget, setEditTarget] = useState<any>(null)
+  const [editForm, setEditForm] = useState({ full_name: '', is_active: true, role: 'admin', new_password: '' })
   const [createForm, setCreateForm] = useState({ email: '', password: '', full_name: '', role: 'admin' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -2596,6 +2597,53 @@ function AdminsManagementTab() {
       await reload()
     } catch (e: any) {
       alert('❌ Erro: ' + (e.response?.data?.detail || e.message))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const openEdit = (admin: any) => {
+    setEditTarget(admin)
+    setEditForm({
+      full_name: admin.full_name || '',
+      is_active: admin.is_active,
+      role: admin.role,
+      new_password: '',
+    })
+  }
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editTarget) return
+    setBusy(true)
+    setError(null)
+    try {
+      // 1) Atualiza full_name + is_active (endpoint PUT /admin/users/{id})
+      await adminApi.updateUser(editTarget.id, {
+        full_name: editForm.full_name,
+        is_active: editForm.is_active,
+      } as any)
+      // 2) Se role mudou, chama endpoint dedicado
+      if (editForm.role !== editTarget.role) {
+        await api.put(`/admin/users/${editTarget.id}/role`, {
+          new_role: editForm.role,
+          reason: 'alteração via modal Editar',
+        })
+      }
+      // 3) Se preencheu senha, troca (endpoint POST /admin/users/{id}/password)
+      if (editForm.new_password && editForm.new_password.length >= 8) {
+        await api.post(`/admin/users/${editTarget.id}/password`, {
+          new_password: editForm.new_password,
+          reason: 'reset via modal Editar',
+        })
+      } else if (editForm.new_password && editForm.new_password.length < 8 && editForm.new_password.length > 0) {
+        alert('⚠️ Senha precisa ter no mínimo 8 caracteres — não foi trocada')
+      }
+      setEditTarget(null)
+      await reload()
+      alert('✅ Administrador atualizado!')
+    } catch (e: any) {
+      setError(e.response?.data?.detail || e.message || 'Erro ao atualizar')
     } finally {
       setBusy(false)
     }
@@ -2687,6 +2735,14 @@ function AdminsManagementTab() {
                   <option value="SUPER_ADMIN">SUPER_ADMIN</option>
                 </select>
                 <button
+                  onClick={() => openEdit(a)}
+                  disabled={busy}
+                  className="text-indigo-400 hover:text-indigo-300 p-1"
+                  title="Editar administrador"
+                >
+                  <Edit3 size={16} />
+                </button>
+                <button
                   onClick={() => handleDelete(a.id, a.email)}
                   disabled={busy || a.id === currentUser?.id}
                   className="text-red-400 hover:text-red-300 p-1 disabled:opacity-30"
@@ -2757,6 +2813,86 @@ function AdminsManagementTab() {
                 </button>
                 <button type="submit" disabled={busy} className="flex-1 py-2 rounded-xl text-white font-semibold disabled:opacity-50" style={{ background: '#6366F1' }}>
                   {busy ? 'Criando...' : 'Criar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Editar administrador */}
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}>
+          <div className="w-full max-w-md rounded-2xl p-6 relative" style={{ background: '#1a1a2e', border: '1px solid #2a2a3e' }}>
+            <button onClick={() => setEditTarget(null)} className="absolute top-4 right-4 text-ayria-muted hover:text-ayria-text">
+              <X size={20} />
+            </button>
+            <h3 className="text-xl font-bold text-ayria-text mb-1 flex items-center gap-2">
+              <Edit3 size={20} />
+              Editar Administrador
+            </h3>
+            <p className="text-xs text-ayria-muted mb-4">{editTarget.email}</p>
+            <form onSubmit={handleEdit} className="space-y-3">
+              <div>
+                <label className="block text-xs text-ayria-muted mb-1">Nome completo</label>
+                <input
+                  type="text"
+                  value={editForm.full_name}
+                  onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg text-sm" style={{ background: '#0A0A1A', border: '1px solid #2a2a3e', color: '#fff' }}
+                  placeholder="Ex: João da Silva"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-ayria-muted mb-1">Role</label>
+                <select
+                  value={editForm.role}
+                  disabled={editTarget.id === currentUser?.id}
+                  onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg text-sm disabled:opacity-50" style={{ background: '#0A0A1A', border: '1px solid #2a2a3e', color: '#fff' }}
+                >
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                  <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                </select>
+                {editTarget.id === currentUser?.id && (
+                  <p className="text-xs text-ayria-muted mt-1">Você não pode rebaixar a si mesmo</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="is_active_edit"
+                  checked={editForm.is_active}
+                  onChange={(e) => setEditForm({ ...editForm, is_active: e.target.checked })}
+                  disabled={editTarget.id === currentUser?.id}
+                  className="w-4 h-4"
+                />
+                <label htmlFor="is_active_edit" className="text-sm text-ayria-text cursor-pointer">
+                  Administrador ativo
+                </label>
+                {editTarget.id === currentUser?.id && (
+                  <span className="text-xs text-ayria-muted ml-2">(não pode desativar a si mesmo)</span>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs text-ayria-muted mb-1">Nova senha (deixe vazio pra não trocar)</label>
+                <input
+                  type="password"
+                  value={editForm.new_password}
+                  onChange={(e) => setEditForm({ ...editForm, new_password: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg text-sm" style={{ background: '#0A0A1A', border: '1px solid #2a2a3e', color: '#fff' }}
+                  placeholder="Mínimo 8 caracteres"
+                  minLength={0}
+                />
+              </div>
+              {error && <div className="text-xs text-red-300">{error}</div>}
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setEditTarget(null)} className="flex-1 py-2 rounded-xl text-ayria-muted hover:text-ayria-text" style={{ border: '1px solid #2a2a3e' }}>
+                  Cancelar
+                </button>
+                <button type="submit" disabled={busy} className="flex-1 py-2 rounded-xl text-white font-semibold disabled:opacity-50" style={{ background: '#6366F1' }}>
+                  {busy ? 'Salvando...' : 'Salvar'}
                 </button>
               </div>
             </form>
