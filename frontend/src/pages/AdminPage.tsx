@@ -176,45 +176,84 @@ export function AdminPage() {
       <div className="flex" style={{ minHeight: 'calc(100vh - 73px)' }}>
         {/* Sidebar — LATERAL ESQUERDA COMPLETA, sem card, sem sticky, sem rounded, fundo próprio */}
         <aside
-          className="w-64 shrink-0 flex flex-col border-r border-ayria-border"
+          className="w-64 shrink-0 flex flex-col border-r border-ayria-border overflow-y-auto"
           style={{ background: '#0F0F1F' }}
         >
-          <nav className="flex-1 flex flex-col gap-1 p-3">
-            {[
-              { id: 'users', label: 'Usuários', icon: Users },
-              { id: 'plans', label: 'Planos', icon: Tag },
-              { id: 'credits', label: 'Créditos', icon: Wallet },
-              { id: 'knowledge', label: 'Conhecimento', icon: FileText },
-              { id: 'supervision', label: 'Supervisão', icon: Activity },
-              { id: 'alma', label: 'ALMA', icon: Sparkles },
-              { id: 'logs', label: 'Logs', icon: AlertTriangle },
-              { id: 'settings', label: 'Configurações', icon: Cpu },
-              // 🆕 22/07 20:38 — aba "Administradores" só pra SUPER_ADMIN
-              ...(user?.role === 'SUPER_ADMIN'
-                ? [{ id: 'admins', label: 'Administradores', icon: Shield }]
-                : []),
-            ].map((t) => {
-              const isActive = tab === t.id
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id as Tab)}
-                  className={`w-full px-4 py-3 text-sm flex items-center gap-3 transition-colors text-left ${
-                    isActive
-                      ? 'text-ayria-text font-medium'
-                      : 'text-ayria-muted hover:bg-[#1a1a2e] hover:text-ayria-text'
-                  }`}
-                  style={
-                    isActive
-                      ? { borderLeft: '3px solid #6366F1', background: 'rgba(99, 102, 241, 0.15)' }
-                      : { borderLeft: '3px solid transparent' }
-                  }
-                >
-                  <t.icon size={16} />
-                  <span>{t.label}</span>
-                </button>
-              )
-            })}
+          <nav className="flex-1 flex flex-col gap-3 p-3">
+            {(() => {
+              // 🆕 22/07 20:55 — categorias pra organizar o menu (Rafael pediu)
+              type Item = { id: string; label: string; icon: any }
+              type Section = { title: string; items: Item[] }
+              const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+              const sections: Section[] = [
+                {
+                  title: 'Usuários',
+                  items: [
+                    { id: 'users', label: 'Usuários', icon: Users },
+                  ],
+                },
+                {
+                  title: 'Administração',
+                  items: [
+                    { id: 'plans', label: 'Planos', icon: Tag },
+                    { id: 'credits', label: 'Créditos', icon: Wallet },
+                    // só SUPER_ADMIN pode gerenciar outros admins
+                    ...(isSuperAdmin
+                      ? [{ id: 'admins', label: 'Administradores', icon: Shield } as Item]
+                      : []),
+                  ],
+                },
+                {
+                  title: 'Conteúdo',
+                  items: [
+                    { id: 'knowledge', label: 'Conhecimento', icon: FileText },
+                    { id: 'alma', label: 'ALMA', icon: Sparkles },
+                  ],
+                },
+                {
+                  title: 'Monitoramento',
+                  items: [
+                    { id: 'supervision', label: 'Supervisão', icon: Activity },
+                    { id: 'logs', label: 'Logs', icon: AlertTriangle },
+                  ],
+                },
+                {
+                  title: 'Sistema',
+                  items: [
+                    { id: 'settings', label: 'Configurações', icon: Cpu },
+                  ],
+                },
+              ]
+              return sections.map((section, i) => (
+                <div key={i}>
+                  <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ayria-muted opacity-60">
+                    {section.title}
+                  </div>
+                  {section.items.map((t) => {
+                    const isActive = tab === t.id
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => setTab(t.id as Tab)}
+                        className={`w-full px-4 py-2.5 text-sm flex items-center gap-3 transition-colors text-left rounded-lg ${
+                          isActive
+                            ? 'text-ayria-text font-medium'
+                            : 'text-ayria-muted hover:bg-[#1a1a2e] hover:text-ayria-text'
+                        }`}
+                        style={
+                          isActive
+                            ? { borderLeft: '3px solid #6366F1', background: 'rgba(99, 102, 241, 0.15)' }
+                            : { borderLeft: '3px solid transparent' }
+                        }
+                      >
+                        <t.icon size={15} />
+                        <span>{t.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              ))
+            })()}
           </nav>
         </aside>
 
