@@ -22,16 +22,12 @@ class StorageService:
     """Service de storage com Azure Blob primário e fallback local"""
 
     def __init__(self):
-        # 19/07/2026: agora lê de `settings` (pydantic carrega .env) — antes usava
-        # os.getenv direto, que não carrega o .env, então o Azure aparecia "Não configurado"
-        # mesmo com AZURE_STORAGE_SAS_URL setado.
-        from database import settings
-        self.container_name = settings.AZURE_STORAGE_CONTAINER or "ayria"
-        self.use_local = bool(settings.AZURE_STORAGE_LOCAL_FALLBACK)
+        self.container_name = os.getenv("AZURE_STORAGE_CONTAINER", "ayria")
+        self.use_local = os.getenv("AZURE_STORAGE_LOCAL_FALLBACK", "false").lower() == "true"
 
         # Tenta Azure via SAS URL (mais simples, sem precisar da connection string)
-        self.sas_url = (settings.AZURE_STORAGE_SAS_URL or "").strip()
-        self.connection_string = (settings.AZURE_STORAGE_CONNECTION_STRING or "").strip()
+        self.sas_url = os.getenv("AZURE_STORAGE_SAS_URL", "").strip()
+        self.connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING", "").strip()
 
         self._azure_client = None
         self._azure_container = None
@@ -98,15 +94,8 @@ class StorageService:
         # Gera nome único (filename pode ser SpooledTemporaryFile ou str)
         if hasattr(filename, 'name'):
             filename = filename.name
-        # 19/07/2026: preserva filename original (ex: backups com timestamp)
-        # Para backups a gente quer ler pelo timestamp, não por UUID
-        import re as _re
-        safe_name = _re.sub(r'[^A-Za-z0-9._-]', '_', os.path.basename(str(filename)))
-        ext = os.path.splitext(safe_name)[1]
-        if ext:
-            unique_name = safe_name
-        else:
-            unique_name = f"{uuid.uuid4()}{ext}"
+        ext = os.path.splitext(str(filename))[1]
+        unique_name = f"{uuid.uuid4()}{ext}"
 
         # Monta path final: {folder}/{uuid}.{ext} (se folder)
         folder_clean = folder.strip().strip("/").strip()

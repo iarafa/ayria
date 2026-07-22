@@ -13,9 +13,6 @@ import { AdminPage } from './pages/AdminPage'
 import { AdminLoginPage } from './pages/AdminLoginPage'
 import { ObserveUserPage } from './pages/ObserveUserPage'
 import CreatingProfilePage from './pages/CreatingProfilePage'
-import { PlanosPage } from './pages/PlanosPage'
-import { MinhaContaPage } from './pages/MinhaContaPage'
-import { PagamentoSucessoPage } from './pages/PagamentoSucessoPage'
 
 function PrivateRoute({ children, adminOnly = false, requireOnboarding = false }: { children: React.ReactNode; adminOnly?: boolean; requireOnboarding?: boolean }) {
   const { user, token, loadUser } = useAuth()
@@ -116,30 +113,6 @@ export default function App() {
         element={
           <PrivateRoute adminOnly>
             <ObserveUserPage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/planos"
-        element={
-          <PrivateRoute>
-            <PlanosPage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/minha-conta"
-        element={
-          <PrivateRoute>
-            <MinhaContaPage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/pagamento/sucesso"
-        element={
-          <PrivateRoute>
-            <PagamentoSucessoPage />
           </PrivateRoute>
         }
       />

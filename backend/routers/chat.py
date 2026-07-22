@@ -480,24 +480,6 @@ async def send_message(
 ):
     """Envia mensagem e recebe resposta da AYRIA. Consome 1 crédito se onboarding completo."""
     from services.credit_service import consume_credits, InsufficientCreditsError
-    from utils.billing_guard import check_access
-
-    # ADMINISTRADOR nunca é barrado (mesmo SUPER_ADMIN)
-    if user.role in ("admin", "SUPER_ADMIN"):
-        pass  # bypass
-    else:
-        # BLOQUEIO POR BILLING (19/07/2026) — pagamento não autorizado → não usa chat
-        has_access, reason = check_access(user)
-        if not has_access:
-            logger.warning(
-                f"Billing bloqueou chat: user={user.id} email={user.email} "
-                f"billing_status={user.billing_status} blocked_until={user.blocked_until} motivo={reason}"
-            )
-            raise HTTPException(
-                status_code=402,  # Payment Required
-                detail=f"Acesso bloqueado: {reason}. Contrate um plano em /planos.",
-                headers={"X-Billing-Block": "true"},
-            )
 
     # BLOQUEIO: user precisa ter completado onboarding (exceto SUPER_ADMIN)
     if user.role != "SUPER_ADMIN" and user.onboarding_status != "completed":
@@ -506,35 +488,15 @@ async def send_message(
             detail="Complete o onboarding antes de usar o chat. Redirecione para /onboarding.",
         )
 
-    # CRÉDITOS: consome ANTES de processar (atomicidade)
-    # 21/07/2026 — agora aceita action_type (custo variável 1/2/5)
-    action_type_id = None
-    if payload.action_type:
-        from models import ActionType
-        at_res = await db.execute(
-            select(ActionType).where(
-                ActionType.slug == payload.action_type,
-                ActionType.active == True,
-            )
-        )
-        at = at_res.scalar_one_or_none()
-        if at:
-            action_type_id = at.id
-        else:
-            # Slug inválido — loga warning mas não bloqueia (cai no default = 1 cr)
-            import logging as _log
-            _log.getLogger(__name__).warning(
-                f"ActionType slug '{payload.action_type}' não encontrado — usando padrão"
-            )
-
+    # CRÉDITOS: consome 1 ANTES de processar (atomicidade)
+    # Admin bypass + onboarding incompleto já tratado dentro do consume_credits()
     success, tx = await consume_credits(
         db=db,
         user=user,
-        amount=1,  # será sobrescrito dentro se action_type_id válido
-        description=f"Consumo de crédito por mensagem no chat",
+        amount=1,
+        description=f"Consumo de 1 crédito por mensagem no chat",
         reference_type="chat_message",
         reference_id=None,  # preenchido depois com o message_id
-        action_type_id=action_type_id,
     )
     if not success:
         # Saldo insuficiente — bloqueia com mensagem amigável
@@ -584,7 +546,6 @@ async def send_message(
         user_id=user.id,
         role="user",
         content=payload.content,
-        action_type_id=action_type_id,  # 21/07/2026 — rastreia custo variável
         metadata_json={},
     )
     db.add(user_msg)
@@ -944,25 +905,6 @@ async def send_message(
         ai_content = response.choices[0].message.content
         ai_model = response.model
         tokens_used = response.usage.total_tokens if response.usage else None
-        prompt_tokens = response.usage.prompt_tokens if response.usage else 0
-        completion_tokens = response.usage.completion_tokens if response.usage else 0
-
-        # 21/07/2026 — log de uso pra billing/dashboard
-        try:
-            from services.usage_service import log_ai_usage
-            await log_ai_usage(
-                db=db,
-                user_id=str(user.id),
-                action_type_id=str(action_type_id) if action_type_id else None,
-                chat_id=str(chat.id) if chat else None,
-                message_id=None,  # preenchido depois
-                model=ai_model or "MiniMax-M3",
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                status="success",
-            )
-        except Exception as log_err:
-            logger.warning(f"⚠️ Falha ao gravar ai_usage_log (não crítico): {log_err}")
 
         # Sanitiza: separa thinking se AI vazar (regex simples)
         ai_content_clean, ai_thinking = _split_thinking(ai_content)
@@ -1088,7 +1030,7 @@ async def send_message(
             "supervisor_block": False,
         },
         "credit_balance": user.credit_balance if tx is not None else None,
-        "credit_consumed": abs(tx.amount) if tx is not None else 0,  # 21/07/2026 — varia por action_type
+        "credit_consumed": 1 if tx is not None else 0,
         "credit_blocked": False,
     }
     return schemas.MessageResponse(**msg_data)

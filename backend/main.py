@@ -127,22 +127,6 @@ async def lifespan(app: FastAPI):
     print("🌙 AYRIA encerrando...")
 
 
-
-# 🆕 21/07 00:39 — DIAGNOSTIC MIDDLEWARE (TEMPORÁRIO)
-# Loga tamanho e primeiros bytes do body em qualquer POST
-import sys
-from starlette.middleware.base import BaseHTTPMiddleware
-
-class DiagMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        if request.method == 'POST' and '/api/auth/login' in str(request.url):
-            body_bytes = await request.body()
-            body_str = body_bytes.decode('utf-8', errors='replace')[:300] if body_bytes else '<EMPTY>'
-            body_len = len(body_bytes)
-            print(f'[DIAG] POST /api/auth/login — body_len={body_len} body_preview={body_str!r}', flush=True)
-        response = await call_next(request)
-        return response
-
 app = FastAPI(
     title="AYRIA API",
     description="Plataforma de IA para autoconhecimento, psicologia e numerologia",
@@ -153,7 +137,6 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.ENVIRONMENT == "development" else None,
     lifespan=lifespan,
 )
-app.add_middleware(DiagMiddleware)
 
 # CORS
 cors_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",")]
@@ -291,7 +274,7 @@ async def info():
 
 
 # Routers
-from routers import auth, onboarding, chats, chat, admin, memory, training, credits, supervisor, spiritual, debug_log, stripe_billing, coupons, frontend_errors, action_types
+from routers import auth, onboarding, chats, chat, admin, memory, training, credits, supervisor, spiritual, debug_log
 # 🆕 08/07/2026 — sub-alma por user + análise admin por user
 from routers import admin_alma, admin_analysis, admin_backfill
 app.include_router(auth.router)
@@ -304,14 +287,10 @@ app.include_router(memory.router)
 app.include_router(training.router)
 app.include_router(credits.router)
 app.include_router(supervisor.router)
-app.include_router(coupons.router)
-app.include_router(frontend_errors.router)
 app.include_router(spiritual.router)
 app.include_router(admin_alma.router)
 app.include_router(admin_analysis.router)
 app.include_router(admin_backfill.router)
-app.include_router(stripe_billing.router)
-app.include_router(action_types.router)
 
 
 if __name__ == "__main__":

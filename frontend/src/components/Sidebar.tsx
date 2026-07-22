@@ -17,12 +17,12 @@
  * - observerUser?: { full_name, email, plan?, balance? } — info do user observado (só p/ mode='observer')
  */
 import { useEffect, useRef, useState } from 'react'
-import { Plus, MessageCircle, Shield, Trash2, Zap, Pencil, Check, X, CreditCard, UserCircle, LayoutDashboard } from "lucide-react"
+import { Plus, MessageCircle, Shield, Trash2, Zap, Pencil, Check, X } from "lucide-react"
 import { useAuth } from '../store/auth'
 import { useChat } from '../store/chat'
 import { LogoIcon } from './Logo'
 import { ConfirmModal } from './ConfirmModal'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 
 export interface SidebarProps {
@@ -233,15 +233,6 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
             </div>
           )}
         </div>
-      )}
-
-      {/* Menu de navegação rápida — links do lado esquerdo (22/07/2026) */}
-      {mode === 'user' && (
-        <nav className="px-2 py-2 border-b border-ayria-border space-y-1">
-          <NavItem href="/chat" icon={<MessageCircle size={16} />} label="Conversas" onClose={onClose} />
-          <NavItem href="/planos" icon={<CreditCard size={16} />} label="Planos" onClose={onClose} />
-          <NavItem href="/minha-conta" icon={<UserCircle size={16} />} label="Minha Conta" onClose={onClose} />
-        </nav>
       )}
 
       {/* Nova conversa — em modo user normal; em observer não cria conversa nova */}
@@ -499,44 +490,5 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
         working={deleting}
       />
     </>
-  )
-}
-
-// ============================================================
-// NavItem — link do menu lateral (22/07/2026)
-// Highlight automático quando rota atual bate com href.
-// ============================================================
-function NavItem({
-  href,
-  icon,
-  label,
-  onClose,
-}: {
-  href: string
-  icon: React.ReactNode
-  label: string
-  onClose?: () => void
-}) {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const active =
-    location.pathname === href ||
-    (href === '/chat' && location.pathname === '/')
-  return (
-    <button
-      onClick={() => {
-        navigate(href)
-        onClose?.()
-      }}
-      className={`w-full px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${
-        active
-          ? 'bg-[#1a1a1a] text-ayria-text'
-          : 'text-ayria-muted hover:bg-[#161616] hover:text-ayria-text'
-      }`}
-      style={active ? { borderLeft: '2px solid #6366F1', paddingLeft: '10px' } : undefined}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
   )
 }
