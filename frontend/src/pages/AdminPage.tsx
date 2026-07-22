@@ -799,11 +799,15 @@ function CreditsTab({ users, onAdjust }: {
         </button>
       </div>
 
-      {/* Lista */}
-      <div className="space-y-2">
-        {filtered.map((u) => (
+      {/* Lista com paginação + busca */}
+      <ListWithControls
+        data={filtered}
+        itemName="usuário"
+        searchPlaceholder="Buscar por email, plano..."
+        emptyMessage="Nenhum usuário com esses filtros"
+      >
+        {(u) => (
           <div
-            key={u.id}
             className="p-3 rounded-xl flex items-center justify-between"
             style={{ background: '#111111', border: '1px solid #1E1E2E' }}
           >
@@ -840,8 +844,8 @@ function CreditsTab({ users, onAdjust }: {
               </button>
             </div>
           </div>
-        ))}
-      </div>
+        )}
+      </ListWithControls>
 
       {/* Modal de ajuste */}
       {adjustModal && (
