@@ -190,6 +190,10 @@ export function AdminPage() {
                   title: 'Usuários',
                   items: [
                     { id: 'users', label: 'Usuários', icon: Users },
+                    // só SUPER_ADMIN pode gerenciar outros admins (Rafael 22/07 20:56)
+                    ...(isSuperAdmin
+                      ? [{ id: 'admins', label: 'Administradores', icon: Shield } as Item]
+                      : []),
                   ],
                 },
                 {
@@ -197,10 +201,6 @@ export function AdminPage() {
                   items: [
                     { id: 'plans', label: 'Planos', icon: Tag },
                     { id: 'credits', label: 'Créditos', icon: Wallet },
-                    // só SUPER_ADMIN pode gerenciar outros admins
-                    ...(isSuperAdmin
-                      ? [{ id: 'admins', label: 'Administradores', icon: Shield } as Item]
-                      : []),
                   ],
                 },
                 {
