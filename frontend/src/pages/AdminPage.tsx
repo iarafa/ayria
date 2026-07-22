@@ -171,14 +171,14 @@ export function AdminPage() {
         </div>
       </header>
 
-      {/* Layout 2-coluna: SIDEBAR à esquerda + CONTEÚDO à direita (Rafael 22/07 20:32) */}
-      <div className="max-w-7xl mx-auto px-6 py-6 flex gap-6">
-        {/* Sidebar fixa lateral esquerda — 240px */}
+      {/* Layout full-height: SIDEBAR lateral esquerda 100% altura + CONTEÚDO à direita (Rafael 22/07 20:34) */}
+      <div className="flex" style={{ minHeight: 'calc(100vh - 73px)' }}>
+        {/* Sidebar — LATERAL ESQUERDA COMPLETA, sem card, sem sticky, sem rounded, fundo próprio */}
         <aside
-          className="w-60 shrink-0 glass rounded-2xl p-3 sticky top-6 self-start"
-          style={{ maxHeight: 'calc(100vh - 3rem)' }}
+          className="w-64 shrink-0 flex flex-col border-r border-ayria-border"
+          style={{ background: '#0F0F1F' }}
         >
-          <nav className="flex flex-col gap-1">
+          <nav className="flex-1 flex flex-col gap-1 p-3">
             {[
               { id: 'users', label: 'Usuários', icon: Users },
               { id: 'plans', label: 'Planos', icon: Tag },
@@ -194,10 +194,10 @@ export function AdminPage() {
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id as Tab)}
-                  className={`w-full px-3 py-2.5 text-sm flex items-center gap-3 rounded-xl transition-colors text-left ${
+                  className={`w-full px-4 py-3 text-sm flex items-center gap-3 transition-colors text-left ${
                     isActive
-                      ? 'bg-ayria-admin/20 text-ayria-text font-medium'
-                      : 'text-ayria-muted hover:bg-[#1a1a1a] hover:text-ayria-text'
+                      ? 'text-ayria-text font-medium'
+                      : 'text-ayria-muted hover:bg-[#1a1a2e] hover:text-ayria-text'
                   }`}
                   style={
                     isActive
@@ -214,7 +214,7 @@ export function AdminPage() {
         </aside>
 
         {/* Conteúdo principal */}
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 px-6 py-6 overflow-x-auto">
 
         {/* Content */}
         {loading && <div className="text-ayria-muted">Carregando...</div>}
@@ -422,14 +422,14 @@ export function AdminPage() {
         {/* SETTINGS / CONFIGURAÇÕES DO SISTEMA */}
         {tab === 'settings' && <SystemSettingsTab />}
         {tab === 'logs' && <LogsTab />}
-        </main>
-      </div>
 
         {/* SUPERVISÃO - monitoramento de risco */}
         {tab === 'supervision' && <SupervisionTab />}
 
         {/* ALMA - editor do system prompt da Ayria */}
         {tab === 'alma' && <AlmaTab />}
+        </main>
+      </div>
 
       {/* MODAL: Criar usuário */}
       {showCreateModal && (
