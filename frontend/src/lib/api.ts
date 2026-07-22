@@ -114,6 +114,15 @@ export interface User {
   role: string
   onboarding_status: string
   numerology_data?: any
+  billing_status?: 'active' | 'trialing' | 'past_due' | 'unpaid' | 'incomplete' | 'incomplete_expired' | 'canceled' | null
+  billing_provider?: 'stripe' | null
+  external_customer_id?: string | null
+  external_subscription_id?: string | null
+  selected_plan_id?: string | null
+  is_verified?: boolean
+  is_active?: boolean
+  credit_balance?: number | null
+  blocked_until?: string | null
 }
 
 export interface Chat {

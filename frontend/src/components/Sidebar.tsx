@@ -17,13 +17,29 @@
  * - observerUser?: { full_name, email, plan?, balance? } — info do user observado (só p/ mode='observer')
  */
 import { useEffect, useRef, useState } from 'react'
-import { Plus, MessageCircle, Shield, Trash2, Zap, Pencil, Check, X } from "lucide-react"
+import { Plus, MessageCircle, Shield, Trash2, Zap, Pencil, Check, X, CreditCard, UserCircle } from "lucide-react"
 import { useAuth } from '../store/auth'
 import { useChat } from '../store/chat'
 import { LogoIcon } from './Logo'
 import { ConfirmModal } from './ConfirmModal'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { api } from '../lib/api'
+
+function NavItem({ href, icon, label, onClose }: { href: string; icon: React.ReactNode; label: string; onClose?: () => void }) {
+  const location = useLocation()
+  const isActive = location.pathname === href || (href === '/chat' && location.pathname === '/')
+  const navigate = useNavigate()
+  return (
+    <button
+      onClick={() => { navigate(href); onClose?.() }}
+      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'text-white font-medium' : 'text-ayria-muted hover:bg-[#1a1a1a] hover:text-ayria-text'}`}
+      style={isActive ? { background: 'rgba(99, 102, 241, 0.15)', borderLeft: '2px solid #6366F1' } : undefined}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  )
+}
 
 export interface SidebarProps {
   open: boolean
@@ -235,6 +251,15 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
         </div>
       )}
 
+      {/* Menu de navegação rápida — links do lado esquerdo (22/07/2026) */}
+      {mode === 'user' && (
+        <nav className="px-2 py-2 border-b border-ayria-border space-y-1">
+          <NavItem href="/chat" icon={<MessageCircle size={16} />} label="Conversas" onClose={onClose} />
+          <NavItem href="/planos" icon={<CreditCard size={16} />} label="Planos" onClose={onClose} />
+          <NavItem href="/minha-conta" icon={<UserCircle size={16} />} label="Minha Conta" onClose={onClose} />
+        </nav>
+      )}
+
       {/* Nova conversa — em modo user normal; em observer não cria conversa nova */}
       {mode === 'user' && (
         <div className="p-4">
@@ -383,29 +408,71 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
       {/* Footer: créditos + ações (só em modo user) */}
       {mode === 'user' && (
         <div className="p-4 border-t border-ayria-border space-y-3">
+          {/* 🆕 19/07/2026 21:34 — Alerta de billing bloqueado (cartão falhou etc) */}
+          {user?.billing_status && ['past_due', 'unpaid', 'incomplete', 'incomplete_expired'].includes(user.billing_status) && (
+            <div
+              className="rounded-lg p-2.5 text-xs cursor-pointer hover:opacity-80 transition-opacity"
+              style={{
+                background: 'rgba(245, 158, 11, 0.12)',
+                border: '1px solid rgba(245, 158, 11, 0.35)',
+              }}
+              onClick={() => navigate('/minha-conta')}
+              title="Clique para atualizar forma de pagamento"
+            >
+              <div className="flex items-start gap-1.5">
+                <span className="text-yellow-400 mt-0.5">⚠️</span>
+                <div className="flex-1 leading-snug">
+                  <div className="text-yellow-400 font-bold mb-0.5">
+                    {user.billing_status === 'past_due' ? 'Cartão recusado' : 'Pagamento pendente'}
+                  </div>
+                  <div className="text-yellow-200/80">
+                    {user.billing_status === 'past_due'
+                      ? 'Atualize em até 3 dias'
+                      : 'Regularize agora'}
+                    {' '}→
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-1.5">
                 <Zap size={12} className="text-ayria-primary" />
-                <span className="text-xs font-semibold text-ayria-text">Créditos usados</span>
+                <span className="text-xs font-semibold text-ayria-text">Créditos disponíveis</span>
               </div>
               <span className="text-xs text-ayria-muted">
-                {credits.planTotal ? Math.max(0, credits.planTotal - credits.balance) : 0}
-                {credits.planTotal ? `/${credits.planTotal}` : ''}
+                {credits.balance.toLocaleString('pt-BR')}
+                {credits.planTotal ? `/${credits.planTotal.toLocaleString('pt-BR')}` : ''}
               </span>
             </div>
-            <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: '#1E1E2E' }}>
-              <div
-                className="h-full rounded-full transition-all"
-                style={{
-                  width: `${credits.planTotal ? Math.min(100, Math.max(0, (credits.planTotal - credits.balance) / credits.planTotal) * 100) : 0}%`,
-                  background: credits.balance === 0 ? '#EF4444' : 'linear-gradient(90deg, #6366F1, #A855F7)',
-                  boxShadow: credits.balance === 0 ? 'none' : '0 0 8px rgba(99, 102, 241, 0.5)',
-                }}
-              />
-            </div>
-            {credits.planName && (
-              <div className="text-xs text-ayria-muted mt-1">Plano {credits.planName}</div>
+            {credits.planTotal ? (
+              <>
+                <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: '#1E1E2E' }}>
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, (credits.balance / credits.planTotal) * 100))}%`,
+                      background: credits.balance === 0 ? '#EF4444' : 'linear-gradient(90deg, #6366F1, #A855F7)',
+                      boxShadow: credits.balance === 0 ? 'none' : '0 0 8px rgba(99, 102, 241, 0.5)',
+                    }}
+                  />
+                </div>
+                <div className="text-xs text-ayria-muted mt-1">
+                  Plano {credits.planName} — {credits.balance === 0 ? 'saldo zerado' : `${Math.round((credits.balance / credits.planTotal) * 100)}% restante`}
+                </div>
+              </>
+            ) : (
+              /* 🆕 19/07/2026 — sem plano ativo: mostra CTA claro pra assinar */
+              <div className="mt-2">
+                <button
+                  onClick={() => navigate('/planos')}
+                  className="w-full px-3 py-2 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                  style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                >
+                  Sem plano · escolha um →
+                </button>
+              </div>
             )}
           </div>
 
