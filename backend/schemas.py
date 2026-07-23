@@ -738,3 +738,28 @@ class CommissionReportResponse(BaseModel):
     total_paid_cents: int
     period_start: Optional[str] = None
     period_end: Optional[str] = None
+
+
+# ============================================================
+# 🆕 22/07 22:50 — LOGIN LOCKOUT (admin)
+# ============================================================
+class LoginLockoutInfo(BaseModel):
+    identifier: str
+    identifier_type: str  # 'email' | 'ip'
+    failed_attempts: int
+    locked_until: Optional[datetime] = None
+    lockout_level: int
+    is_locked: bool
+    label: str
+    last_failed_at: datetime
+    unlocked_by: Optional[str] = None
+    unlocked_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class LoginLockoutUnlockRequest(BaseModel):
+    identifier: str
+    identifier_type: str = "email"
+    reason: Optional[str] = None

@@ -310,6 +310,23 @@ async def resend_verification(
 @router.post("/login", response_model=schemas.TokenResponse)
 async def login(payload: schemas.UserLogin, request: Request, db: AsyncSession = Depends(get_db)):
     """Login com email + senha"""
+    # 🆕 22/07 22:50 — Bloqueio progressivo anti brute-force (Rafael pediu)
+    # Regras: 3 erros → 15min, 4 → 30min, 5 → 60min, 6 → 24h, 7+ → TOTAL
+    from services.lockout_service import check_lockout, record_failed_attempt, record_success
+
+    # 1) Verifica bloqueio ANTES de tentar autenticar
+    is_locked, lock_info = await check_lockout(db, payload.email, "email")
+    if is_locked:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Conta bloqueada por excesso de tentativas. Tente novamente em {lock_info['label']}.",
+            headers={
+                "X-Locked-Until": lock_info['locked_until'] or "permanent",
+                "X-Lockout-Level": str(lock_info['level']),
+                "X-Failed-Attempts": str(lock_info['failed_attempts']),
+            }
+        )
+
     # ⚠️ RATE LIMIT REMOVIDO (Rafael cobrou: em produção, login nunca deve bloquear o user)
     # O bloco abaixo estava implementando um rate-limit por IP que travava
     # o desenvolvedor em testes. Login não deve ter rate-limit duro - cabe
@@ -318,9 +335,26 @@ async def login(payload: schemas.UserLogin, request: Request, db: AsyncSession =
         select(models.User).where(models.User.email == payload.email)
     )
     user = result.scalar_one_or_none()
-    
+
+    # 2) Tentativa falha — registra pra bloqueio progressivo
     if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Email ou senha inválidos")
+        lockout_info = await record_failed_attempt(db, payload.email, "email")
+        headers = {
+            "X-Failed-Attempts": str(lockout_info['failed_attempts']),
+            "X-Lockout-Level": str(lockout_info['level']),
+        }
+        if lockout_info['locked']:
+            headers["X-Locked-Until"] = lockout_info['locked_until'] or "permanent"
+            raise HTTPException(
+                status_code=429,
+                detail=f"Senha inválida. ⚠️ Conta bloqueada por {lockout_info['label']}.",
+                headers=headers,
+            )
+        raise HTTPException(
+            status_code=401,
+            detail=f"Senha inválida. ({lockout_info['next_threshold']})",
+            headers=headers,
+        )
 
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Usuário desativado")
@@ -335,6 +369,7 @@ async def login(payload: schemas.UserLogin, request: Request, db: AsyncSession =
     
     # Atualiza last_login
     user.last_login_at = datetime.utcnow()
+    await record_success(db, payload.email, "email")
     await db.commit()
     await db.refresh(user)
     
