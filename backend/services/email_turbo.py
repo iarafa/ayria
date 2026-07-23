@@ -50,9 +50,13 @@ class TurboSMTPClient:
         self.timeout = float(os.getenv("TURBOSMTP_TIMEOUT", "30"))
 
         if not self.consumer_key or not self.consumer_secret:
-            logger.warning(
-                "⚠️ TurboSMTP credenciais não configuradas. "
-                "Defina TURBOSMTP_CONSUMER_KEY e TURBOSMTP_CONSUMER_SECRET."
+            # 🚨 FAIL-FAST: se faltar credencial, sistema inteiro quebra alto no startup.
+            # Antes era só logger.warning() — backend subia "happy" sem email, e o auth.py
+            # engolia o erro e retornava 201 mentiroso "Enviamos email". (23/07/2026)
+            raise EmailServiceError(
+                "🚨 TurboSMTP NÃO configurado. "
+                "Defina TURBOSMTP_CONSUMER_KEY e TURBOSMTP_CONSUMER_SECRET no ambiente "
+                "antes de subir o backend. Verifique /home/peron/projects/ayria/.turbo-secrets.env"
             )
 
     def _format_from(self) -> str:

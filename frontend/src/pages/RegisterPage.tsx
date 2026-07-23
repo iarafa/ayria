@@ -42,13 +42,19 @@ export function RegisterPage() {
     if (!selectedPlanSlug) return
     const ok = await register(email, password, fullName || undefined, selectedPlanSlug)
     if (ok) {
-      // 🆕 Após register (07/07/2026): se não tem token salvo, é pq email verification está ativo
-      const tokenAfter = localStorage.getItem('ayria_token')
-      if (!tokenAfter) {
-        // Mostra tela "verifique seu email"
-        setVerificationSent(true)
+      // 🆕 23/07/2026: usa verification_sent do backend (não chutar baseado em token)
+      const { verification_sent } = useAuth.getState()
+      if (verification_sent === false) {
+        // Email FALHOU — backend mandou email_error mas criou a conta
+        setVerificationSent(false)
       } else {
-        navigate('/onboarding')
+        // Caminho padrão: sem token + verificação OK
+        const tokenAfter = localStorage.getItem('ayria_token')
+        if (!tokenAfter) {
+          setVerificationSent(true)
+        } else {
+          navigate('/onboarding')
+        }
       }
     }
   }

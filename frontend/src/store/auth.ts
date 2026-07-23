@@ -10,6 +10,9 @@ interface AuthState {
   token: string | null
   loading: boolean
   error: string | null
+  // 🆕 23/07/2026: resultado do último register (pra RegisterPage mostrar tela certa)
+  verification_sent?: boolean
+  email_error?: string | null
 
   login: (email: string, password: string) => Promise<boolean>
   register: (email: string, password: string, fullName?: string, planSlug?: string) => Promise<boolean>
@@ -110,7 +113,13 @@ export const useAuth = create<AuthState>((set) => ({
       // Backend retorna RegisterResponse (SEM access_token).
       // User precisa verificar email antes de logar.
       if (!data.access_token) {
-        set({ loading: false })
+        // 🆕 23/07/2026: expõe verification_sent + email_error pro RegisterPage
+        // pra mostrar tela certa ("sucesso" vs "falha ao enviar").
+        set({
+          loading: false,
+          verification_sent: data.verification_sent,
+          email_error: data.email_error ?? null,
+        })
         return true  // sucesso, mas sem logar
       }
 

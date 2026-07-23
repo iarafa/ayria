@@ -169,8 +169,11 @@ async def register(payload: schemas.UserRegister, request: Request, db: AsyncSes
     return schemas.RegisterResponse(
         user=await _user_to_response(user, db),
         message=(
-            "Conta criada! Enviamos um email de confirmação para "
-            f"{user.email}. Clique no link pra ativar."
+            f"Conta criada! Enviamos um email de confirmação para {user.email}. "
+            f"Clique no link pra ativar."
+            if email_error is None
+            else f"Conta criada, mas NÃO conseguimos enviar o email de confirmação "
+                 f"({email_error}). Use o botão 'Reenviar' na próxima tela."
         ),
         verification_sent=email_error is None,
         email_error=email_error,
