@@ -163,9 +163,6 @@ export function AdminPage() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/chat')} className="text-ayria-muted hover:text-ayria-text text-sm">
-            Ir pro Chat
-          </button>
           <button onClick={logout} className="text-ayria-muted hover:text-red-400">
             <LogOut size={18} />
           </button>
