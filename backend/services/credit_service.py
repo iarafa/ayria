@@ -253,3 +253,7 @@ async def get_transactions(
     )
     items = list(res.scalars().all())
     return items, total
+
+
+# Alias para compatibilidade com stripe_billing.py (22/07 21:10)
+grant_credits = grant_initial_credits

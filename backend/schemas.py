@@ -16,7 +16,7 @@ class UserRegister(BaseModel):
     password: str = Field(min_length=8, max_length=128)  # 🆕 min 8 chars (era 6)
     full_name: Optional[str] = None
     role: Optional[str] = "user"  # admin pode passar SUPER_ADMIN na criação
-    plan_slug: Optional[str] = None  # basico|intermediario|premium — obrigatório em /auth/register (exceto admin criando user)
+    plan_slug: Optional[str] = None  # basico|intermediario|premium — OPCIONAL em /auth/register (19/07/2026 — user escolhe em /planos depois de logar)
 
 
 class UserLogin(BaseModel):
@@ -255,6 +255,7 @@ class ChatResponse(BaseModel):
 class MessageCreate(BaseModel):
     chat_id: Optional[uuid.UUID] = None  # se None, cria novo chat
     content: str = Field(min_length=1, max_length=10000)
+    action_type: Optional[str] = None  # 21/07/2026 — slug do ActionType (ex: 'tarot', 'cartomancia')
 
 
 class MessageResponse(BaseModel):
@@ -365,6 +366,19 @@ class AdminUserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AdminUsersListResponse(BaseModel):
+    """Resposta paginada do GET /api/admin/users (19/07/2026).
+
+    Suporta: search (email/full_name), status (all/active/inactive/blocked/pending),
+    page (1-based), page_size (default 25, max 100).
+    """
+    items: List[AdminUserResponse]
+    total: int           # total de usuários que casaram o filtro
+    page: int            # página atual (1-based)
+    page_size: int       # tamanho da página
+    total_pages: int     # total de páginas = ceil(total / page_size)
 
 
 class UserBlockRequest(BaseModel):
@@ -504,3 +518,219 @@ class ReligionOption(BaseModel):
 
 class ReligionOptionsResponse(BaseModel):
     options: List[ReligionOption]
+
+
+# ============================================================
+# 19/07/2026 — Rate Limit Dashboard
+# ============================================================
+from typing import List as _List, Dict as _Dict, Any as _Any
+
+
+class RateLimitStatusResponse(BaseModel):
+    """Resumo agregado para o card no dashboard."""
+    ips_blocked_now: int
+    ips_in_alert: int
+    total_failures_24h: int
+    total_blocks_24h: int
+    paused: bool                          # se rate limit global tá pausado
+
+
+class RateLimitBlockedIP(BaseModel):
+    ip: str
+    endpoint: str
+    geo: Optional[str] = None
+    failures_in_window: int
+    retry_in_seconds: int
+    blocked_until_epoch: float
+    blocked_until_iso: str
+    user_agent: Optional[str] = None
+    last_email_attempted: Optional[str] = None
+
+
+class RateLimitAlertIP(BaseModel):
+    ip: str
+    endpoint: str
+    geo: Optional[str] = None
+    failures_in_window: int
+    user_agent: Optional[str] = None
+
+
+class RateLimitEventsPage(BaseModel):
+    items: _List[_Dict[str, _Any]]
+    total: int
+
+
+class RateLimitBlockedList(BaseModel):
+    items: _List[RateLimitBlockedIP]
+    total: int
+
+
+class RateLimitAlertList(BaseModel):
+    items: _List[RateLimitAlertIP]
+    total: int
+
+
+class BlacklistItem(BaseModel):
+    ip: str
+    reason: Optional[str] = None
+    added_by: str
+    added_at: str
+    expires_at: Optional[str] = None
+
+
+class BlacklistAddRequest(BaseModel):
+    ip: str
+    reason: Optional[str] = None
+    expires_at: Optional[str] = None      # ISO 8601, None = permanente
+
+
+class BlacklistResponse(BaseModel):
+    items: _List[BlacklistItem]
+    total: int
+
+
+class RateLimitUnblockRequest(BaseModel):
+    ip: str
+    endpoint: Optional[str] = None        # se None, limpa tudo do IP
+
+
+class RateLimitConfigResponse(BaseModel):
+    login: _Dict[str, _Any]
+    register: _Dict[str, _Any]
+    forgot_password: _Dict[str, _Any]
+
+
+class RateLimitToggleRequest(BaseModel):
+    paused: bool
+
+
+# ============================================================
+# PARTNERS + COUPONS (20/07/2026 22:54)
+# ============================================================
+
+class PartnerCreate(BaseModel):
+    name: str
+    email: str
+    phone: Optional[str] = None
+    document_type: Optional[str] = None      # 'CPF' | 'CNPJ'
+    document_number: Optional[str] = None
+    pix_key: Optional[str] = None
+    commission_pct: Optional[float] = None
+    notes: Optional[str] = None
+
+
+class PartnerUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    document_type: Optional[str] = None
+    document_number: Optional[str] = None
+    pix_key: Optional[str] = None
+    commission_pct: Optional[float] = None
+    notes: Optional[str] = None
+    active: Optional[bool] = None
+
+
+class PartnerResponse(BaseModel):
+    id: str
+    name: str
+    email: str
+    phone: Optional[str] = None
+    document_type: Optional[str] = None
+    document_number: Optional[str] = None
+    pix_key: Optional[str] = None
+    commission_pct: Optional[float] = None
+    notes: Optional[str] = None
+    active: bool
+    created_at: str
+    coupons_count: int = 0
+    total_commission_cents: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class CouponCreate(BaseModel):
+    code: str
+    name: Optional[str] = None
+    partner_id: Optional[str] = None
+    discount_type: str                       # 'percent' | 'fixed'
+    discount_value: float
+    applicable_plan_slug: str
+    duration_months: int = 1
+    commission_pct: float
+    max_redemptions: Optional[int] = None
+    expires_at: Optional[str] = None         # ISO 8601
+
+
+class CouponUpdate(BaseModel):
+    name: Optional[str] = None
+    commission_pct: Optional[float] = None
+    max_redemptions: Optional[int] = None
+    expires_at: Optional[str] = None
+    active: Optional[bool] = None
+
+
+class CouponResponse(BaseModel):
+    id: str
+    code: str
+    stripe_coupon_id: str
+    partner_id: Optional[str] = None
+    partner_name: Optional[str] = None
+    name: Optional[str] = None
+    discount_type: str
+    discount_value: float
+    applicable_plan_slug: str
+    duration_months: int
+    commission_pct: float
+    max_redemptions: Optional[int] = None
+    current_redemptions: int
+    expires_at: Optional[str] = None
+    active: bool
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class CouponValidateRequest(BaseModel):
+    code: str
+    plan_slug: Optional[str] = None          # se passar, valida se cupom vale pro plano
+
+
+class CouponValidateResponse(BaseModel):
+    valid: bool
+    coupon_id: Optional[str] = None
+    code: Optional[str] = None
+    name: Optional[str] = None
+    discount_type: Optional[str] = None
+    discount_value: Optional[float] = None
+    applicable_plan_slug: Optional[str] = None
+    duration_months: Optional[int] = None
+    partner_name: Optional[str] = None       # exposto se houver
+    preview: Optional[dict] = None           # { original_cents, discount_cents, final_cents }
+    error: Optional[str] = None
+
+
+class RedemptionResponse(BaseModel):
+    id: str
+    coupon_code: Optional[str] = None
+    partner_name: Optional[str] = None
+    user_email: Optional[str] = None
+    plan_slug: str
+    original_amount_cents: int
+    discount_amount_cents: int
+    final_amount_cents: int
+    commission_pct: Optional[float] = None
+    commission_amount_cents: Optional[int] = None
+    payout_status: str
+    payout_at: Optional[str] = None
+    created_at: str
+
+
+class CommissionReportResponse(BaseModel):
+    items: list
+    total_pending_cents: int
+    total_paid_cents: int
+    period_start: Optional[str] = None
+    period_end: Optional[str] = None

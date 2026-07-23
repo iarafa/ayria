@@ -37,6 +37,10 @@ class User(Base):
     verification_token_expires_at = Column(DateTime(timezone=True))
     verification_sent_at = Column(DateTime(timezone=True))  # rate-limit reenvio
     verified_at = Column(DateTime(timezone=True))  # quando clicou no link
+    # 🆕 19/07/2026 — reset de senha (single-use, 1h)
+    password_reset_token = Column(String(64), index=True)
+    password_reset_token_expires_at = Column(DateTime(timezone=True))
+    password_reset_sent_at = Column(DateTime(timezone=True))  # rate-limit reenvio
     numerology_data = Column(JSONB)  # mapa numerológico calculado
     astrology_data = Column(JSONB)  # mapa astral completo (sol, lua, asc, planetas, casas)
     profile_status = Column(String(50), default="pending")  # pending|calculating|ready|failed
@@ -230,6 +234,7 @@ class Message(Base):
     content = Column(Text, nullable=False)
     tokens_used = Column(Integer)
     ai_model = Column(String(100))
+    action_type_id = Column(UUID(as_uuid=True), ForeignKey("action_types.id", ondelete="SET NULL"), index=True, nullable=True)  # 21/07/2026 — custo variável
     metadata_json = Column("metadata", JSONB, default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     supervisor_analyses = relationship("SupervisorAnalysis", back_populates="message", cascade="all, delete-orphan")
@@ -490,3 +495,234 @@ class UserSupervisorNote(Base):
     signals_used = Column(JSONB, nullable=False, default=dict)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+# ============================================================
+# 17. SYSTEM_CONFIG (configurações editáveis do sistema — 19/07/2026)
+# Key/value store para sobrescrever variáveis do .env sem reiniciar.
+# Usado para: AI_API_KEY, AI_BASE_URL, AI_MODEL, AI_PROVIDER.
+# Quando chave existe no DB, sobrepõe o valor do .env em runtime.
+# ============================================================
+class SystemConfig(Base):
+    """Config editável em runtime pelo painel admin.
+    Key = nome da config (ex: 'AI_API_KEY'), value = valor persistido.
+    Audit: updated_by registra QUAL admin mudou.
+    """
+    __tablename__ = "system_config"
+
+    key = Column(String(100), primary_key=True)
+    value = Column(Text, nullable=False)
+    description = Column(Text)  # o que essa config faz (pra tooltip no painel)
+    updated_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+# ============================================================
+# 18. STRIPE_SUBSCRIPTIONS (19/07/2026)
+# Uma row por assinatura Stripe. User pode ter várias no histórico
+# (canceladas), mas só UMA ativa por vez (regra de duplicação).
+# ============================================================
+class StripeSubscription(Base):
+    __tablename__ = "stripe_subscriptions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    ayria_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    stripe_customer_id = Column(String(100), nullable=False, index=True)
+    stripe_subscription_id = Column(String(100), unique=True, nullable=False)
+    stripe_product_id = Column(String(100))
+    stripe_price_id = Column(String(100))
+    plan_slug = Column(String(50), nullable=False)  # basic | premium | gold
+    plan_name = Column(String(100))
+    subscription_status = Column(String(50), nullable=False, index=True)  # active|trialing|past_due|unpaid|canceled|incomplete|incomplete_expired
+    current_period_start = Column(DateTime(timezone=True))
+    current_period_end = Column(DateTime(timezone=True))
+    cancel_at_period_end = Column(Boolean, default=False)
+    last_payment_status = Column(String(50))
+    metadata_json = Column("metadata", JSONB, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Relationship
+    user = relationship("User", backref="stripe_subscriptions")
+
+
+# ============================================================
+# 19. STRIPE_INVOICES (19/07/2026)
+# Histórico de faturas — uma row por invoice da Stripe.
+# ============================================================
+class StripeInvoice(Base):
+    __tablename__ = "stripe_invoices"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    ayria_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    stripe_invoice_id = Column(String(100), unique=True, nullable=False)
+    stripe_subscription_id = Column(String(100))
+    amount_total = Column(Integer)  # em centavos (ex: 4990 = R$ 49,90)
+    currency = Column(String(10), default="brl")
+    status = Column(String(50), nullable=False, index=True)  # paid|open|uncollectible|void
+    paid_at = Column(DateTime(timezone=True))
+    invoice_pdf_url = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    user = relationship("User", backref="stripe_invoices")
+
+
+# ============================================================
+# 20. STRIPE_WEBHOOK_EVENTS (19/07/2026)
+# Tabela de idempotência — Stripe reenvia webhooks em caso de falha,
+# então deduplicamos por stripe_event_id (UNIQUE).
+# ============================================================
+class StripeWebhookEvent(Base):
+    __tablename__ = "stripe_webhook_events"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    stripe_event_id = Column(String(100), unique=True, nullable=False)
+    event_type = Column(String(100), nullable=False, index=True)
+    payload = Column(JSONB, nullable=False)
+    processed_at = Column(DateTime(timezone=True))
+    error = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+# ============================================================
+# 21. PARTNERS (20/07/2026 22:54)
+# Cadastro de parceiros que indicam clientes com cupom de desconto
+# ============================================================
+class Partner(Base):
+    __tablename__ = "partners"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    name = Column(String(200), nullable=False)
+    email = Column(String(255), unique=True, nullable=False)
+    phone = Column(String(20))
+    document_type = Column(String(10))       # CPF | CNPJ
+    document_number = Column(String(20))
+    pix_key = Column(String(255))            # chave PIX pra repasse
+    commission_pct = Column(Numeric(5, 2))   # opcional agora (comissão fica no coupon)
+    notes = Column(Text)
+    active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    coupons = relationship("Coupon", back_populates="partner")
+    redemptions = relationship("CouponRedemption", back_populates="partner")
+
+
+# ============================================================
+# 22. COUPONS (20/07/2026 22:54)
+# Cupom de desconto — espelho do Stripe + dados AYRIA
+# ============================================================
+class Coupon(Base):
+    __tablename__ = "coupons"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    code = Column(String(50), unique=True, nullable=False, index=True)
+    stripe_coupon_id = Column(String(100), unique=True, nullable=False, index=True)
+    partner_id = Column(UUID(as_uuid=True), ForeignKey("partners.id", ondelete="SET NULL"), index=True)
+
+    name = Column(String(200))
+    discount_type = Column(String(10), nullable=False)   # 'percent' | 'fixed'
+    discount_value = Column(Numeric(10, 2), nullable=False)
+
+    applicable_plan_slug = Column(String(50), nullable=False, index=True)
+    duration_months = Column(Integer, default=1, nullable=False)
+    commission_pct = Column(Numeric(5, 2), nullable=False)
+
+    max_redemptions = Column(Integer)                     # NULL = ilimitado
+    current_redemptions = Column(Integer, default=0, nullable=False)
+    expires_at = Column(DateTime(timezone=True))          # NULL = sem expiração
+
+    active = Column(Boolean, default=True, nullable=False, index=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    partner = relationship("Partner", back_populates="coupons")
+    redemptions = relationship("CouponRedemption", back_populates="coupon")
+
+
+# ============================================================
+# 23. COUPON_REDEMPTIONS (20/07/2026 22:54)
+# Log de uso do cupom + comissão gerada
+# ============================================================
+class CouponRedemption(Base):
+    __tablename__ = "coupon_redemptions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    coupon_id = Column(UUID(as_uuid=True), ForeignKey("coupons.id", ondelete="SET NULL"), index=True)
+    partner_id = Column(UUID(as_uuid=True), ForeignKey("partners.id", ondelete="SET NULL"), index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    stripe_invoice_id = Column(String(100), index=True)
+    stripe_subscription_id = Column(String(100))
+
+    plan_slug = Column(String(50), nullable=False)
+    original_amount_cents = Column(Integer, nullable=False)
+    discount_amount_cents = Column(Integer, nullable=False)
+    final_amount_cents = Column(Integer, nullable=False)
+
+    commission_pct = Column(Numeric(5, 2))
+    commission_amount_cents = Column(Integer)
+
+    payout_status = Column(String(20), default="pending", nullable=False, index=True)  # pending|paid|cancelled
+    payout_at = Column(DateTime(timezone=True))
+    payout_notes = Column(Text)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    coupon = relationship("Coupon", back_populates="redemptions")
+    partner = relationship("Partner", back_populates="redemptions")
+    user = relationship("User", backref="coupon_redemptions")
+
+
+# ============================================================
+# 24. ACTION_TYPES (21/07/2026 11:18)
+# Catálogo de tipos de ação com custo variável em créditos
+# Decisão Rafael: 1 cr (chat simples), 2 (chat profundo), 5 (especiais)
+# ============================================================
+class ActionType(Base):
+    __tablename__ = "action_types"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    slug = Column(String(50), unique=True, nullable=False, index=True)   # 'chat_simples' | 'cartomancia'
+    name = Column(String(100), nullable=False)
+    description = Column(Text)
+    credits_cost = Column(Integer, nullable=False)                        # quanto desconta
+    is_special = Column(Boolean, default=False, nullable=False)           # TRUE = ação premium
+    category = Column(String(50), default="chat", nullable=False)         # chat|mystic|astrology|divination
+    icon = Column(String(50))                                              # emoji ou nome de ícone
+    sort_order = Column(Integer, default=0, nullable=False)
+    active = Column(Boolean, default=True, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+# ============================================================
+# 25. AI_USAGE_LOG (21/07/2026 11:18)
+# Rastreamento de tokens e custo de cada chamada de IA
+# Usado pra dashboard admin + billing reconciliation
+# ============================================================
+class AIUsageLog(Base):
+    __tablename__ = "ai_usage_log"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=gen_uuid)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    action_type_id = Column(UUID(as_uuid=True), ForeignKey("action_types.id", ondelete="SET NULL"), index=True)
+    chat_id = Column(UUID(as_uuid=True), ForeignKey("chats.id", ondelete="SET SET NULL"), index=True)
+    message_id = Column(UUID(as_uuid=True), ForeignKey("messages.id", ondelete="SET NULL"))
+
+    model = Column(String(100), nullable=False)
+    prompt_tokens = Column(Integer, default=0, nullable=False)
+    completion_tokens = Column(Integer, default=0, nullable=False)
+    total_tokens = Column(Integer, default=0, nullable=False)
+
+    cost_input_usd = Column(Numeric(12, 6), default=0, nullable=False)
+    cost_output_usd = Column(Numeric(12, 6), default=0, nullable=False)
+    cost_total_usd = Column(Numeric(12, 6), default=0, nullable=False)
+
+    response_ms = Column(Integer)
+    status = Column(String(20), default="success", nullable=False, index=True)  # success|error|rate_limited
+    error_message = Column(Text)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    user = relationship("User", backref="ai_usage_logs")
+    action_type = relationship("ActionType")

@@ -276,7 +276,7 @@ async def info():
 # Routers
 from routers import auth, onboarding, chats, chat, admin, memory, training, credits, supervisor, spiritual, debug_log
 # 🆕 08/07/2026 — sub-alma por user + análise admin por user
-from routers import admin_alma, admin_analysis, admin_backfill
+from routers import admin_alma, admin_analysis, admin_backfill, coupons, stripe_billing
 app.include_router(auth.router)
 app.include_router(onboarding.router)
 app.include_router(chats.router)
@@ -291,6 +291,8 @@ app.include_router(spiritual.router)
 app.include_router(admin_alma.router)
 app.include_router(admin_analysis.router)
 app.include_router(admin_backfill.router)
+app.include_router(coupons.router)        # 🆕 22/07 21:08 — sistema de cupom + parceiro
+app.include_router(stripe_billing.router) # 🆕 22/07 21:08 — pagamento + comissão
 
 
 if __name__ == "__main__":

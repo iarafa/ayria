@@ -26,9 +26,18 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "CHANGE_ME_AYRIA_DEV_ONLY"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 1440
-    
+
     ENVIRONMENT: str = "development"
     CORS_ORIGINS: str = "http://localhost:5173,http://192.168.3.37:5173"
+
+    # 🆕 22/07 21:11 — Stripe (billing)
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_PUBLISHABLE_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRICE_BASIC: str = ""
+    STRIPE_PRICE_PREMIUM: str = ""
+    STRIPE_PRICE_GOLD: str = ""
+    STRIPE_TRIAL_CREDITS: int = 10
 
     class Config:
         env_file = ".env"
