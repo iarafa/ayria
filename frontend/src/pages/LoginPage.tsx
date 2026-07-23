@@ -26,11 +26,16 @@ export function LoginPage() {
     e.preventDefault()
     const ok = await login(email, password)
     if (ok) {
-      // 🛡️ ADMIN vai direto pro dashboard (Rafael 22/07 17:30)
-      // Admin não usa chat como user comum — só usa pra verificar conversa de user.
+      // 🛡️ ADMIN → /admin | User sem Stripe → /planos (SEMPRE) | User com Stripe → /chat
+      // Rafael 22/07 21:41: user comum só cai no chat DEPOIS de assinar Stripe.
       const u = useAuth.getState().user
       const isAdmin = u?.role === 'SUPER_ADMIN' || u?.role === 'admin'
-      navigate(isAdmin ? '/admin' : '/chat', { replace: true })
+      if (isAdmin) {
+        navigate('/admin', { replace: true })
+        return
+      }
+      const hasActiveSubscription = !!u?.external_subscription_id && u?.billing_status === 'active'
+      navigate(hasActiveSubscription ? '/chat' : '/planos', { replace: true })
     }
   }
 
