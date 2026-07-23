@@ -48,6 +48,38 @@ KEYWORDS = {
         r"\barquétipo\b", r"\bsombra\b", r"\bedipiano\b", r"\bmecanismo de defesa\b",
         r"\brepetição de padrão\b",
     ],
+    "psicologia_clinica": [
+        # Diagnósticos / condições clínicas
+        r"\bdsm\b", r"\bcid\b", r"\bdiagn[óo]stic", r"\bsintomas\b",
+        r"\btranstorno\b", r"\bdepress[ãa]o maior\b", r"\btag\b", r"\btoc\b",
+        r"\btdah\b", r"\bbipolar\b", r"\bman[ií]a\b", r"\bhipoman", r"\btept\b",
+        r"\bp[âa]nico\b", r"\bfobia social\b", r"\bschizofrenia\b",
+        r"\bborderline\b", r"\bautism", r"\btourette\b",
+        # Medicação (nomes comerciais E genéricos)
+        r"\bfluoxetina\b", r"\bprozac\b", r"\bsertralina\b", r"\bzoloft\b",
+        r"\bescitalopram\b", r"\blexapro\b", r"\bparoxetina\b", r"\bpaxil\b",
+        r"\bvenlafaxina\b", r"\bclonazepam\b", r"\britonil\b", r"\balprazolam\b",
+        r"\bdiazepam\b", r"\bvalium\b", r"\brivotril\b", r"\bl[ií]tio\b",
+        r"\brisperidona\b", r"\bquetiapina\b", r"\bolanzapina\b",
+        r"\bantidepressivo\b", r"\bpsicof[áa]rmaco\b", r"\bmedica[çc][ãa]o\b",
+        r"\bmedicament", r"\btomando (remédio|rem[ée]dio|medicamento)\b",
+        r"\btomo (remédio|rem[ée]dio|medicamento)\b",
+        r"\befeito(s)? colateral\b", r"\bantipsic[óo]tic", r"\bestabilizador\b",
+        # Escalas
+        r"\bphq-?9\b", r"\bgad-?7\b", r"\bpss-?10\b", r"\bphq\b", r"\bgad\b",
+        r"\bescala.*depress", r"\bescala.*ansiedade",
+        r"\bavalia[çc][ãa]o\b", r"\btriagem\b",
+        # Encaminhamento
+        r"\bpsiquiatra\b", r"\bquer[oa].*psic[óo]log", r"\bquer[oa].*psicanal",
+        r"\bcomo (achar|encontrar|procurar).*(psic[óo]log|psicanal|terapeuta)",
+        r"\bpreciso.*(psic[óo]log|psicanal|terapeuta)\b",
+        r"\bconv[eê]nio\b.*psic", r"\bzenklub\b", r"\bvittude\b", r"\bmoodar\b",
+        r"\bcaps\b", r"\bsus\b.*psic",
+        # Abordagens
+        r"\btcc\b", r"\bdbt\b", r"\bact\b", r"\bifs\b",
+        r"\bterapia.*esquema\b", r"\blogoterapia\b",
+        r"\bterapia cognitivo", r"\bterapia comportamental\b",
+    ],
     "religiao": [
         r"\bdeus\b", r"\bjesus\b", r"\bbíblia\b", r"\boração\b", r"\bfé\b",
         r"\breligião\b", r"\bespiritual", r"\bislam\b", r"\bjudaísmo\b",
@@ -243,6 +275,21 @@ def classify(
             if mod_key not in modulos:
                 modulos.append(mod_key)
                 reasons[mod_key] = f"mencionou termo de {label} na mensagem"
+
+    # 🆕 22/07 23:08 — Psicologia clínica ativa em paralelo com psicologia/psicanálise
+    # Trás DSM-5, escalas, psicofármacos, encaminhamento
+    if "psicologia" in modulos or "psicanalise" in modulos:
+        if _matches_any(user_message, KEYWORDS.get("psicologia_clinica", [])):
+            if "psicologia_clinica" not in modulos:
+                modulos.append("psicologia_clinica")
+                reasons["psicologia_clinica"] = "sinais clínicos detectados (sintomas específicos, medicação, escalas)"
+
+    # 🆕 22/07 23:08 — Protocolo de crise estruturado
+    # Ativado em paralelo com seguranca_crise para forçar estrutura de resposta validada
+    if flags.get("crise"):
+        if "crise_protocolo" not in modulos:
+            modulos.insert(0, "crise_protocolo")  # posição 0 = prioridade máxima
+            reasons["crise_protocolo"] = "crise detectada → protocolo estruturado ativado"
 
     return {
         "modulos": modulos,
