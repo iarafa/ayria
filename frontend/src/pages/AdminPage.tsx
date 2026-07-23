@@ -436,10 +436,14 @@ export function AdminPage() {
                 <input type="file" accept=".pdf,.txt,.md" onChange={handleUpload} className="hidden" />
               </label>
             </div>
-            <div className="space-y-2">
-              {docs.map((d) => (
+            <ListWithControls
+              data={docs}
+              itemName="documento"
+              searchPlaceholder="Buscar por título ou arquivo..."
+              emptyMessage="Nenhum documento cadastrado"
+            >
+              {(d) => (
                 <div
-                  key={d.id}
                   className="p-4 rounded-xl flex items-center justify-between"
                   style={{ background: '#111111', border: '1px solid #1E1E2E' }}
                 >
@@ -468,13 +472,8 @@ export function AdminPage() {
                     Deletar
                   </button>
                 </div>
-              ))}
-              {docs.length === 0 && (
-                <div className="text-center text-ayria-muted py-8">
-                  Nenhum documento ainda.
-                </div>
               )}
-            </div>
+            </ListWithControls>
           </div>
         )}
 
