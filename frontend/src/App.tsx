@@ -132,13 +132,15 @@ export default function App() {
   )
 }
 
-// 🛡️ ADMIN → /admin | User novo (sem onboarding) → /planos | User completo → /chat
-// Rafael pediu 22/07 21:39: novos users vão direto pra ESCOLHER PLANO, não pro /onboarding
+// 🛡️ ADMIN → /admin | SEMPRE Stripe PRIMEIRO, onboard SÓ DEPOIS de pagar
+// Rafael pediu 22/07 21:41: user comum só cai no /chat DEPOIS de assinar Stripe.
+// Se não tem subscription Stripe ativa, manda pra /planos SEMPRE.
 function RootRedirect() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'admin'
   if (isAdmin) return <Navigate to="/admin" replace />
-  // User sem onboarding completo → manda pra /planos (Stripe checkout) ANTES de cair no chat
-  if (!user || user.onboarding_status !== 'completed') return <Navigate to="/planos" replace />
+  // User sem assinatura Stripe ativa (external_subscription_id null OU billing_status diferente de 'active') → /planos
+  const hasActiveSubscription = !!user?.external_subscription_id && user?.billing_status === 'active'
+  if (!user || !hasActiveSubscription) return <Navigate to="/planos" replace />
   return <Navigate to="/chat" replace />
 }
