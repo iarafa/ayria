@@ -121,7 +121,7 @@ export function RegisterPage() {
         ) : (
         <>
         <div className="flex justify-center mb-6">
-          <LogoIcon size={400} variant="circular" className="max-w-[80vw]" />
+          <LogoIcon size={320} variant="circular" className="max-w-[80vw]" />
         </div>
 
         <h1 className="text-3xl font-bold text-center mb-2 gradient-text">

@@ -2,12 +2,14 @@
  * AYRIA - Logo component
  *
  * Visual alinhado com a landing Lovable:
- * - Logo dourado com glow
- * - Texto "AYRIA" em serif (Cormorant Garamond)
+ * - Logo wordmark "AYRIA" com fundo transparente
+ * - Texto "AYRIA" do Logo em serif (Cormorant Garamond)
  *
- * - <Logo /> — logo + texto
- * - <LogoIcon variant="plain" /> — só PNG do logo
- * - <LogoIcon variant="circular" /> — círculo do logo (com glow dourado)
+ * Logo wide (aspect 1536:220 ≈ 7:1) — apenas o wordmark,
+ * sem o subtítulo "CLAREZA PRA DECIDIR" (que é redundante com H1 da página).
+ *
+ * - <Logo /> — logo + texto "AYRIA" em gradient
+ * - <LogoIcon variant="circular" /> — só PNG do logo wide
  */
 import { useState } from 'react'
 
@@ -20,12 +22,12 @@ interface LogoProps {
 
 export function Logo({ size = 48, showText = true, className = '', glow = true }: LogoProps) {
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
+    <div className={`flex flex-col items-center gap-2 ${className}`}>
       <LogoIcon size={size} variant="circular" glow={glow} />
       {showText && (
         <span
-          className="font-display font-medium tracking-[0.18em] gradient-text"
-          style={{ fontSize: size * 0.42 }}
+          className="font-display font-medium tracking-[0.25em] gradient-text"
+          style={{ fontSize: size * 0.14 }}
         >
           AYRIA
         </span>
@@ -41,32 +43,37 @@ interface LogoIconProps {
   variant?: 'plain' | 'circular'
 }
 
+// Logo wide aspect ratio (1536 / 220)
+const ASPECT_WIDE = 1536 / 220
+
 export function LogoIcon({ size = 40, glow = true, className = '', variant = 'plain' }: LogoIconProps) {
   const [err, setErr] = useState(false)
 
-  // Glow dourado Lovable (substituindo indigo)
+  // Glow dourado Lovable
   const goldGlow = glow
     ? 'drop-shadow(0 0 14px rgba(241,201,97,0.55)) drop-shadow(0 0 28px rgba(218,149,11,0.35))'
     : undefined
 
-  // Responsivo: limita largura em telas pequenas (mobile) pra não estourar.
-  // Inline maxWidth tem prioridade sobre className Tailwind.
+  // Responsivo: limita largura em telas pequenas (mobile)
   const maxWidth = size >= 300 ? '90vw' : size >= 150 ? '70vw' : size >= 80 ? '50vw' : undefined
 
+  // Wide: size = LARGURA. Altura proporcional (size / 7).
+  const width = size
+  const height = Math.round(size / ASPECT_WIDE)
+
   if (variant === 'circular') {
-    // Cache-bust via query string pra navegador não usar cache antigo
-    const v = '20260723a'
+    const v = '20260723b'  // cache-bust: wide AYRIA-only
     return (
       <img
         src={`${err ? '/ayria-logo-lovable.png' : '/ayria-logo-lovable.png'}?v=${v}`}
         alt="AYRIA"
-        width={size}
-        height={size}
+        width={width}
+        height={height}
         className={className}
         style={{
           display: 'block',
-          width: size,
-          height: size,
+          width,
+          height,
           maxWidth,
           objectFit: 'contain',
           filter: goldGlow,
@@ -78,10 +85,10 @@ export function LogoIcon({ size = 40, glow = true, className = '', variant = 'pl
 
   return (
     <img
-      src={`${err ? '/ayria-logo-lovable.png' : '/ayria-logo-lovable.png'}?v=20260723a`}
+      src={`${err ? '/ayria-logo-lovable.png' : '/ayria-logo-lovable.png'}?v=20260723b`}
       alt="AYRIA"
-      width={size}
-      height={size}
+      width={width}
+      height={height}
       className={className}
       style={{
         display: 'block',
