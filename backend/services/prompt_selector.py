@@ -80,10 +80,98 @@ KEYWORDS = {
         r"\bterapia.*esquema\b", r"\blogoterapia\b",
         r"\bterapia cognitivo", r"\bterapia comportamental\b",
     ],
+    "abordagens_terapeuticas": [
+        # Nomes das abordagens
+        r"\btcc\b", r"\bterapia cognitivo", r"\btc[oó]?\b", r"\bcognitivo.comportamental\b",
+        r"\bdbt\b", r"\bterapia dial[eé]tica\b", r"\bdialetic",
+        r"\bact\b", r"\bterapia de aceita[çc][ãa]o\b", r"\baceita[çc][ãa]o e compromis",
+        r"\bifs\b", r"\bsistemas familiares internos\b", r"\bpartes internas\b",
+        r"\bemdr\b", r"\bdessensibiliza[çc][ãa]o\b", r"\breprocessament",
+        r"\blogoterapia\b", r"\bfrankl\b", r"\bsentido da vida\b", r"\bvontade de sentido\b",
+        r"\bgestalt\b", r"\bperls\b", r"\baqui e agora\b", r"\bawareness\b",
+        r"\banálise transacional\b", r"\btransacional\b", r"\bberne\b",
+        r"\bpais\b.*\b(?:adulto|crian[çc]a)\b", r"\bcrian[çc]a interior\b", r"\bestados do ego\b",
+        r"\bterapia do esquema\b", r"\besquemas\b.*\biniciais\b", r"\byoung\b",
+        r"\bterapia centrada\b", r"\brogers\b", r"\baceita[çc][ãa]o incondicional\b",
+        r"\bterapia sistêmica\b", r"\bsistêmica\b", r"\bconstela[çc][ãa]o familiar\b",
+        r"\brebt\b", r"\bellis\b", r"\bracional emotiva\b",
+        # Técnicas comuns
+        r"\breestrutura[çc][ãa]o cognitiva\b", r"\bregistro de pensamentos\b",
+        r"\bexposição gradual\b", r"\bativa[çc][ãa]o comportamental\b",
+        r"\bthought record\b", r"\bensaio cognitivo\b",
+        r"\btipp\b", r"\bwise mind\b", r"\bmindfulness\b.*\bdbt\b",
+        r"\bdear man\b", r"\bhexaflex\b",
+        r"\bdefusão cognitiva\b", r"\bflexibilidade psicol[óo]gica\b",
+        r"\bmedita[çc][ãa]o\b.*\bterapia\b",
+        r"\bmen[íi]na\.parte\b", r"\bparte interna\b", r"\bs?elf\b.*\bintern",
+    ],
+    "glossario_psicologia": [
+        # Termos de psicologia clínica
+        r"\bo que [ée] (?:depress|ansiedad|burnout|toc|tda|tag|transtorno|psic[óo]log|psican|psiquiatr)\b",
+        r"\bsignifica (?:depress|ansiedad|burnout|toc|tda|tag|psic[óo]log|psican|psiquiatr)\b",
+        r"\bdiferen[çc]a entre (?:depress|luto|burnout|ansiedad|tristeza)\b",
+        r"\bdiferen[çc]a (?:entre|de) (?:depress|ansiedad|burnout|toc|tda|tag|psic[óo]log|psican|psiquiatr|luto|mania|hipomania|tept)\b",
+        r"\bgloss[áa]rio\b", r"\bdicion[áa]rio.*psicolog",
+        # Termos clínicos específicos
+        r"\bburnout\b", r"\bburn[ -]?out\b",
+        r"\bmania\b", r"\bhipomania\b", r"\bepis[óo]dio (?:man[íi]aco|hipoman[íi]aco)\b",
+        r"\bautoles[ãa]o\b", r"\bautolesionar\b", r"\bme machucar\b",
+        r"\bideação suicida\b", r"\bideação de morte\b",
+        r"\bdistor[çc][ãa]o cognitiva\b", r"\bcatastrofiza[çc][ãa]o\b",
+        r"\bleitura mental\b", r"\bfiltro mental\b", r"\btudo ou nada\b",
+        r"\bregula[çc][ãa]o emocional\b", r"\bapego (?:ansioso|evitativo|seguro)\b",
+        r"\bv[íi]nculo (?:seguro|ansioso|evitativo|desorganizado)\b",
+        r"\bautoestima\b", r"\bautoconfian[çc]a\b", r"\bautoefic[áa]cia\b",
+        r"\bresili[êe]ncia\b", r"\bmindfulness\b",
+        r"\besquemas?\b.*(?:iniciais|desadaptativos)\b", r"\bmecanismos? de defesa\b",
+        r"\bracionaliza[çc][ãa]o\b", r"\bproje[çc][ãa]o\b", r"\bnega[çc][ãa]o\b", r"\brepress[ãa]o\b",
+        # Serviços
+        r"\bcr\.p\b", r"\bcrp\b",
+        # Conceitos amplos
+        r"\bsa[úu]de mental\b.*\bo que [ée]\b", r"\btranstorno mental\b.*\bo que [ée]\b",
+    ],
+    "saude_mental_br": [
+        # Serviços e linhas de crise
+        r"\bcvv\b", r"\b188\b", r"\bcentro de valoriza[çc][ãa]o da vida\b",
+        r"\bsamu\b", r"\b192\b",
+        r"\bupa\b", r"\bpronto.atendimento\b.*psic",
+        r"\bsus\b.*psic", r"\bsus\b.*sa[úu]de mental\b",
+        r"\bcaps\b", r"\bcentro de aten[çc][ãa]o psicossocial\b",
+        r"\bubs\b.*psic", r"\bunidade b[áa]sica de sa[úu]de\b",
+        r"\bm[eé]dico de fam[íi]lia\b.*psic",
+        # Plataformas particulares
+        r"\bzenklub\b", r"\bvittude\b", r"\bmoodar\b", r"\bpsicologia viva\b",
+        r"\bdoctoralia\b",
+        # Grupos e ONGs
+        r"\balco[óo]licos an[ôo]nimos\b", r"\baa\b.*reuni", r"\bna\b.*reuni",
+        r"\bal.an[oô]nimo\b",
+        r"\bgrupo de apoio\b.*psic", r"\bong\b.*sa[úu]de mental\b",
+        r"\babp\b", r"\bassocia[çc][ãa]o brasileira de psiquiatria\b",
+        r"\bcfp\b", r"\bconselho federal de psicologia\b",
+        # Termos relacionados a custo / acesso
+        r"\bn[ãa]o tenho dinheiro\b.*(?:psic|terap|psiquiatr)\b",
+        r"\bn[ãa]o posso pagar\b.*(?:psic|terap|psiquiatr)\b",
+        r"\bn[ãa]o tenho como pagar\b.*(?:psic|terap|psiquiatr)\b",
+        r"\bcomo (?:achar|encontrar|procurar) (?:psic[óo]log|psiquiatr|terapeuta)\b",
+        r"\b(?:achar|encontrar|procurar) (?:psic[óo]log|psiquiatr|terapeuta)\b",
+        r"\bplano de sa[úu]de\b.*psic", r"\bconv[êe]nio\b.*psic",
+        r"\bmeu plano\b.*(?:psic|terap|psiquiatr|cobre|cobertura)\b",
+        r"\bplano\b.*(?:cobre|cobertura).*(?:psic|terap|psiquiatr)\b",
+        r"\batende gratis\b.*psic", r"\bgratis\b.*(?:psic|terap|psiquiatr)\b",
+        r"\bsem dinheiro\b.*(?:psic|terap|psiquiatr)\b",
+        r"\bcar[êe]ncia\b.*plano\b", r"\bcobertura\b.*psic",
+        # Direitos
+        r"\blei.*psiqui[áa]trica\b", r"\breforma psiqui[áa]trica\b",
+        r"\bbenef[íi]cio.*incapacidade\b", r"\bbpc\b",
+        r"\batestado.*psic", r"\baux[íi]lio doen[çc]a\b",
+        # SUS / gratuito
+        r"\bpelo sus\b", r"\bsus\b.*(?:psic|terap|psiquiatr|atende)\b",
+        r"\bgratuit[oa]\b.*(?:psic|terap|psiquiatr|atendiment)\b",
+    ],
     "religiao": [
-        r"\bdeus\b", r"\bjesus\b", r"\bbíblia\b", r"\boração\b", r"\bfé\b",
-        r"\breligião\b", r"\bespiritual", r"\bislam\b", r"\bjudaísmo\b",
-        r"\bcristã", r"\bcatólic", r"\bevang", r"\bespirita\b",
+        r"\bdeus\b", r"\bjesus\b", r"\bb[íi]blia\b", r"\boração\b", r"\bf[ée]\b",
+        r"\breligião\b", r"\bespiritual", r"\bislam\b", r"\bjuda[íi]smo\b",
+        r"\bcristã", r"\bcat[óo]lic", r"\bevang", r"\bespirita\b",
         r"\bbudismo\b", r"\balma\b(?! da ayria)",
     ],
     "visao_mundo": [
@@ -283,6 +371,27 @@ def classify(
         if "psicologia_clinica" not in modulos:
             modulos.append("psicologia_clinica")
             reasons["psicologia_clinica"] = "sinais clínicos detectados (sintomas, medicação, escalas, encaminhamento)"
+
+    # 🆕 22/07 23:25 — Abordagens terapêuticas (TCC, DBT, ACT, IFS, EMDR, Logoterapia, etc)
+    # Independente: user pode perguntar "como funciona TCC" sem ter sintoma
+    if _matches_any(user_message, KEYWORDS.get("abordagens_terapeuticas", [])):
+        if "abordagens_terapeuticas" not in modulos:
+            modulos.append("abordagens_terapeuticas")
+            reasons["abordagens_terapeuticas"] = "user mencionou abordagem terapêutica (TCC, DBT, ACT, IFS, etc)"
+
+    # 🆕 22/07 23:25 — Glossário de psicologia
+    # Ativa quando user pergunta "o que é X?" ou usa termo técnico sem saber o que significa
+    if _matches_any(user_message, KEYWORDS.get("glossario_psicologia", [])):
+        if "glossario_psicologia" not in modulos:
+            modulos.append("glossario_psicologia")
+            reasons["glossario_psicologia"] = "user perguntou sobre termo ou conceito de psicologia"
+
+    # 🆕 22/07 23:25 — Saúde mental no Brasil
+    # Ativa quando user pede caminhos, serviços, linhas de crise, gratuidade
+    if _matches_any(user_message, KEYWORDS.get("saude_mental_br", [])):
+        if "saude_mental_br" not in modulos:
+            modulos.append("saude_mental_br")
+            reasons["saude_mental_br"] = "user procura serviços de saúde mental no Brasil (CVV, CAPS, SUS, gratuidade)"
 
     # 🆕 22/07 23:08 — Protocolo de crise estruturado
     # Ativado em paralelo com seguranca_crise para forçar estrutura de resposta validada
