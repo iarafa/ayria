@@ -6,13 +6,14 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../store/auth'
 import { adminApi, api } from '../lib/api'
 import { LogoIcon } from '../components/Logo'
-import { Users, FileText, Settings, LogOut, UserPlus, X, Shield, Wallet, Plus, Tag, Edit3, Eye, ChevronDown, ChevronRight, Calendar, MapPin, Star, Heart, Briefcase, Sparkles, ExternalLink, Cpu, CheckCircle2, AlertCircle, Database, Cloud, Activity, AlertTriangle, MessageCircle, MessageSquare, Receipt, User, Clock, Calculator, ClipboardList, Trash2 } from 'lucide-react'
+import { Users, FileText, Settings, LogOut, UserPlus, X, Shield, Wallet, Plus, Tag, Edit3, Eye, ChevronDown, ChevronRight, Calendar, MapPin, Star, Heart, Briefcase, Sparkles, ExternalLink, Cpu, CheckCircle2, AlertCircle, Database, Cloud, Activity, AlertTriangle, MessageCircle, MessageSquare, Receipt, User, Clock, Calculator, ClipboardList, Trash2, KeyRound } from 'lucide-react'
 import { AlmaTab } from '../components/AlmaTab'
 import { LogsTab } from '../components/LogsTab'
 import { ListWithControls } from '../components/ListWithControls'
 import { SupervisorPromptModal } from '../components/SupervisorPromptModal'
 import { SupervisorKeywordsViewer } from '../components/SupervisorKeywordsViewer'
 import { BlockUserModal } from '../components/BlockUserModal'
+import { ChangePasswordModal } from '../components/ChangePasswordModal'
 import { AdminChangePasswordModal } from '../components/AdminChangePasswordModal'
 
 type Tab = 'users' | 'plans' | 'credits' | 'knowledge' | 'onboarding' | 'attributes' | 'settings' | 'supervision' | 'alma' | 'logs' | 'admins' | 'partners' | 'coupons' | 'commissions'
@@ -30,6 +31,7 @@ export function AdminPage() {
   const [createForm, setCreateForm] = useState({ email: '', password: '', full_name: '', role: 'user', plan_slug: 'basico' })
   const [editingUser, setEditingUser] = useState<any>(null)
   const [passwordTarget, setPasswordTarget] = useState<{ id: string; email: string; full_name?: string | null } | null>(null)
+  const [selfPasswordOpen, setSelfPasswordOpen] = useState(false)
   const [editForm, setEditForm] = useState({ full_name: '', is_active: true, selected_plan_slug: '' })
   const [availablePlans, setAvailablePlans] = useState<any[]>([])
   const [detailsUserId, setDetailsUserId] = useState<string | null>(null)
@@ -163,7 +165,15 @@ export function AdminPage() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={logout} className="text-ayria-muted hover:text-red-400">
+          <button
+            onClick={() => setSelfPasswordOpen(true)}
+            className="text-ayria-muted hover:text-ayria-text text-sm flex items-center gap-1.5"
+            title="Trocar minha senha"
+          >
+            <KeyRound size={16} />
+            Trocar senha
+          </button>
+          <button onClick={logout} className="text-ayria-muted hover:text-red-400" title="Sair">
             <LogOut size={18} />
           </button>
         </div>
@@ -497,6 +507,12 @@ export function AdminPage() {
           onClose={() => setPasswordTarget(null)}
           user={passwordTarget}
           onSuccess={() => reloadUsers()}
+        />
+
+        {/* 🆕 23/07 16:03 — ADMIN trocar a PRÓPRIA senha (botão no header) */}
+        <ChangePasswordModal
+          open={selfPasswordOpen}
+          onClose={() => setSelfPasswordOpen(false)}
         />
 {/* KNOWLEDGE */}
         {tab === 'knowledge' && !loading && (
