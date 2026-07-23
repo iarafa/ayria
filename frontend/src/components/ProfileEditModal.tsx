@@ -147,7 +147,7 @@ export function ProfileEditModal({ open, onClose }: ProfileEditModalProps) {
               style={{
                 background: user?.role === 'SUPER_ADMIN' || user?.role === 'admin'
                   ? 'linear-gradient(135deg, #F59E0B, #EF4444)'
-                  : 'linear-gradient(135deg, #6366F1, #A855F7)',
+                  : 'linear-gradient(135deg, #f1c961, #da950b)',
                 boxShadow: '0 0 20px rgba(99, 102, 241, 0.4)',
                 border: '3px solid rgba(99, 102, 241, 0.3)',
               }}
@@ -167,7 +167,7 @@ export function ProfileEditModal({ open, onClose }: ProfileEditModalProps) {
               onClick={() => fileInputRef.current?.click()}
               className="absolute bottom-0 right-0 w-9 h-9 rounded-full flex items-center justify-center text-white shadow-lg transition-transform hover:scale-110"
               style={{
-                background: 'linear-gradient(135deg, #6366F1, #A855F7)',
+                background: 'linear-gradient(135deg, #f1c961, #da950b)',
                 border: '3px solid #111111',
               }}
               title="Trocar foto"
@@ -253,7 +253,7 @@ export function ProfileEditModal({ open, onClose }: ProfileEditModalProps) {
             onClick={handleSave}
             disabled={saving}
             className="flex-1 py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
-            style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+            style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
           >
             <Save size={16} />
             {saving ? 'Salvando...' : 'Salvar'}

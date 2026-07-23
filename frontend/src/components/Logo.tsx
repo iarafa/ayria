@@ -1,9 +1,13 @@
 /**
  * AYRIA - Logo component
  *
+ * Visual alinhado com a landing Lovable:
+ * - Logo dourado com glow
+ * - Texto "AYRIA" em serif (Cormorant Garamond)
+ *
  * - <Logo /> — logo + texto
  * - <LogoIcon variant="plain" /> — só PNG do logo
- * - <LogoIcon variant="circular" /> — círculo neon do logo, sem caixa/quadrado
+ * - <LogoIcon variant="circular" /> — círculo do logo (com glow dourado)
  */
 import { useState } from 'react'
 
@@ -20,8 +24,8 @@ export function Logo({ size = 48, showText = true, className = '', glow = true }
       <LogoIcon size={size} variant="circular" glow={glow} />
       {showText && (
         <span
-          className="font-bold tracking-[0.3em] text-ayria-text"
-          style={{ fontSize: size * 0.35 }}
+          className="font-display font-medium tracking-[0.18em] gradient-text"
+          style={{ fontSize: size * 0.42 }}
         >
           AYRIA
         </span>
@@ -40,15 +44,17 @@ interface LogoIconProps {
 export function LogoIcon({ size = 40, glow = true, className = '', variant = 'plain' }: LogoIconProps) {
   const [err, setErr] = useState(false)
 
+  // Glow dourado Lovable (substituindo indigo)
+  const goldGlow = glow
+    ? 'drop-shadow(0 0 14px rgba(241,201,97,0.55)) drop-shadow(0 0 28px rgba(218,149,11,0.35))'
+    : undefined
+
   if (variant === 'circular') {
-    // SEM container, SEM background, SEM box-shadow, SEM overflow:hidden.
-    // O PNG já é circular com cantos transparentes.
-    // objectFit: 'contain' garante que o PNG aparece inteiro (sem corte).
-    // Cache-bust via query string pra navegador não usar cache antigo.
-    const v = '20260629b'
+    // Cache-bust via query string pra navegador não usar cache antigo
+    const v = '20260723a'
     return (
       <img
-        src={`${err ? '/ayria-logo-transparent.png' : '/ayria-logo-circular.png'}?v=${v}`}
+        src={`${err ? '/ayria-logo-lovable.png' : '/ayria-logo-lovable.png'}?v=${v}`}
         alt="AYRIA"
         width={size}
         height={size}
@@ -58,7 +64,7 @@ export function LogoIcon({ size = 40, glow = true, className = '', variant = 'pl
           width: size,
           height: size,
           objectFit: 'contain',
-          filter: glow ? 'drop-shadow(0 0 12px rgba(99,102,241,0.5))' : undefined,
+          filter: goldGlow,
         }}
         onError={() => setErr(true)}
       />
@@ -67,12 +73,12 @@ export function LogoIcon({ size = 40, glow = true, className = '', variant = 'pl
 
   return (
     <img
-      src={err ? '/ayria-logo-transparent.png' : '/ayria-logo-dark.png'}
+      src={`${err ? '/ayria-logo-lovable.png' : '/ayria-logo-lovable.png'}?v=20260723a`}
       alt="AYRIA"
       width={size}
       height={size}
       className={className}
-      style={glow ? { filter: 'drop-shadow(0 0 16px rgba(99,102,241,0.6))' } : undefined}
+      style={glow ? { filter: goldGlow } : undefined}
       onError={() => setErr(true)}
     />
   )

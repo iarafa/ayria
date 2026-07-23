@@ -105,7 +105,7 @@ export function RegisterPage() {
                 onClick={handleResend}
                 disabled={resendCooldown > 0}
                 className="px-6 py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
               >
                 {resendCooldown > 0 ? `Reenviar em ${resendCooldown}s` : 'Reenviar email'}
               </button>
@@ -197,10 +197,10 @@ export function RegisterPage() {
                       className="relative text-left p-4 rounded-2xl transition-all hover:scale-[1.02]"
                       style={{
                         background: selected
-                          ? 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(168,85,247,0.15))'
+                          ? 'linear-gradient(135deg, rgba(241,201,97,0.15), rgba(218,149,11,0.15))'
                           : '#111111',
                         border: selected
-                          ? '2px solid #A855F7'
+                          ? '2px solid #da950b'
                           : '1px solid #1E1E2E',
                         boxShadow: selected
                           ? '0 0 24px rgba(168, 85, 247, 0.3)'
@@ -210,7 +210,7 @@ export function RegisterPage() {
                       {selected && (
                         <div
                           className="absolute -top-2 -right-2 w-7 h-7 rounded-full flex items-center justify-center"
-                          style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                          style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
                         >
                           <Check size={14} className="text-white" />
                         </div>
@@ -247,7 +247,7 @@ export function RegisterPage() {
             type="submit"
             disabled={loading || !selectedPlanSlug}
             className="w-full py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+            style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
           >
             {loading ? 'Criando...' : selectedPlanSlug ? 'Criar conta e começar' : 'Escolha um plano'}
           </button>

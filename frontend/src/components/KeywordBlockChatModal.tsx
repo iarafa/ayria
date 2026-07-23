@@ -224,7 +224,7 @@ export function KeywordBlockChatModal({
                 style={
                   m.role === 'user'
                     ? {
-                        background: 'linear-gradient(135deg, #6366F1, #A855F7)',
+                        background: 'linear-gradient(135deg, #f1c961, #da950b)',
                         color: '#fff',
                       }
                     : {

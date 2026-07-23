@@ -47,7 +47,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
           disabled={disabled || !text.trim()}
           className="p-2 rounded-xl text-white disabled:opacity-30 transition-opacity hover:opacity-90 flex-shrink-0"
           style={{
-            background: 'linear-gradient(135deg, #6366F1, #A855F7)',
+            background: 'linear-gradient(135deg, #f1c961, #da950b)',
           }}
         >
           <Send size={16} className="sm:hidden" />

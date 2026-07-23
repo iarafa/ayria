@@ -5,6 +5,10 @@
 :root {
   font-family: 'Inter', sans-serif;
   color-scheme: dark;
+  /* Paleta AYRIA — dourado Lovable */
+  --gold: #f1c961;
+  --gold-dark: #da950b;
+  --gold-glow: rgba(241, 201, 97, 0.4);
 }
 
 body {
@@ -12,12 +16,21 @@ body {
   background: #050505;
   color: #F8FAFC;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -moz-osx-font-smoothing: antialiased;
 }
 
 * { box-sizing: border-box; }
 
-/* Scrollbar dark */
+/* Títulos serif (Lovable-style) */
+.font-display,
+h1.ayria-hero,
+h2.ayria-hero {
+  font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+/* Scrollbar dark com acento dourado */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -30,20 +43,29 @@ body {
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #6366F1;
+  background: #f1c961;
 }
 
-/* Glassmorphism */
+/* Glassmorphism com acento dourado */
 .glass {
   background: rgba(17, 17, 17, 0.8);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+  border-bottom: 1px solid rgba(241, 201, 97, 0.12);
 }
 
-/* Gradient text */
+/* Gradient text — dourado Lovable */
 .gradient-text {
-  background: linear-gradient(135deg, #6366F1, #A855F7);
+  background: linear-gradient(135deg, #f1c961, #da950b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Gradient text — dourado vertical (alternativo) */
+.gradient-text-vertical {
+  background: linear-gradient(180deg, #f1c961, #da950b);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -61,18 +83,26 @@ body {
   30% { transform: translateY(-8px); opacity: 1; }
 }
 
-/* Glow */
+/* Glow dourado (substituindo indigo) */
 .glow {
-  box-shadow: 0 0 24px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 0 24px rgba(241, 201, 97, 0.4);
 }
 .glow-sm {
-  box-shadow: 0 0 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 0 12px rgba(241, 201, 97, 0.3);
+}
+.glow-lg {
+  box-shadow: 0 0 48px rgba(241, 201, 97, 0.5);
+}
+
+/* Text glow */
+.text-glow {
+  text-shadow: 0 0 16px rgba(241, 201, 97, 0.6);
 }
 
 /* Smooth scroll */
 html { scroll-behavior: smooth; }
 
-/* Markdown styling */
+/* Markdown styling — com acento dourado */
 .markdown {
   line-height: 1.6;
 }
@@ -80,6 +110,7 @@ html { scroll-behavior: smooth; }
   font-weight: 600;
   margin-top: 0.5em;
   margin-bottom: 0.5em;
+  font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
 }
 .markdown p { margin: 0.5em 0; }
 .markdown ul, .markdown ol {
@@ -88,15 +119,15 @@ html { scroll-behavior: smooth; }
 }
 .markdown li { margin: 0.25em 0; }
 .markdown code {
-  background: rgba(168, 85, 247, 0.15);
-  color: #A855F7;
+  background: rgba(241, 201, 97, 0.12);
+  color: #f1c961;
   padding: 0.1em 0.4em;
   border-radius: 4px;
   font-family: ui-monospace, monospace;
   font-size: 0.9em;
 }
 .markdown blockquote {
-  border-left: 3px solid #6366F1;
+  border-left: 3px solid #f1c961;
   padding-left: 1em;
   color: #94A3B8;
   font-style: italic;

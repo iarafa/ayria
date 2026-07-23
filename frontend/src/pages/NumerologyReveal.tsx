@@ -146,7 +146,7 @@ export function NumerologyReveal() {
           <button
             onClick={() => navigate('/chat')}
             className="mt-4 px-6 py-2 rounded-xl text-white"
-            style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+            style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
           >
             Ir pro chat
           </button>
@@ -203,7 +203,7 @@ export function NumerologyReveal() {
             onClick={() => navigate('/chat')}
             className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl text-white font-semibold text-lg transition-opacity hover:opacity-90"
             style={{
-              background: 'linear-gradient(135deg, #6366F1, #A855F7)',
+              background: 'linear-gradient(135deg, #f1c961, #da950b)',
               boxShadow: '0 0 32px rgba(99, 102, 241, 0.4)',
             }}
           >

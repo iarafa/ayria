@@ -183,8 +183,8 @@ export function BlockUserModal({ open, onClose, user, onSuccess }: BlockUserModa
                     onClick={() => setDuration('permanent')}
                     className="px-3 py-3 rounded-lg text-center transition-all"
                     style={{
-                      background: duration === 'permanent' ? 'rgba(168,85,247,0.15)' : 'rgba(0,0,0,0.3)',
-                      border: `1px solid ${duration === 'permanent' ? 'rgba(168,85,247,0.5)' : '#1E1E2E'}`,
+                      background: duration === 'permanent' ? 'rgba(218,149,11,0.15)' : 'rgba(0,0,0,0.3)',
+                      border: `1px solid ${duration === 'permanent' ? 'rgba(218,149,11,0.5)' : '#1E1E2E'}`,
                       color: duration === 'permanent' ? '#C084FC' : '#94A3B8',
                     }}
                   >
@@ -275,7 +275,7 @@ export function BlockUserModal({ open, onClose, user, onSuccess }: BlockUserModa
               background: isCurrentlyBlocked
                 ? 'linear-gradient(135deg, #22C55E, #16A34A)'
                 : duration === 'permanent'
-                  ? 'linear-gradient(135deg, #A855F7, #6366F1)'
+                  ? 'linear-gradient(135deg, #da950b, #f1c961)'
                   : duration === '24h'
                     ? 'linear-gradient(135deg, #EF4444, #DC2626)'
                     : 'linear-gradient(135deg, #F59E0B, #D97706)',

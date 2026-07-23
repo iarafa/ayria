@@ -101,7 +101,7 @@ export function LoginPage() {
             type="submit"
             disabled={loading}
             className="w-full py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-            style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+            style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
           >
             {loading ? 'Entrando...' : 'Entrar'}
           </button>

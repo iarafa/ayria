@@ -123,7 +123,7 @@ export function AdminChangePasswordModal({
         {/* User alvo */}
         <div
           className="rounded-lg p-3 mb-4 text-sm"
-          style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}
+          style={{ background: 'rgba(218,149,11,0.08)', border: '1px solid rgba(218,149,11,0.2)' }}
         >
           <div className="text-ayria-muted text-xs mb-1">Usuário alvo:</div>
           <div className="font-medium text-ayria-text">{user.full_name || '—'}</div>

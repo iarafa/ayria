@@ -71,7 +71,7 @@ export function VerifyEmailPage() {
           <>
             <div className="flex justify-center">
               <div className="w-16 h-16 rounded-full border-4 border-t-transparent animate-spin"
-                style={{ borderColor: 'rgba(99, 102, 241, 0.3)', borderTopColor: '#6366F1' }} />
+                style={{ borderColor: 'rgba(99, 102, 241, 0.3)', borderTopColor: '#f1c961' }} />
             </div>
             <p className="text-ayria-muted">Confirmando seu email...</p>
           </>
@@ -92,7 +92,7 @@ export function VerifyEmailPage() {
             <button
               onClick={() => navigate('/login', { replace: true })}
               className="inline-block px-6 py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+              style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
             >
               OK, ir pro login
             </button>
@@ -114,7 +114,7 @@ export function VerifyEmailPage() {
             <button
               onClick={() => navigate('/login', { replace: true })}
               className="inline-block px-6 py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+              style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
             >
               OK, ir pro login
             </button>
@@ -136,7 +136,7 @@ export function VerifyEmailPage() {
             <Link
               to="/register"
               className="inline-block px-6 py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+              style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
             >
               Criar nova conta
             </Link>

@@ -130,13 +130,13 @@ export function LogsTab() {
         <StatCard
           label="Linhas"
           value={logLines.length}
-          color="#A855F7"
+          color="#da950b"
           icon={<Info size={14} />}
         />
         <StatCard
           label="Arquivos"
           value={info?.files ?? '—'}
-          color="#6366F1"
+          color="#f1c961"
           icon={<Filter size={14} />}
         />
       </div>
@@ -170,10 +170,10 @@ export function LogsTab() {
               onClick={() => setLevel(lvl)}
               className="px-3 py-1.5 rounded text-xs font-semibold transition-colors"
               style={{
-                background: level === lvl ? 'rgba(168,85,247,0.2)' : 'transparent',
+                background: level === lvl ? 'rgba(218,149,11,0.2)' : 'transparent',
                 color: level === lvl ? '#C084FC' : '#94A3B8',
                 border: '1px solid',
-                borderColor: level === lvl ? 'rgba(168,85,247,0.4)' : '#1E1E2E',
+                borderColor: level === lvl ? 'rgba(218,149,11,0.4)' : '#1E1E2E',
               }}
             >
               {lvl === 'all' ? 'TODOS' : lvl}
@@ -209,7 +209,7 @@ export function LogsTab() {
           onClick={fetchLogs}
           disabled={loading}
           className="px-3 py-1.5 rounded-lg font-semibold text-white flex items-center gap-1.5 disabled:opacity-50"
-          style={{ background: 'linear-gradient(135deg, #A855F7, #6366F1)' }}
+          style={{ background: 'linear-gradient(135deg, #da950b, #f1c961)' }}
         >
           <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
           Atualizar

@@ -98,9 +98,9 @@ export function SupervisorKeywordsViewer() {
           <span
             className="text-[10px] px-2 py-0.5 rounded font-bold flex items-center gap-1"
             style={{
-              background: 'rgba(99,102,241,0.12)',
+              background: 'rgba(241,201,97,0.12)',
               color: '#A5B4FC',
-              border: '1px solid rgba(99,102,241,0.3)',
+              border: '1px solid rgba(241,201,97,0.3)',
             }}
             title="A edição é por bloco. Clique em 'Editar com IA' em cada categoria abaixo."
           >

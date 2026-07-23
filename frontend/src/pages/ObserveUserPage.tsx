@@ -257,7 +257,7 @@ const highlightMessageId = searchParams.get('msg')
         <div className="flex items-center gap-2 mt-2 text-xs text-ayria-muted flex-wrap">
           <span
             className="px-1.5 py-0.5 rounded"
-            style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#A855F7' }}
+            style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#da950b' }}
           >
             {targetUser?.selected_plan_name || 'sem plano'}
           </span>
@@ -383,7 +383,7 @@ const highlightMessageId = searchParams.get('msg')
             onClick={() => openAlmaPanel()}
             className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition"
             style={{
-              background: 'linear-gradient(135deg, #EC4899, #A855F7)',
+              background: 'linear-gradient(135deg, #EC4899, #da950b)',
               opacity: almaLoading ? 0.5 : 1,
             }}
             disabled={almaLoading}
@@ -396,7 +396,7 @@ const highlightMessageId = searchParams.get('msg')
             onClick={() => setAnalysisOpen(true)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition"
             style={{
-              background: 'linear-gradient(135deg, #A855F7, #6366F1)',
+              background: 'linear-gradient(135deg, #da950b, #f1c961)',
             }}
             title="Chat IA trancado neste user (sem custo)"
           >
@@ -462,7 +462,7 @@ const highlightMessageId = searchParams.get('msg')
               <button
                 disabled
                 className="p-2 rounded-xl opacity-30 cursor-not-allowed flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
                 title="Envio desabilitado em modo observador"
               >
                 <Send size={16} className="text-white" />
@@ -613,7 +613,7 @@ function ObserverMessageBubble({ message, onShowDebug }: { message: Message; onS
               className="opacity-70 hover:opacity-100 text-xs px-2 py-0.5 rounded flex items-center gap-1 ml-auto"
               style={{
                 background: 'rgba(168, 85, 247, 0.15)',
-                color: '#A855F7',
+                color: '#da950b',
                 border: '1px solid rgba(168, 85, 247, 0.3)',
               }}
               title="Ver o que a IA viu: prompt, contexto interpretado, tokens..."
@@ -627,7 +627,7 @@ function ObserverMessageBubble({ message, onShowDebug }: { message: Message; onS
           className="px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl text-sm whitespace-pre-wrap break-words"
           style={{
             background: isUser
-              ? 'linear-gradient(135deg, #6366F1, #A855F7)'
+              ? 'linear-gradient(135deg, #f1c961, #da950b)'
               : '#111111',
             border: isUser ? 'none' : '1px solid #1E1E2E',
             color: '#FFFFFF',
@@ -744,7 +744,7 @@ function AdminPremisePanel({ metadata }: { metadata: any }) {
         {constitutionSrc?.includes('customizada') && (
           <span
             className="text-[10px] px-1.5 py-0.5 rounded"
-            style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#A855F7' }}
+            style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#da950b' }}
           >
             Constituição custom
           </span>
@@ -975,7 +975,7 @@ function SubAlmaPanel(props: {
                   onClick={onRegenerate}
                   disabled={almaWorking}
                   className="text-xs px-3 py-2 rounded-lg text-white font-bold flex items-center gap-1.5 disabled:opacity-40"
-                  style={{ background: 'linear-gradient(135deg, #EC4899, #A855F7)' }}
+                  style={{ background: 'linear-gradient(135deg, #EC4899, #da950b)' }}
                 >
                   🔄 Regenerar (vai pra draft)
                 </button>
@@ -1048,7 +1048,7 @@ function SubAlmaPanel(props: {
                             background:
                               v.status === 'active' ? 'rgba(34,197,94,0.2)'
                               : v.status === 'draft' ? 'rgba(245,158,11,0.2)'
-                              : v.status === 'superseded' ? 'rgba(99,102,241,0.15)'
+                              : v.status === 'superseded' ? 'rgba(241,201,97,0.15)'
                               : 'rgba(239,68,68,0.15)',
                             color:
                               v.status === 'active' ? '#86EFAC'
@@ -1066,7 +1066,7 @@ function SubAlmaPanel(props: {
                             onClick={() => onRollback(v.version)}
                             disabled={almaWorking}
                             className="text-[10px] px-2 py-0.5 rounded font-bold text-white"
-                            style={{ background: 'rgba(99,102,241,0.6)' }}
+                            style={{ background: 'rgba(241,201,97,0.6)' }}
                           >
                             ↩ Rollback
                           </button>
@@ -1078,10 +1078,10 @@ function SubAlmaPanel(props: {
               )}
 
               {/* Notas do admin */}
-              <div className="rounded-xl overflow-hidden text-xs" style={{ background: '#0a0a0a', border: '1px solid rgba(168,85,247,0.25)' }}>
+              <div className="rounded-xl overflow-hidden text-xs" style={{ background: '#0a0a0a', border: '1px solid rgba(218,149,11,0.25)' }}>
                 <div
                   className="px-3 py-2 flex items-center gap-2 font-bold"
-                  style={{ background: 'rgba(168,85,247,0.06)' }}
+                  style={{ background: 'rgba(218,149,11,0.06)' }}
                 >
                   📋 Notas do admin ({notes.length})
                 </div>
@@ -1104,7 +1104,7 @@ function SubAlmaPanel(props: {
                           <span
                             className="text-[10px] px-1.5 py-0.5 rounded font-bold uppercase"
                             style={{
-                              background: n.kind === 'analysis' ? 'rgba(168,85,247,0.2)'
+                              background: n.kind === 'analysis' ? 'rgba(218,149,11,0.2)'
                                 : n.kind === 'observation' ? 'rgba(59,130,246,0.2)'
                                 : 'rgba(245,158,11,0.2)',
                               color: n.kind === 'analysis' ? '#C084FC'

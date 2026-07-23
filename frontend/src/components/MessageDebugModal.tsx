@@ -94,7 +94,7 @@ export function MessageDebugModal({ message, onClose }: { message: Message; onCl
           <div className="flex items-center gap-3">
             <div
               className="w-10 h-10 rounded-full flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, #A855F7, #6366F1)' }}
+              style={{ background: 'linear-gradient(135deg, #da950b, #f1c961)' }}
             >
               <Eye size={18} className="text-white" />
             </div>
@@ -113,12 +113,12 @@ export function MessageDebugModal({ message, onClose }: { message: Message; onCl
         <div className="px-6 py-4 max-h-[75vh] overflow-y-auto space-y-4">
           {/* Quick stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatBox icon={<Cpu size={14} />} label="Modelo" value={model || '—'} color="#A855F7" />
+            <StatBox icon={<Cpu size={14} />} label="Modelo" value={model || '—'} color="#da950b" />
             <StatBox
               icon={<FileText size={14} />}
               label="Tokens (input est.)"
               value={tokensIn != null ? tokensIn.toLocaleString('pt-BR') : '—'}
-              color="#6366F1"
+              color="#f1c961"
             />
             <StatBox
               icon={<FileText size={14} />}
@@ -144,10 +144,10 @@ export function MessageDebugModal({ message, onClose }: { message: Message; onCl
           {meta.prompt_architecture === 'modular_v2' && (
             <div
               className="p-4 rounded-xl"
-              style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.08), rgba(99,102,241,0.08))', border: '1px solid rgba(168, 85, 247, 0.3)' }}
+              style={{ background: 'linear-gradient(135deg, rgba(218,149,11,0.08), rgba(241,201,97,0.08))', border: '1px solid rgba(168, 85, 247, 0.3)' }}
             >
               <div className="flex items-center gap-2 mb-2">
-                <Sparkles size={16} style={{ color: '#A855F7' }} />
+                <Sparkles size={16} style={{ color: '#da950b' }} />
                 <span className="text-sm font-bold text-ayria-text">Arquitetura Modular v2</span>
               </div>
               <div className="text-xs text-ayria-muted mb-2">
@@ -159,7 +159,7 @@ export function MessageDebugModal({ message, onClose }: { message: Message; onCl
                     <span
                       key={mod}
                       className="text-xs px-2 py-0.5 rounded font-mono"
-                      style={{ background: '#A855F7', color: '#FFFFFF' }}
+                      style={{ background: '#da950b', color: '#FFFFFF' }}
                       title={meta.prompt_reason?.[mod] || 'módulo carregado'}
                     >
                       {mod}
@@ -287,7 +287,7 @@ export function MessageDebugModal({ message, onClose }: { message: Message; onCl
                         className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded"
                         style={{
                           background:
-                            m.role === 'system' ? '#A855F7' : m.role === 'user' ? '#6366F1' : '#10B981',
+                            m.role === 'system' ? '#da950b' : m.role === 'user' ? '#f1c961' : '#10B981',
                           color: '#FFFFFF',
                         }}
                       >
@@ -421,7 +421,7 @@ function Section({
           <button
             onClick={onCopy}
             className="text-xs px-2.5 py-1 rounded flex items-center gap-1.5"
-            style={{ background: '#1E1E2E', color: copied ? '#10B981' : '#A855F7' }}
+            style={{ background: '#1E1E2E', color: copied ? '#10B981' : '#da950b' }}
             title={copyLabel}
           >
             {copied ? <Check size={11} /> : <Copy size={11} />}
@@ -463,7 +463,7 @@ function Field({ label, value, mono, onCopy, copied }: { label: string; value: s
       <div className="flex items-center justify-between mb-1">
         <div className="text-xs text-ayria-muted">{label}</div>
         {onCopy && (
-          <button onClick={onCopy} className="text-xs px-2 py-0.5 rounded flex items-center gap-1" style={{ background: '#1E1E2E', color: copied ? '#10B981' : '#A855F7' }}>
+          <button onClick={onCopy} className="text-xs px-2 py-0.5 rounded flex items-center gap-1" style={{ background: '#1E1E2E', color: copied ? '#10B981' : '#da950b' }}>
             {copied ? <Check size={10} /> : <Copy size={10} />}
             {copied ? 'Copiado' : 'Copiar'}
           </button>

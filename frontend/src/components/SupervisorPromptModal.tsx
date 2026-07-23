@@ -160,7 +160,7 @@ export function SupervisorPromptModal({ open, onClose, onSaved }: SupervisorProm
                     className="text-[10px] px-2 py-0.5 rounded font-bold"
                     style={{
                       background: isCustom ? 'rgba(168, 85, 247, 0.15)' : 'rgba(148, 163, 184, 0.15)',
-                      color: isCustom ? '#A855F7' : '#94A3B8',
+                      color: isCustom ? '#da950b' : '#94A3B8',
                     }}
                   >
                     {isCustom ? '✨ Custom' : '📦 Padrão'}
@@ -176,10 +176,10 @@ export function SupervisorPromptModal({ open, onClose, onSaved }: SupervisorProm
                 onClick={() => setChatOpen(true)}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(168,85,247,0.25), rgba(99,102,241,0.25))',
+                  background: 'linear-gradient(135deg, rgba(218,149,11,0.25), rgba(241,201,97,0.25))',
                   color: '#C084FC',
-                  border: '1px solid rgba(168,85,247,0.4)',
-                  boxShadow: '0 0 8px rgba(168,85,247,0.15)',
+                  border: '1px solid rgba(218,149,11,0.4)',
+                  boxShadow: '0 0 8px rgba(218,149,11,0.15)',
                 }}
                 title="Conversar com IA sobre o prompt do supervisor"
               >

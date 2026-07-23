@@ -238,7 +238,7 @@ export function PlanosPage() {
               >
                 {isPremium && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-bold text-white"
-                    style={{ background: 'linear-gradient(90deg, #A855F7, #6366F1)' }}>
+                    style={{ background: 'linear-gradient(90deg, #da950b, #f1c961)' }}>
                     MAIS POPULAR
                   </div>
                 )}
@@ -290,7 +290,7 @@ export function PlanosPage() {
                   className="w-full py-3 rounded-lg font-semibold text-white transition disabled:opacity-50"
                   style={{
                     background: isPremium
-                      ? 'linear-gradient(90deg, #A855F7, #6366F1)'
+                      ? 'linear-gradient(90deg, #da950b, #f1c961)'
                       : 'rgba(255, 255, 255, 0.08)', border: isPremium ? 'none' : '1px solid rgba(255, 255, 255, 0.15)' }}
                   data-testid={`subscribe-${plan.slug}`}
                 >

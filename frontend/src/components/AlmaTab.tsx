@@ -35,14 +35,14 @@ export function AlmaTab() {
       <div
         className="p-5 rounded-2xl"
         style={{
-          background: 'linear-gradient(135deg, rgba(168,85,247,0.10), rgba(99,102,241,0.10))',
+          background: 'linear-gradient(135deg, rgba(218,149,11,0.10), rgba(241,201,97,0.10))',
           border: '1px solid rgba(168, 85, 247, 0.3)',
         }}
       >
         <div className="flex items-start gap-3">
           <div
             className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, #A855F7, #6366F1)' }}
+            style={{ background: 'linear-gradient(135deg, #da950b, #f1c961)' }}
           >
             <Sparkles size={18} className="text-white" />
           </div>
@@ -214,7 +214,7 @@ function ConstituicaoEditor() {
             className="text-xs px-2 py-1 rounded uppercase tracking-wider font-semibold"
             style={{
               background: isCustom ? 'rgba(168, 85, 247, 0.15)' : 'rgba(148, 163, 184, 0.15)',
-              color: isCustom ? '#A855F7' : '#94A3B8',
+              color: isCustom ? '#da950b' : '#94A3B8',
             }}
           >
             {isCustom ? '✨ Customizada' : '📦 Padrão'}
@@ -241,9 +241,9 @@ function ConstituicaoEditor() {
           onClick={() => setChatOpen(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors hover:opacity-80"
           style={{
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.2))',
+            background: 'linear-gradient(135deg, rgba(241,201,97,0.2), rgba(218,149,11,0.2))',
             color: '#C084FC',
-            border: '1px solid rgba(168,85,247,0.3)',
+            border: '1px solid rgba(218,149,11,0.3)',
           }}
           title="Conversar com IA sobre esta constituição"
         >
@@ -321,7 +321,7 @@ function ConstituicaoEditor() {
           onClick={handleSave}
           disabled={saving || !dirty}
           className="flex-1 min-w-[180px] px-4 py-3 rounded-xl font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50"
-          style={{ background: 'linear-gradient(135deg, #A855F7, #6366F1)' }}
+          style={{ background: 'linear-gradient(135deg, #da950b, #f1c961)' }}
         >
           <Save size={16} />
           {saving ? 'Salvando...' : 'Salvar e ativar'}
@@ -496,7 +496,7 @@ function ModulosEditor({ onCountChange }: { onCountChange?: (total: number, cust
                   {isCustom && (
                     <span
                       className="text-[10px] px-1.5 py-0.5 rounded font-bold"
-                      style={{ background: '#A855F7', color: '#FFFFFF' }}
+                      style={{ background: '#da950b', color: '#FFFFFF' }}
                     >
                       ✨ CUSTOM
                     </span>
@@ -541,11 +541,11 @@ function ModulosEditor({ onCountChange }: { onCountChange?: (total: number, cust
       <button
         onClick={() => setCreateOpen(true)}
         className="w-full p-4 rounded-xl border-2 border-dashed flex items-center justify-center gap-2 hover:scale-[1.01] transition-transform"
-        style={{ borderColor: 'rgba(168,85,247,0.3)', color: '#C084FC' }}
+        style={{ borderColor: 'rgba(218,149,11,0.3)', color: '#C084FC' }}
       >
         <Plus size={16} />
         <span className="text-sm font-semibold">Criar novo módulo</span>
-        <span className="text-[10px] px-1.5 py-0.5 rounded ml-2" style={{ background: 'rgba(168,85,247,0.15)' }}>
+        <span className="text-[10px] px-1.5 py-0.5 rounded ml-2" style={{ background: 'rgba(218,149,11,0.15)' }}>
           ✨ com ajuda da IA
         </span>
       </button>
@@ -608,7 +608,7 @@ function DeleteModuleModal({
           Excluir módulo
         </h3>
         <p className="text-sm text-ayria-muted mb-4">
-          Tem certeza que quer excluir o módulo <strong style={{ color: '#A855F7' }}>{target}</strong>?
+          Tem certeza que quer excluir o módulo <strong style={{ color: '#da950b' }}>{target}</strong>?
         </p>
         <div className="text-xs p-3 rounded mb-4" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#FCA5A5' }}>
           ⚠️ <strong>Esta ação:</strong>
@@ -744,7 +744,7 @@ function ModuleEditor({
         </button>
         <div className="flex-1">
           <h3 className="text-lg font-bold text-ayria-text">
-            Módulo: <span style={{ color: '#A855F7' }}>{moduleKey}</span>
+            Módulo: <span style={{ color: '#da950b' }}>{moduleKey}</span>
           </h3>
           <div className="text-xs text-ayria-muted">
             Carregado sob demanda quando o classificador detecta o tema
@@ -754,9 +754,9 @@ function ModuleEditor({
           onClick={() => setChatOpen(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors hover:opacity-80"
           style={{
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.2))',
+            background: 'linear-gradient(135deg, rgba(241,201,97,0.2), rgba(218,149,11,0.2))',
             color: '#C084FC',
-            border: '1px solid rgba(168,85,247,0.3)',
+            border: '1px solid rgba(218,149,11,0.3)',
           }}
           title="Conversar com IA sobre este módulo"
         >
@@ -767,7 +767,7 @@ function ModuleEditor({
           className="text-xs px-2 py-1 rounded uppercase tracking-wider font-semibold"
           style={{
             background: isCustom ? 'rgba(168, 85, 247, 0.15)' : 'rgba(148, 163, 184, 0.15)',
-            color: isCustom ? '#A855F7' : '#94A3B8',
+            color: isCustom ? '#da950b' : '#94A3B8',
           }}
         >
           {isCustom ? '✨ Custom' : '📦 Padrão'}
@@ -831,7 +831,7 @@ function ModuleEditor({
           onClick={handleSave}
           disabled={saving || !dirty}
           className="flex-1 min-w-[180px] px-4 py-3 rounded-xl font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50"
-          style={{ background: 'linear-gradient(135deg, #A855F7, #6366F1)' }}
+          style={{ background: 'linear-gradient(135deg, #da950b, #f1c961)' }}
         >
           <Save size={16} />
           {saving ? 'Salvando...' : 'Salvar'}
@@ -873,7 +873,7 @@ function ModuleEditor({
               Excluir módulo
             </h3>
             <p className="text-sm text-ayria-muted mb-4">
-              Tem certeza que quer excluir o módulo <strong style={{ color: '#A855F7' }}>{moduleKey}</strong>?
+              Tem certeza que quer excluir o módulo <strong style={{ color: '#da950b' }}>{moduleKey}</strong>?
             </p>
             <div className="text-xs p-3 rounded mb-4" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#FCA5A5' }}>
               ⚠️ <strong>Esta ação:</strong>
@@ -1078,7 +1078,7 @@ function RagStatusPanel() {
           onClick={reindexAll}
           disabled={working === 'all'}
           className="px-4 py-2 rounded-lg font-semibold text-white flex items-center gap-2 disabled:opacity-50"
-          style={{ background: 'linear-gradient(135deg, #A855F7, #6366F1)' }}
+          style={{ background: 'linear-gradient(135deg, #da950b, #f1c961)' }}
         >
           <RefreshCw size={14} className={working === 'all' ? 'animate-spin' : ''} />
           {working === 'all' ? 'Reindexando...' : 'Reindexar tudo'}
@@ -1174,7 +1174,7 @@ function Stat({ icon, label, value, color }: { icon: string; label: string; valu
       <span className="text-lg">{icon}</span>
       <div>
         <div className="text-[10px] text-ayria-muted uppercase tracking-wider">{label}</div>
-        <div className="text-lg font-bold" style={{ color: color || '#A855F7' }}>{value}</div>
+        <div className="text-lg font-bold" style={{ color: color || '#da950b' }}>{value}</div>
       </div>
     </div>
   )

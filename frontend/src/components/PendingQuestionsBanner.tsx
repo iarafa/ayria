@@ -85,10 +85,10 @@ export function PendingQuestionsBanner({ question, onClose, onResponded }: Props
             className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
             style={{ background: 'rgba(99, 102, 241, 0.2)' }}
           >
-            <AlertCircle size={16} style={{ color: '#A855F7' }} />
+            <AlertCircle size={16} style={{ color: '#da950b' }} />
           </div>
           <div>
-            <p className="text-xs font-medium" style={{ color: '#A855F7' }}>
+            <p className="text-xs font-medium" style={{ color: '#da950b' }}>
               AYRIA quer te conhecer melhor
             </p>
             <p className="text-sm text-ayria-text mt-0.5">
@@ -135,7 +135,7 @@ export function PendingQuestionsBanner({ question, onClose, onResponded }: Props
               disabled={submitting}
               className="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-opacity hover:opacity-80 disabled:opacity-50"
               style={{
-                background: 'linear-gradient(135deg, #6366F1, #A855F7)',
+                background: 'linear-gradient(135deg, #f1c961, #da950b)',
                 color: '#FFFFFF',
               }}
             >
@@ -196,7 +196,7 @@ export function PendingQuestionsBanner({ question, onClose, onResponded }: Props
               disabled={submitting}
               className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-colors hover:opacity-80 disabled:opacity-50"
               style={{
-                background: 'linear-gradient(135deg, #6366F1, #A855F7)',
+                background: 'linear-gradient(135deg, #f1c961, #da950b)',
                 color: '#FFFFFF',
               }}
             >

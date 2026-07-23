@@ -158,7 +158,7 @@ export function OnboardingPage() {
               className="h-full rounded-full transition-all"
               style={{
                 width: `${progress}%`,
-                background: 'linear-gradient(90deg, #6366F1, #A855F7)',
+                background: 'linear-gradient(90deg, #f1c961, #da950b)',
               }}
             />
           </div>
@@ -260,7 +260,7 @@ export function OnboardingPage() {
               onClick={handleNext}
               disabled={submitting}
               className="px-5 py-2 rounded-xl text-white font-semibold flex items-center gap-2 disabled:opacity-50"
-              style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+              style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
             >
               {currentIdx + 1 >= questions.length ? (
                 <>
@@ -352,8 +352,8 @@ function QuestionInput({
                   : 'border-ayria-border'
               }`}
               style={{
-                background: value === (opt.value ?? opt.label) ? 'rgba(99,102,241,0.1)' : '#0a0a0a',
-                border: `1px solid ${value === (opt.value ?? opt.label) ? '#6366F1' : '#1E1E2E'}`,
+                background: value === (opt.value ?? opt.label) ? 'rgba(241,201,97,0.1)' : '#0a0a0a',
+                border: `1px solid ${value === (opt.value ?? opt.label) ? '#f1c961' : '#1E1E2E'}`,
               }}
             >
               {opt.label ?? opt.value}
@@ -378,8 +378,8 @@ function QuestionInput({
                 }
                 className="px-4 py-2 rounded-xl text-sm transition-all"
                 style={{
-                  background: isSelected ? 'rgba(99,102,241,0.2)' : '#0a0a0a',
-                  border: `1px solid ${isSelected ? '#6366F1' : '#1E1E2E'}`,
+                  background: isSelected ? 'rgba(241,201,97,0.2)' : '#0a0a0a',
+                  border: `1px solid ${isSelected ? '#f1c961' : '#1E1E2E'}`,
                   color: isSelected ? '#F8FAFC' : '#94A3B8',
                 }}
               >

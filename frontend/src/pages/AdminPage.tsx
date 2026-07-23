@@ -246,7 +246,7 @@ export function AdminPage() {
                         }`}
                         style={
                           isActive
-                            ? { borderLeft: '3px solid #6366F1', background: 'rgba(99, 102, 241, 0.15)' }
+                            ? { borderLeft: '3px solid #f1c961', background: 'rgba(99, 102, 241, 0.15)' }
                             : { borderLeft: '3px solid transparent' }
                         }
                       >
@@ -292,7 +292,7 @@ export function AdminPage() {
               <button
                 onClick={() => setShowCreateModal(true)}
                 className="px-4 py-2 rounded-xl text-white font-medium flex items-center gap-2 hover:opacity-90"
-                style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
               >
                 <UserPlus size={16} />
                 Criar usuário
@@ -350,7 +350,7 @@ export function AdminPage() {
                   <div className="flex items-center gap-3">
                     <div
                       className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold"
-                      style={{ background: u.role === 'SUPER_ADMIN' ? 'linear-gradient(135deg, #F59E0B, #EF4444)' : 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                      style={{ background: u.role === 'SUPER_ADMIN' ? 'linear-gradient(135deg, #F59E0B, #EF4444)' : 'linear-gradient(135deg, #f1c961, #da950b)' }}
                     >
                       {u.email[0].toUpperCase()}
                     </div>
@@ -366,7 +366,7 @@ export function AdminPage() {
                             style={{
                               background:
                                 u.selected_plan_slug === 'premium' ? 'rgba(212,175,55,0.18)'
-                                : u.selected_plan_slug === 'intermediario' ? 'rgba(99,102,241,0.18)'
+                                : u.selected_plan_slug === 'intermediario' ? 'rgba(241,201,97,0.18)'
                                 : 'rgba(156,163,175,0.18)',
                               color:
                                 u.selected_plan_slug === 'premium' ? '#D4AF37'
@@ -404,8 +404,8 @@ export function AdminPage() {
                     <span
                       className="text-xs px-2 py-1 rounded"
                       style={{
-                        background: u.onboarding_status === 'completed' ? 'rgba(99,102,241,0.15)' : 'rgba(168,85,247,0.15)',
-                        color: u.onboarding_status === 'completed' ? '#6366F1' : '#A855F7',
+                        background: u.onboarding_status === 'completed' ? 'rgba(241,201,97,0.15)' : 'rgba(218,149,11,0.15)',
+                        color: u.onboarding_status === 'completed' ? '#f1c961' : '#da950b',
                       }}
                     >
                       {u.onboarding_status}
@@ -415,7 +415,7 @@ export function AdminPage() {
                         <button
                           onClick={() => openUserDetails(u.id)}
                           className="text-xs px-3 py-1 rounded flex items-center gap-1"
-                          style={{ background: 'rgba(168,85,247,0.15)', color: '#A855F7' }}
+                          style={{ background: 'rgba(218,149,11,0.15)', color: '#da950b' }}
                           title="Ver detalhes completos (perfil, numerologia, astrologia)"
                         >
                           <Eye size={12} />
@@ -433,7 +433,7 @@ export function AdminPage() {
                         <button
                           onClick={() => startEditUser(u)}
                           className="text-xs px-3 py-1 rounded flex items-center gap-1"
-                          style={{ background: 'rgba(99,102,241,0.15)', color: '#6366F1' }}
+                          style={{ background: 'rgba(241,201,97,0.15)', color: '#f1c961' }}
                           title="Editar usuário"
                         >
                           Editar
@@ -506,7 +506,7 @@ export function AdminPage() {
           <div>
             <div className="mb-4">
               <label className="inline-block px-4 py-2 rounded-xl cursor-pointer text-white font-medium"
-                style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}>
+                style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}>
                 + Upload de documento
                 <input type="file" accept=".pdf,.txt,.md" onChange={handleUpload} className="hidden" />
               </label>
@@ -529,7 +529,7 @@ export function AdminPage() {
                         className="text-[10px] px-2 py-0.5 rounded uppercase tracking-wider font-semibold"
                         style={{
                           background: d.storage_provider === 'azure' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(168, 85, 247, 0.15)',
-                          color: d.storage_provider === 'azure' ? '#38BDF8' : '#A855F7',
+                          color: d.storage_provider === 'azure' ? '#38BDF8' : '#da950b',
                           border: `1px solid ${d.storage_provider === 'azure' ? 'rgba(56, 189, 248, 0.3)' : 'rgba(168, 85, 247, 0.3)'}`,
                         }}
                       >
@@ -688,7 +688,7 @@ export function AdminPage() {
                   type="submit"
                   disabled={creating}
                   className="flex-1 py-3 rounded-xl text-white font-semibold disabled:opacity-50"
-                  style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                  style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
                 >
                   {creating ? 'Criando...' : 'Criar usuário'}
                 </button>
@@ -780,7 +780,7 @@ export function AdminPage() {
                 <button
                   type="submit"
                   className="flex-1 py-3 rounded-xl text-white font-semibold"
-                  style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                  style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
                 >
                   Salvar
                 </button>
@@ -888,7 +888,7 @@ function CreditsTab({ users, onAdjust }: {
             <div className="flex items-center gap-3">
               <div
                 className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold"
-                style={{ background: u.role === 'SUPER_ADMIN' ? 'linear-gradient(135deg, #F59E0B, #EF4444)' : 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                style={{ background: u.role === 'SUPER_ADMIN' ? 'linear-gradient(135deg, #F59E0B, #EF4444)' : 'linear-gradient(135deg, #f1c961, #da950b)' }}
               >
                 {u.email[0].toUpperCase()}
               </div>
@@ -912,7 +912,7 @@ function CreditsTab({ users, onAdjust }: {
               <button
                 onClick={() => setAdjustModal({ user: u, amount: 10, description: '', type: 'bonus_manual' })}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium text-white"
-                style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
               >
                 Ajustar
               </button>
@@ -942,7 +942,7 @@ function CreditsTab({ users, onAdjust }: {
             <div className="mb-3 text-sm text-ayria-muted">
               User: <strong className="text-ayria-text">{adjustModal.user.email}</strong>
               <br />
-              Saldo atual: <strong style={{ color: '#A855F7' }}>{adjustModal.user.credit_balance || 0}</strong>
+              Saldo atual: <strong style={{ color: '#da950b' }}>{adjustModal.user.credit_balance || 0}</strong>
             </div>
             <div className="space-y-3">
               <div className="flex gap-2">
@@ -996,7 +996,7 @@ function CreditsTab({ users, onAdjust }: {
                   setAdjustModal(null)
                 }}
                 className="w-full py-3 rounded-xl font-semibold text-white disabled:opacity-50"
-                style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
               >
                 Confirmar ajuste ({adjustModal.amount > 0 ? '+' : ''}{adjustModal.amount})
               </button>
@@ -1084,7 +1084,7 @@ function PlansTab({ availablePlans, reloadPlans }: {
             <button
               onClick={() => startEdit(p)}
               className="w-full py-2 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-1.5"
-              style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+              style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
             >
               <Edit3 size={14} />
               Editar plano
@@ -1180,7 +1180,7 @@ function PlansTab({ availablePlans, reloadPlans }: {
                   onClick={handleSave}
                   disabled={saving}
                   className="flex-1 py-2.5 rounded-lg font-semibold text-white disabled:opacity-50"
-                  style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                  style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
                 >
                   {saving ? 'Salvando...' : 'Salvar'}
                 </button>
@@ -1270,13 +1270,13 @@ function UserDetailsModal({ userId, data, loading, onClose }: {
                 icon={<MessageCircle size={18} />}
                 label="Chats"
                 value={data.chats_count || 0}
-                color="#A855F7"
+                color="#da950b"
               />
               <StatCard
                 icon={<MessageSquare size={18} />}
                 label="Mensagens"
                 value={data.message_count || 0}
-                color="#6366F1"
+                color="#f1c961"
               />
               <StatCard
                 icon={<Wallet size={18} />}
@@ -1467,7 +1467,7 @@ function Field({ label, value, highlight }: { label: string; value: any; highlig
   let color = ''
   if (highlight === 'success') color = '#10B981'
   else if (highlight === 'danger') color = '#EF4444'
-  else if (highlight === true) color = '#A855F7'
+  else if (highlight === true) color = '#da950b'
 
   return (
     <div>
@@ -1488,8 +1488,8 @@ function UserHeader({ data, onClose, navigate }: { data: any; onClose: () => voi
 
   const planColor =
     data.selected_plan_slug === 'premium' ? '#F59E0B' :
-    data.selected_plan_slug === 'intermediario' ? '#A855F7' :
-    '#6366F1'
+    data.selected_plan_slug === 'intermediario' ? '#da950b' :
+    '#f1c961'
 
   const onboardingColors: Record<string, string> = {
     completed: '#10B981',
@@ -1503,7 +1503,7 @@ function UserHeader({ data, onClose, navigate }: { data: any; onClose: () => voi
     <div
       className="rounded-2xl p-5 sm:p-6"
       style={{
-        background: 'linear-gradient(135deg, rgba(99,102,241,0.10), rgba(168,85,247,0.10))',
+        background: 'linear-gradient(135deg, rgba(241,201,97,0.10), rgba(218,149,11,0.10))',
         border: '1px solid rgba(99, 102, 241, 0.3)',
       }}
     >
@@ -1515,7 +1515,7 @@ function UserHeader({ data, onClose, navigate }: { data: any; onClose: () => voi
           <div
             className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center font-bold text-2xl flex-shrink-0"
             style={{
-              background: `linear-gradient(135deg, ${planColor}, #A855F7)`,
+              background: `linear-gradient(135deg, ${planColor}, #da950b)`,
               color: '#FFFFFF',
             }}
           >
@@ -1533,7 +1533,7 @@ function UserHeader({ data, onClose, navigate }: { data: any; onClose: () => voi
           {/* Badges */}
           <div className="flex flex-wrap gap-2 mt-3">
             {data.role && (
-              <Badge color="#A855F7" icon={<Shield size={11} />}>
+              <Badge color="#da950b" icon={<Shield size={11} />}>
                 {data.role}
               </Badge>
             )}
@@ -1653,8 +1653,8 @@ function NumberCard({ label, numero, ehMestre }: { label: string; numero: number
       style={{
         background: ehMestre
           ? 'linear-gradient(135deg, rgba(245,158,11,0.2), rgba(239,68,68,0.2))'
-          : 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(168,85,247,0.15))',
-        border: ehMestre ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(168,85,247,0.3)',
+          : 'linear-gradient(135deg, rgba(241,201,97,0.15), rgba(218,149,11,0.15))',
+        border: ehMestre ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(218,149,11,0.3)',
       }}
     >
       <div className="text-3xl font-bold gradient-text">{numero}</div>
@@ -1669,8 +1669,8 @@ function PlanetCard({ nome, signo, elemento, casa, destaque }: { nome: string; s
     <div
       className="p-3 rounded-xl"
       style={{
-        background: destaque ? 'rgba(168,85,247,0.1)' : '#0a0a0a',
-        border: destaque ? '1px solid rgba(168,85,247,0.3)' : '1px solid #1E1E2E',
+        background: destaque ? 'rgba(218,149,11,0.1)' : '#0a0a0a',
+        border: destaque ? '1px solid rgba(218,149,11,0.3)' : '1px solid #1E1E2E',
       }}
     >
       <div className="text-xs text-ayria-muted">{nome}</div>
@@ -1996,7 +1996,7 @@ function SupervisionTab() {
             <button
               onClick={() => setSupPromptOpen(true)}
               className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white border border-purple-500/40 hover:opacity-90"
-              style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.25), rgba(99,102,241,0.25))' }}
+              style={{ background: 'linear-gradient(135deg, rgba(218,149,11,0.25), rgba(241,201,97,0.25))' }}
               title="Editar prompt crítico do supervisor"
             >
               🛡️ Editar Prompt Crítico
@@ -2028,9 +2028,9 @@ function SupervisionTab() {
                 subTab === s.key ? '' : 'text-ayria-muted hover:text-ayria-text'
               }`}
               style={subTab === s.key ? {
-                background: 'linear-gradient(135deg, rgba(99,102,241,0.20), rgba(168,85,247,0.20))',
+                background: 'linear-gradient(135deg, rgba(241,201,97,0.20), rgba(218,149,11,0.20))',
                 color: '#C4B5FD',
-                border: '1px solid rgba(168,85,247,0.4)',
+                border: '1px solid rgba(218,149,11,0.4)',
               } : {}}
               title={s.hint}
             >
@@ -2044,7 +2044,7 @@ function SupervisionTab() {
         {subTab === 'dashboard' && (
           <>
             {/* Banner de avisos importantes (08/07/2026) */}
-            <div className="mb-4 p-3 rounded-xl" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.3)' }}>
+            <div className="mb-4 p-3 rounded-xl" style={{ background: 'rgba(241,201,97,0.08)', border: '1px solid rgba(241,201,97,0.3)' }}>
               <div className="flex items-start gap-2">
                 <span className="text-base">💡</span>
                 <div className="flex-1 text-xs text-ayria-text">
@@ -2144,11 +2144,11 @@ function SupervisionTab() {
             className="p-3 rounded-lg text-left transition-all hover:scale-[1.03] active:scale-[0.98]"
             style={{
               background: filterLevel === 'N3' && viewTab === 'open'
-                ? 'rgba(168,85,247,0.20)'
-                : 'rgba(168,85,247,0.05)',
+                ? 'rgba(218,149,11,0.20)'
+                : 'rgba(218,149,11,0.05)',
               border: filterLevel === 'N3' && viewTab === 'open'
-                ? '2px solid rgba(168,85,247,0.7)'
-                : '1px solid rgba(168,85,247,0.3)',
+                ? '2px solid rgba(218,149,11,0.7)'
+                : '1px solid rgba(218,149,11,0.3)',
               cursor: 'pointer',
             }}
             title="Filtrar alertas N3 (vícios/compulsões)"
@@ -2176,7 +2176,7 @@ function SupervisionTab() {
               <button
                 onClick={() => setSupPromptOpen(true)}
                 className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white border border-purple-500/40 hover:opacity-90"
-                style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.25), rgba(99,102,241,0.25))' }}
+                style={{ background: 'linear-gradient(135deg, rgba(218,149,11,0.25), rgba(241,201,97,0.25))' }}
                 title="Editar keywords via Prompt Crítico"
               >
                 ✏️ Editar Keywords
@@ -2189,7 +2189,7 @@ function SupervisionTab() {
         {/* 🆕 SUB-ABA: Config — comportamento do supervisor */}
         {subTab === 'config' && (
           <div className="space-y-3">
-            <div className="p-4 rounded-xl" style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.3)' }}>
+            <div className="p-4 rounded-xl" style={{ background: 'rgba(241,201,97,0.08)', border: '1px solid rgba(241,201,97,0.3)' }}>
               <div className="flex items-start gap-2">
                 <span className="text-lg">⚙️</span>
                 <div className="flex-1">
@@ -2210,7 +2210,7 @@ function SupervisionTab() {
               <button
                 onClick={() => setSupPromptOpen(true)}
                 className="text-xs px-4 py-2 rounded-lg font-semibold text-white border border-purple-500/40 hover:opacity-90"
-                style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.30), rgba(99,102,241,0.30))' }}
+                style={{ background: 'linear-gradient(135deg, rgba(218,149,11,0.30), rgba(241,201,97,0.30))' }}
               >
                 🛡️ Abrir Editor de Prompt Crítico
               </button>
@@ -2282,7 +2282,7 @@ function SupervisionTab() {
           { key: 'all', label: 'Todos', color: '#94A3B8' },
           { key: 'N1', label: '🚨 N1', color: '#EF4444' },
           { key: 'N2', label: '⚠️ N2', color: '#F59E0B' },
-          { key: 'N3', label: '🎲 N3', color: '#A855F7' },
+          { key: 'N3', label: '🎲 N3', color: '#da950b' },
         ].map(f => (
           <button
             key={f.key}
@@ -2309,7 +2309,7 @@ function SupervisionTab() {
           {viewTab === 'open' ? '🟢 Abertos' : '🗃️ Histórico'}
           {filterLevel !== 'all' && (
             <span className="text-[10px] px-2 py-0.5 rounded font-bold" style={{
-              background: 'rgba(168,85,247,0.15)', color: '#C084FC'
+              background: 'rgba(218,149,11,0.15)', color: '#C084FC'
             }}>
               filtro: {filterLevel}
             </span>
@@ -2481,7 +2481,7 @@ function SupervisionTab() {
             >
               ◀ Anterior
             </button>
-            <span className="text-xs px-3 py-1.5 rounded-lg font-bold" style={{ background: 'rgba(168,85,247,0.1)', color: '#C084FC', border: '1px solid rgba(168,85,247,0.3)' }}>
+            <span className="text-xs px-3 py-1.5 rounded-lg font-bold" style={{ background: 'rgba(218,149,11,0.1)', color: '#C084FC', border: '1px solid rgba(218,149,11,0.3)' }}>
               {Math.floor(filterOffset / PAGE_SIZE) + 1} / {Math.max(1, Math.ceil(alertsTotal / PAGE_SIZE))}
             </span>
             <button
@@ -2816,7 +2816,7 @@ function AdminsManagementTab() {
           onClick={() => setShowCreate(true)}
           disabled={busy}
           className="px-4 py-2 rounded-xl text-white font-medium flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
-          style={{ background: '#6366F1' }}
+          style={{ background: '#f1c961' }}
         >
           <UserPlus size={16} />
           Novo Administrador
@@ -2848,7 +2848,7 @@ function AdminsManagementTab() {
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div
                   className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold shrink-0"
-                  style={{ background: a.role === 'SUPER_ADMIN' ? '#F59E0B' : '#6366F1' }}
+                  style={{ background: a.role === 'SUPER_ADMIN' ? '#F59E0B' : '#f1c961' }}
                 >
                   {a.email[0].toUpperCase()}
                 </div>
@@ -2949,7 +2949,7 @@ function AdminsManagementTab() {
                 <button type="button" onClick={() => setShowCreate(false)} className="flex-1 py-2 rounded-xl text-ayria-muted hover:text-ayria-text" style={{ border: '1px solid #2a2a3e' }}>
                   Cancelar
                 </button>
-                <button type="submit" disabled={busy} className="flex-1 py-2 rounded-xl text-white font-semibold disabled:opacity-50" style={{ background: '#6366F1' }}>
+                <button type="submit" disabled={busy} className="flex-1 py-2 rounded-xl text-white font-semibold disabled:opacity-50" style={{ background: '#f1c961' }}>
                   {busy ? 'Criando...' : 'Criar'}
                 </button>
               </div>
@@ -3029,7 +3029,7 @@ function AdminsManagementTab() {
                 <button type="button" onClick={() => setEditTarget(null)} className="flex-1 py-2 rounded-xl text-ayria-muted hover:text-ayria-text" style={{ border: '1px solid #2a2a3e' }}>
                   Cancelar
                 </button>
-                <button type="submit" disabled={busy} className="flex-1 py-2 rounded-xl text-white font-semibold disabled:opacity-50" style={{ background: '#6366F1' }}>
+                <button type="submit" disabled={busy} className="flex-1 py-2 rounded-xl text-white font-semibold disabled:opacity-50" style={{ background: '#f1c961' }}>
                   {busy ? 'Salvando...' : 'Salvar'}
                 </button>
               </div>
@@ -3081,7 +3081,7 @@ function PartnersTabInline() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-bold text-ayria-text flex items-center gap-2"><UserPlus size={24}/>Parceiros</h2>
-        <button onClick={() => setShowCreate(true)} className="px-4 py-2 rounded-xl text-white font-medium" style={{ background: '#6366F1' }}>+ Novo Parceiro</button>
+        <button onClick={() => setShowCreate(true)} className="px-4 py-2 rounded-xl text-white font-medium" style={{ background: '#f1c961' }}>+ Novo Parceiro</button>
       </div>
       {error && <div className="mb-4 p-3 rounded-xl bg-red-900/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
       <ListWithControls data={partners} itemName="parceiro" searchPlaceholder="Buscar por nome, email..." emptyMessage="Nenhum parceiro cadastrado">
@@ -3121,7 +3121,7 @@ function PartnersTabInline() {
               </div>
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setShowCreate(false)} className="flex-1 py-2 rounded-xl text-ayria-muted hover:text-ayria-text" style={{ border: '1px solid #2a2a3e' }}>Cancelar</button>
-                <button type="submit" disabled={busy} className="flex-1 py-2 rounded-xl text-white font-semibold disabled:opacity-50" style={{ background: '#6366F1' }}>{busy ? 'Criando...' : 'Criar'}</button>
+                <button type="submit" disabled={busy} className="flex-1 py-2 rounded-xl text-white font-semibold disabled:opacity-50" style={{ background: '#f1c961' }}>{busy ? 'Criando...' : 'Criar'}</button>
               </div>
             </form>
           </div>
@@ -3180,7 +3180,7 @@ function CouponsTabInline() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-bold text-ayria-text flex items-center gap-2"><Tag size={24}/>Cupons de Desconto</h2>
-        <button onClick={() => setShowCreate(true)} className="px-4 py-2 rounded-xl text-white font-medium" style={{ background: '#6366F1' }}>+ Novo Cupom</button>
+        <button onClick={() => setShowCreate(true)} className="px-4 py-2 rounded-xl text-white font-medium" style={{ background: '#f1c961' }}>+ Novo Cupom</button>
       </div>
       {error && <div className="mb-4 p-3 rounded-xl bg-red-900/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
       {validating && (
@@ -3196,7 +3196,7 @@ function CouponsTabInline() {
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-lg font-bold text-ayria-text">{c.code}</span>
-                <span className="text-xs px-2 py-0.5 rounded" style={{ background: c.discount_type === 'percent' ? 'rgba(99,102,241,0.2)' : 'rgba(16,185,129,0.2)', color: c.discount_type === 'percent' ? '#818CF8' : '#10B981' }}>
+                <span className="text-xs px-2 py-0.5 rounded" style={{ background: c.discount_type === 'percent' ? 'rgba(241,201,97,0.2)' : 'rgba(16,185,129,0.2)', color: c.discount_type === 'percent' ? '#818CF8' : '#10B981' }}>
                   {c.discount_type === 'percent' ? `${c.discount_value}% OFF` : `R$ ${c.discount_value} OFF`}
                 </span>
               </div>
@@ -3235,7 +3235,7 @@ function CouponsTabInline() {
               <div><label className="block text-xs text-ayria-muted mb-1">Parceiro (opcional)</label><select value={form.partner_id} onChange={(e) => setForm({ ...form, partner_id: e.target.value })} className="w-full px-3 py-2 rounded-lg text-sm" style={{ background: '#0A0A1A', border: '1px solid #2a2a3e', color: '#fff' }}><option value="">Nenhum</option>{partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setShowCreate(false)} className="flex-1 py-2 rounded-xl text-ayria-muted hover:text-ayria-text" style={{ border: '1px solid #2a2a3e' }}>Cancelar</button>
-                <button type="submit" disabled={busy} className="flex-1 py-2 rounded-xl text-white font-semibold disabled:opacity-50" style={{ background: '#6366F1' }}>{busy ? 'Criando...' : 'Criar'}</button>
+                <button type="submit" disabled={busy} className="flex-1 py-2 rounded-xl text-white font-semibold disabled:opacity-50" style={{ background: '#f1c961' }}>{busy ? 'Criando...' : 'Criar'}</button>
               </div>
             </form>
           </div>

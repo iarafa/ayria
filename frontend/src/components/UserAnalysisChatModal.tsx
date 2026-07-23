@@ -35,7 +35,7 @@ interface NoteProposal {
 }
 
 const KIND_LABEL: Record<string, { label: string; color: string; emoji: string }> = {
-  analysis: { label: 'Análise', color: '#A855F7', emoji: '🧠' },
+  analysis: { label: 'Análise', color: '#da950b', emoji: '🧠' },
   observation: { label: 'Observação', color: '#3B82F6', emoji: '👁' },
   action: { label: 'Ação', color: '#F59E0B', emoji: '⚡' },
 }
@@ -182,13 +182,13 @@ export function UserAnalysisChatModal({
           style={{ borderColor: '#1E1E2E' }}
         >
           <div className="flex items-center gap-2">
-            <Sparkles size={20} style={{ color: '#A855F7' }} />
+            <Sparkles size={20} style={{ color: '#da950b' }} />
             <h3 className="text-base font-bold text-ayria-text">
               Análise de {firstName} — IA
             </h3>
             <span
               className="text-[10px] px-2 py-0.5 rounded uppercase font-bold flex items-center gap-1"
-              style={{ background: 'rgba(168,85,247,0.15)', color: '#A855F7' }}
+              style={{ background: 'rgba(218,149,11,0.15)', color: '#da950b' }}
             >
               <Lock size={10} /> contexto travado neste user
             </span>
@@ -222,12 +222,12 @@ export function UserAnalysisChatModal({
                 style={
                   m.role === 'user'
                     ? {
-                        background: 'linear-gradient(135deg, #6366F1, #A855F7)',
+                        background: 'linear-gradient(135deg, #f1c961, #da950b)',
                         color: '#fff',
                       }
                     : {
                         background: '#141420',
-                        border: '1px solid rgba(168,85,247,0.25)',
+                        border: '1px solid rgba(218,149,11,0.25)',
                         color: '#E5E7EB',
                       }
                 }
@@ -287,12 +287,12 @@ export function UserAnalysisChatModal({
                 className="px-3 py-2 rounded-lg text-sm flex items-center gap-2"
                 style={{
                   background: '#141420',
-                  border: '1px solid rgba(168,85,247,0.25)',
+                  border: '1px solid rgba(218,149,11,0.25)',
                   color: '#94A3B8',
                 }}
               >
                 <Loader2 size={14} className="animate-spin" />
-                <span>IA analisando <strong style={{ color: '#A855F7' }}>{firstName}</strong>...</span>
+                <span>IA analisando <strong style={{ color: '#da950b' }}>{firstName}</strong>...</span>
               </div>
             </div>
           )}
@@ -357,7 +357,7 @@ export function UserAnalysisChatModal({
               style={{
                 background:
                   input.trim() && !busy && !saving
-                    ? 'linear-gradient(135deg, #A855F7, #6366F1)'
+                    ? 'linear-gradient(135deg, #da950b, #f1c961)'
                     : '#1E1E2E',
               }}
             >

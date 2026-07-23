@@ -33,7 +33,7 @@ function NavItem({ href, icon, label, onClose }: { href: string; icon: React.Rea
     <button
       onClick={() => { navigate(href); onClose?.() }}
       className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'text-white font-medium' : 'text-ayria-muted hover:bg-[#1a1a1a] hover:text-ayria-text'}`}
-      style={isActive ? { background: 'rgba(99, 102, 241, 0.15)', borderLeft: '2px solid #6366F1' } : undefined}
+      style={isActive ? { background: 'rgba(99, 102, 241, 0.15)', borderLeft: '2px solid #f1c961' } : undefined}
     >
       {icon}
       <span>{label}</span>
@@ -267,7 +267,7 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
             onClick={handleNewChat}
             className="w-full py-2 px-3 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-1.5 transition-opacity hover:opacity-90"
             style={{
-              background: 'linear-gradient(135deg, #6366F1, #A855F7)',
+              background: 'linear-gradient(135deg, #f1c961, #da950b)',
             }}
           >
             <Plus size={14} />
@@ -369,7 +369,7 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
                     popVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1'
                   }`}
                   style={{
-                    background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(168,85,247,0.15))',
+                    background: 'linear-gradient(135deg, rgba(241,201,97,0.15), rgba(218,149,11,0.15))',
                     borderColor: 'rgba(168, 85, 247, 0.4)',
                     boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)',
                   }}
@@ -393,7 +393,7 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
                       onClick={handlePopSubmit}
                       disabled={!popInput.trim()}
                       className="px-2 py-1 rounded text-xs font-medium text-white disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
-                      style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                      style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
                     >
                       OK
                     </button>
@@ -453,7 +453,7 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
                     className="h-full rounded-full transition-all"
                     style={{
                       width: `${Math.min(100, Math.max(0, (credits.balance / credits.planTotal) * 100))}%`,
-                      background: credits.balance === 0 ? '#EF4444' : 'linear-gradient(90deg, #6366F1, #A855F7)',
+                      background: credits.balance === 0 ? '#EF4444' : 'linear-gradient(90deg, #f1c961, #da950b)',
                       boxShadow: credits.balance === 0 ? 'none' : '0 0 8px rgba(99, 102, 241, 0.5)',
                     }}
                   />
@@ -468,7 +468,7 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
                 <button
                   onClick={() => navigate('/planos')}
                   className="w-full px-3 py-2 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                  style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+                  style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
                 >
                   Sem plano · escolha um →
                 </button>

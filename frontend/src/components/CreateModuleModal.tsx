@@ -116,8 +116,8 @@ export function CreateModuleModal({ open, onClose, onCreated }: CreateModuleModa
           className="w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden"
           style={{
             background: '#0a0a0a',
-            border: '1px solid rgba(168,85,247,0.4)',
-            boxShadow: '0 0 40px rgba(168,85,247,0.2)',
+            border: '1px solid rgba(218,149,11,0.4)',
+            boxShadow: '0 0 40px rgba(218,149,11,0.2)',
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -130,7 +130,7 @@ export function CreateModuleModal({ open, onClose, onCreated }: CreateModuleModa
               <div
                 className="w-7 h-7 rounded-lg flex items-center justify-center"
                 style={{
-                  background: 'linear-gradient(135deg, #A855F7, #6366F1)',
+                  background: 'linear-gradient(135deg, #da950b, #f1c961)',
                 }}
               >
                 <Sparkles size={14} className="text-white" />
@@ -141,7 +141,7 @@ export function CreateModuleModal({ open, onClose, onCreated }: CreateModuleModa
                 </h3>
                 <div className="text-[10px] text-ayria-muted">
                   Passo {step === 'name' ? '1' : '2'} de 2 ·{' '}
-                  <span style={{ color: '#A855F7' }}>{cleanKeyNow || '(sem nome)'}</span>
+                  <span style={{ color: '#da950b' }}>{cleanKeyNow || '(sem nome)'}</span>
                 </div>
               </div>
             </div>
@@ -159,14 +159,14 @@ export function CreateModuleModal({ open, onClose, onCreated }: CreateModuleModa
             <div
               className="flex-1 h-1 rounded-full"
               style={{
-                background: step === 'name' ? '#A855F7' : '#6366F1',
+                background: step === 'name' ? '#da950b' : '#f1c961',
                 transition: 'all .3s',
               }}
             />
             <div
               className="flex-1 h-1 rounded-full"
               style={{
-                background: step === 'content' ? '#A855F7' : '#1E1E2E',
+                background: step === 'content' ? '#da950b' : '#1E1E2E',
                 transition: 'all .3s',
               }}
             />
@@ -203,7 +203,7 @@ export function CreateModuleModal({ open, onClose, onCreated }: CreateModuleModa
 
                 <div
                   className="p-3 rounded-xl flex gap-2 items-start"
-                  style={{ background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.2)' }}
+                  style={{ background: 'rgba(218,149,11,0.05)', border: '1px solid rgba(218,149,11,0.2)' }}
                 >
                   <Sparkles size={14} className="text-purple-400 mt-0.5 flex-shrink-0" />
                   <div className="text-xs text-ayria-muted">
@@ -233,9 +233,9 @@ export function CreateModuleModal({ open, onClose, onCreated }: CreateModuleModa
                     onClick={() => setChatOpen(true)}
                     className="flex-1 px-3 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-opacity hover:opacity-80"
                     style={{
-                      background: 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(168,85,247,0.25))',
+                      background: 'linear-gradient(135deg, rgba(241,201,97,0.25), rgba(218,149,11,0.25))',
                       color: '#C084FC',
-                      border: '1px solid rgba(168,85,247,0.4)',
+                      border: '1px solid rgba(218,149,11,0.4)',
                     }}
                   >
                     <MessageCircle size={14} />
@@ -329,7 +329,7 @@ export function CreateModuleModal({ open, onClose, onCreated }: CreateModuleModa
                   }}
                   disabled={!cleanKeyNow}
                   className="px-5 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 flex items-center gap-2"
-                  style={{ background: 'linear-gradient(135deg, #A855F7, #6366F1)' }}
+                  style={{ background: 'linear-gradient(135deg, #da950b, #f1c961)' }}
                 >
                   Próximo <ArrowRight size={14} />
                 </button>
@@ -346,7 +346,7 @@ export function CreateModuleModal({ open, onClose, onCreated }: CreateModuleModa
                   onClick={() => submitCreate(content)}
                   disabled={working || content.length < 100}
                   className="px-5 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 flex items-center gap-2"
-                  style={{ background: 'linear-gradient(135deg, #A855F7, #6366F1)' }}
+                  style={{ background: 'linear-gradient(135deg, #da950b, #f1c961)' }}
                 >
                   {working ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                   {working ? 'Criando...' : 'Criar + Indexar no RAG'}

@@ -117,7 +117,7 @@ export function ChatPage() {
               background: collapseEnabled
                 ? 'rgba(99, 102, 241, 0.15)'
                 : 'rgba(148, 163, 184, 0.08)',
-              color: collapseEnabled ? '#A855F7' : '#94A3B8',
+              color: collapseEnabled ? '#da950b' : '#94A3B8',
               border: collapseEnabled
                 ? '1px solid rgba(168, 85, 247, 0.4)'
                 : '1px solid rgba(148, 163, 184, 0.2)',
@@ -197,7 +197,7 @@ export function ChatPage() {
                   style={{
                     background: user?.role === 'SUPER_ADMIN' || user?.role === 'admin'
                       ? 'linear-gradient(135deg, #F59E0B, #EF4444)'
-                      : 'linear-gradient(135deg, #6366F1, #A855F7)',
+                      : 'linear-gradient(135deg, #f1c961, #da950b)',
                     boxShadow: '0 0 12px rgba(99, 102, 241, 0.4)',
                     border: '2px solid rgba(99, 102, 241, 0.3)',
                   }}

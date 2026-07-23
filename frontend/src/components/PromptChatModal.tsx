@@ -183,7 +183,7 @@ export function PromptChatModal({
         >
           <div
             className="p-2 rounded-lg"
-            style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.2))' }}
+            style={{ background: 'linear-gradient(135deg, rgba(241,201,97,0.2), rgba(218,149,11,0.2))' }}
           >
             <MessageCircle size={18} className="text-purple-300" />
           </div>
@@ -251,9 +251,9 @@ export function PromptChatModal({
                     <div
                       className="mt-3 p-3 rounded-xl border-2 flex items-center justify-between gap-2"
                       style={{
-                        background: 'linear-gradient(135deg, rgba(168,85,247,0.15), rgba(99,102,241,0.15))',
-                        borderColor: 'rgba(168,85,247,0.5)',
-                        boxShadow: '0 0 12px rgba(168,85,247,0.2)',
+                        background: 'linear-gradient(135deg, rgba(218,149,11,0.15), rgba(241,201,97,0.15))',
+                        borderColor: 'rgba(218,149,11,0.5)',
+                        boxShadow: '0 0 12px rgba(218,149,11,0.2)',
                       }}
                     >
                       <div className="flex-1 min-w-0">
@@ -277,7 +277,7 @@ export function PromptChatModal({
                           onClick={handleSaveProposed}
                           disabled={saving}
                           className="text-xs px-3 py-1.5 rounded-lg font-semibold text-white disabled:opacity-50 flex items-center gap-1 whitespace-nowrap"
-                          style={{ background: 'linear-gradient(135deg, #A855F7, #6366F1)' }}
+                          style={{ background: 'linear-gradient(135deg, #da950b, #f1c961)' }}
                         >
                           {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                           {saving ? 'Salvando...' : 'Salvar'}
@@ -329,7 +329,7 @@ export function PromptChatModal({
               onClick={sendMessage}
               disabled={loading || !input.trim()}
               className="px-4 py-2.5 rounded-lg text-white font-semibold disabled:opacity-40 flex items-center gap-2"
-              style={{ background: 'linear-gradient(135deg, #6366F1, #A855F7)' }}
+              style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
             >
               <Send size={14} />
               Enviar

@@ -206,7 +206,7 @@ export default function CreatingProfilePage() {
             onClick={handleComecar}
             className="px-12 py-4 rounded-full font-semibold text-white text-lg transition-all hover:scale-105 active:scale-95"
             style={{
-              background: 'linear-gradient(135deg, #6366F1, #A855F7)',
+              background: 'linear-gradient(135deg, #f1c961, #da950b)',
               boxShadow: '0 0 40px rgba(99, 102, 241, 0.5)',
               animation: 'fadeUp 1s ease-out 0.9s both',
             }}
@@ -307,7 +307,7 @@ export default function CreatingProfilePage() {
           <div
             className="h-full rounded-full"
             style={{
-              background: 'linear-gradient(90deg, #6366F1, #A855F7)',
+              background: 'linear-gradient(90deg, #f1c961, #da950b)',
               width: `${Math.min(100, ((faseAtual + 1) / FASES.length) * 100)}%`,
               transition: 'width 0.6s ease-out',
             }}
@@ -321,7 +321,7 @@ export default function CreatingProfilePage() {
               key={i}
               className="w-2 h-2 rounded-full transition-all"
               style={{
-                background: i <= faseAtual ? '#6366F1' : '#1E1E2E',
+                background: i <= faseAtual ? '#f1c961' : '#1E1E2E',
                 transform: i === faseAtual ? 'scale(1.4)' : 'scale(1)',
               }}
             />

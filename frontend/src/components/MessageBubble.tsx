@@ -155,7 +155,7 @@ export function MessageBubble({ role, content, model, tokens, thinking, collapse
         }`}
         style={
           isUser
-            ? { background: 'linear-gradient(135deg, #6366F1, #A855F7)' }
+            ? { background: 'linear-gradient(135deg, #f1c961, #da950b)' }
             : isYellowNote
               ? {
                   // ⚠️ DESTAQUE AMARELO: pergunta pendente do onboarding (Sistema 2)
@@ -260,15 +260,15 @@ export function TypingIndicator() {
         <div className="flex items-center gap-1">
           <div
             className="typing-dot w-2 h-2 rounded-full"
-            style={{ background: '#6366F1' }}
+            style={{ background: '#f1c961' }}
           />
           <div
             className="typing-dot w-2 h-2 rounded-full"
-            style={{ background: '#6366F1' }}
+            style={{ background: '#f1c961' }}
           />
           <div
             className="typing-dot w-2 h-2 rounded-full"
-            style={{ background: '#6366F1' }}
+            style={{ background: '#f1c961' }}
           />
         </div>
       </div>
