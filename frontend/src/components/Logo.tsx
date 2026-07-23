@@ -43,8 +43,9 @@ interface LogoIconProps {
   variant?: 'plain' | 'circular'
 }
 
-// Logo wide aspect ratio (1536 / 220)
-const ASPECT_WIDE = 1536 / 220
+// Logo wide aspect ratio (1536 / 360) — inclui AYRIA + subtítulo + ornamento
+// (23/07/2026: Rafael pediu pra restaurar o subtítulo que eu tinha cortado)
+const ASPECT_WIDE = 1536 / 360
 
 export function LogoIcon({ size = 40, glow = true, className = '', variant = 'plain' }: LogoIconProps) {
   const [err, setErr] = useState(false)
