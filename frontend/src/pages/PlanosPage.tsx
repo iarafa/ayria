@@ -159,7 +159,7 @@ export function PlanosPage() {
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
-            <LogoIcon size={96} variant="circular" />
+            <LogoIcon size={200} variant="circular" className="max-w-[60vw]" />
           </div>
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
             Escolha seu plano

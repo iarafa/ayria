@@ -49,6 +49,10 @@ export function LogoIcon({ size = 40, glow = true, className = '', variant = 'pl
     ? 'drop-shadow(0 0 14px rgba(241,201,97,0.55)) drop-shadow(0 0 28px rgba(218,149,11,0.35))'
     : undefined
 
+  // Responsivo: limita largura em telas pequenas (mobile) pra não estourar.
+  // Inline maxWidth tem prioridade sobre className Tailwind.
+  const maxWidth = size >= 300 ? '90vw' : size >= 150 ? '70vw' : size >= 80 ? '50vw' : undefined
+
   if (variant === 'circular') {
     // Cache-bust via query string pra navegador não usar cache antigo
     const v = '20260723a'
@@ -63,6 +67,7 @@ export function LogoIcon({ size = 40, glow = true, className = '', variant = 'pl
           display: 'block',
           width: size,
           height: size,
+          maxWidth,
           objectFit: 'contain',
           filter: goldGlow,
         }}
@@ -78,7 +83,11 @@ export function LogoIcon({ size = 40, glow = true, className = '', variant = 'pl
       width={size}
       height={size}
       className={className}
-      style={glow ? { filter: goldGlow } : undefined}
+      style={{
+        display: 'block',
+        maxWidth,
+        filter: goldGlow,
+      }}
       onError={() => setErr(true)}
     />
   )
