@@ -14,6 +14,7 @@ import { AdminLoginPage } from './pages/AdminLoginPage'
 import { ObserveUserPage } from './pages/ObserveUserPage'
 import CreatingProfilePage from './pages/CreatingProfilePage'
 import { PlanosPage } from './pages/PlanosPage'  // 🆕 22/07 21:10 — cupom de desconto
+import { PagamentoSucessoPage } from './pages/PagamentoSucessoPage'  // 🆕 22/07 22:08 — retorno Stripe
 
 function PrivateRoute({ children, adminOnly = false, requireOnboarding = false }: { children: React.ReactNode; adminOnly?: boolean; requireOnboarding?: boolean }) {
   const { user, token, loadUser } = useAuth()
@@ -123,6 +124,15 @@ export default function App() {
         element={
           <PrivateRoute>
             <PlanosPage />
+          </PrivateRoute>
+        }
+      />
+      {/* 🆕 22/07 22:08 — Sucesso do pagamento Stripe (Rafael pediu) */}
+      <Route
+        path="/pagamento/sucesso"
+        element={
+          <PrivateRoute>
+            <PagamentoSucessoPage />
           </PrivateRoute>
         }
       />
