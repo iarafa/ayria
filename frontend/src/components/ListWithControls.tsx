@@ -28,7 +28,18 @@
  * ```
  */
 import { useState, useMemo } from 'react'
-import { Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Filter } from 'lucide-react'
+
+export interface ListFilter {
+  /** Chave do filtro (exibida como label) */
+  key: string
+  /** Label visível pro user */
+  label: string
+  /** Opções: lista de { value, label } */
+  options: { value: string; label: string }[]
+  /** Função que extrai o valor de cada item (deve retornar string) */
+  getValue: (item: any) => string | null | undefined
+}
 
 export interface ListWithControlsProps<T> {
   data: T[]
@@ -40,6 +51,8 @@ export interface ListWithControlsProps<T> {
   searchPlaceholder?: string
   itemName?: string
   idKey?: string
+  /** 🆕 22/07 22:47 — Filtros extras (ex: filtro por plano, status, role) */
+  filters?: ListFilter[]
 }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
@@ -54,25 +67,45 @@ export function ListWithControls<T extends Record<string, any>>({
   searchPlaceholder = 'Buscar...',
   itemName = 'registro',
   idKey = 'id',
+  filters = [],
 }: ListWithControlsProps<T>) {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(initialPageSize)
+  // 🆕 22/07 22:47 — Estado dos filtros extras (key → selected value ou 'all')
+  const [filterValues, setFilterValues] = useState<Record<string, string>>(
+    () => Object.fromEntries(filters.map((f) => [f.key, 'all']))
+  )
 
-  // 1) Filtra por busca
+  // 1) Filtra por busca + filtros extras
   const filtered = useMemo(() => {
-    if (!search.trim()) return data
-    const q = search.toLowerCase()
-    return data.filter((row) => {
-      if (searchFields) {
-        return searchFields(row).toLowerCase().includes(q)
-      }
-      return searchableKeys.some((key) => {
-        const v = row[key]
-        return v != null && String(v).toLowerCase().includes(q)
+    let result = data
+    // 1a) Filtros extras (ANTES da busca textual pra reduzir volume)
+    if (filters.length > 0) {
+      result = result.filter((row) =>
+        filters.every((f) => {
+          const selected = filterValues[f.key]
+          if (!selected || selected === 'all') return true
+          const v = f.getValue(row)
+          return v === selected
+        })
+      )
+    }
+    // 1b) Busca textual
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter((row) => {
+        if (searchFields) {
+          return searchFields(row).toLowerCase().includes(q)
+        }
+        return searchableKeys.some((key) => {
+          const v = row[key]
+          return v != null && String(v).toLowerCase().includes(q)
+        })
       })
-    })
-  }, [data, search, searchableKeys, searchFields])
+    }
+    return result
+  }, [data, search, searchableKeys, searchFields, filters, filterValues])
 
   // 2) Paginação
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
@@ -84,6 +117,7 @@ export function ListWithControls<T extends Record<string, any>>({
     <div>
       {/* Toolbar: busca + escolha de page size + contador */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <div className="flex flex-wrap items-center gap-2 flex-1">
         <div className="relative flex-1 min-w-[200px] max-w-md">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ayria-muted" />
           <input
@@ -94,6 +128,27 @@ export function ListWithControls<T extends Record<string, any>>({
             className="w-full pl-9 pr-3 py-2 rounded-lg text-sm"
             style={{ background: '#0A0A1A', border: '1px solid #2a2a3e', color: '#fff' }}
           />
+        </div>
+        {/* 🆕 22/07 22:47 — Filtros extras (ex: plano, status) */}
+        {filters.map((f) => (
+          <div key={f.key} className="flex items-center gap-1">
+            <Filter size={12} className="text-ayria-muted" />
+            <select
+              value={filterValues[f.key] ?? 'all'}
+              onChange={(e) => {
+                setFilterValues((prev) => ({ ...prev, [f.key]: e.target.value }))
+                setPage(1)
+              }}
+              className="px-2 py-1 rounded text-xs"
+              style={{ background: '#0A0A1A', border: '1px solid #2a2a3e', color: '#fff' }}
+              title={f.label}
+            >
+              {f.options.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+        ))}
         </div>
         <div className="flex items-center gap-3 text-xs text-ayria-muted">
           <span>

@@ -304,6 +304,42 @@ export function AdminPage() {
               itemName="usuário"
               searchPlaceholder="Buscar por email, nome..."
               emptyMessage="Nenhum usuário comum encontrado"
+              filters={[
+                {
+                  key: 'plan',
+                  label: 'Plano',
+                  options: [
+                    { value: 'all', label: 'Todos os planos' },
+                    { value: 'basico', label: 'Básico' },
+                    { value: 'intermediario', label: 'Intermediário' },
+                    { value: 'premium', label: 'Premium' },
+                    { value: '__none__', label: 'Sem plano' },
+                  ],
+                  getValue: (u: any) => u.selected_plan_slug || '__none__',
+                },
+                {
+                  key: 'billing',
+                  label: 'Status',
+                  options: [
+                    { value: 'all', label: 'Todos os status' },
+                    { value: 'active', label: '✅ Ativo (Stripe)' },
+                    { value: 'billing_not_enabled', label: '⚪ Sem assinatura' },
+                    { value: 'past_due', label: '⚠️ Pendente' },
+                    { value: 'canceled', label: '❌ Cancelado' },
+                  ],
+                  getValue: (u: any) => u.billing_status || 'billing_not_enabled',
+                },
+                {
+                  key: 'verified',
+                  label: 'Verificação',
+                  options: [
+                    { value: 'all', label: 'Todos' },
+                    { value: 'verified', label: 'Verificados' },
+                    { value: 'pending', label: 'Pendentes' },
+                  ],
+                  getValue: (u: any) => (u.is_verified ? 'verified' : 'pending'),
+                },
+              ]}
             >
               {(u) => (
                 <div
@@ -322,6 +358,36 @@ export function AdminPage() {
                       <div className="text-ayria-text font-medium">{u.email}</div>
                       <div className="text-xs text-ayria-muted">
                         {u.full_name || '-'} · {u.role} · {u.message_count} msgs
+                      </div>
+                      <div className="text-xs text-ayria-muted mt-0.5 flex flex-wrap gap-1.5">
+                        {u.selected_plan_slug ? (
+                          <span
+                            className="px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                            style={{
+                              background:
+                                u.selected_plan_slug === 'premium' ? 'rgba(212,175,55,0.18)'
+                                : u.selected_plan_slug === 'intermediario' ? 'rgba(99,102,241,0.18)'
+                                : 'rgba(156,163,175,0.18)',
+                              color:
+                                u.selected_plan_slug === 'premium' ? '#D4AF37'
+                                : u.selected_plan_slug === 'intermediario' ? '#A5B4FC'
+                                : '#9CA3AF',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                            }}
+                            title="Plano do usuário"
+                          >
+                            📋 {u.selected_plan_name || u.selected_plan_slug}
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] text-ayria-muted" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                            Sem plano
+                          </span>
+                        )}
+                        {!u.is_verified && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px]" style={{ background: 'rgba(245,158,11,0.18)', color: '#F59E0B' }}>
+                            ⚠️ Não verificado
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
