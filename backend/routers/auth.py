@@ -53,7 +53,11 @@ async def _user_to_response(user: models.User, db: AsyncSession) -> schemas.User
         "credit_status": user.credit_status or "inactive",
         "plan_selected_at": user.plan_selected_at,
         "billing_status": user.billing_status or "billing_not_enabled",
+        "billing_provider": user.billing_provider,
+        "external_customer_id": user.external_customer_id,
+        "external_subscription_id": user.external_subscription_id,
         "credits_last_granted_at": user.credits_last_granted_at,
+        "next_renewal_date": user.next_renewal_date,
     }
     return schemas.UserResponse(**data)
 

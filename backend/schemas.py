@@ -75,7 +75,11 @@ class UserResponse(BaseModel):
     credit_status: str = "inactive"
     plan_selected_at: Optional[datetime] = None
     billing_status: str = "billing_not_enabled"
+    billing_provider: Optional[str] = None  # 🆕 22/07 22:22 — RootRedirect precisa disso
+    external_customer_id: Optional[str] = None  # 🆕 22/07 22:22
+    external_subscription_id: Optional[str] = None  # 🆕 22/07 22:22 — sem isso, PagamentoSucesso nunca detecta activation
     credits_last_granted_at: Optional[datetime] = None
+    next_renewal_date: Optional[datetime] = None  # 🆕 22/07 22:22
 
     class Config:
         from_attributes = True
