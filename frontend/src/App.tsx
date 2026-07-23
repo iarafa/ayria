@@ -132,9 +132,13 @@ export default function App() {
   )
 }
 
-// 🛡️ ADMIN vai direto pro dashboard (Rafael 22/07 17:30)
+// 🛡️ ADMIN → /admin | User novo (sem onboarding) → /planos | User completo → /chat
+// Rafael pediu 22/07 21:39: novos users vão direto pra ESCOLHER PLANO, não pro /onboarding
 function RootRedirect() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'admin'
-  return <Navigate to={isAdmin ? '/admin' : '/chat'} replace />
+  if (isAdmin) return <Navigate to="/admin" replace />
+  // User sem onboarding completo → manda pra /planos (Stripe checkout) ANTES de cair no chat
+  if (!user || user.onboarding_status !== 'completed') return <Navigate to="/planos" replace />
+  return <Navigate to="/chat" replace />
 }
