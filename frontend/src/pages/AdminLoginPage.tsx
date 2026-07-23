@@ -37,7 +37,7 @@ export function AdminLoginPage() {
     >
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
-          <LogoIcon size={80} variant="circular" />
+          <LogoIcon size={200} variant="circular" />
         </div>
 
         <div className="flex justify-center mb-4">

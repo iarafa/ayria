@@ -46,7 +46,7 @@ export function LoginPage() {
     >
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
-          <LogoIcon size={80} variant="circular" />
+          <LogoIcon size={200} variant="circular" />
         </div>
 
         <h1 className="text-3xl font-bold text-center mb-2 gradient-text">

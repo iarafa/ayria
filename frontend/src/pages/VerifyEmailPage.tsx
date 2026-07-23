@@ -64,7 +64,7 @@ export function VerifyEmailPage() {
     >
       <div className="w-full max-w-md text-center space-y-6">
         <div className="flex justify-center">
-          <LogoIcon size={80} variant="circular" />
+          <LogoIcon size={200} variant="circular" />
         </div>
 
         {status === 'loading' && (
