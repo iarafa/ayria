@@ -13,6 +13,7 @@ import { AdminPage } from './pages/AdminPage'
 import { AdminLoginPage } from './pages/AdminLoginPage'
 import { ObserveUserPage } from './pages/ObserveUserPage'
 import CreatingProfilePage from './pages/CreatingProfilePage'
+import { PlanosPage } from './pages/PlanosPage'  // 🆕 22/07 21:10 — cupom de desconto
 
 function PrivateRoute({ children, adminOnly = false, requireOnboarding = false }: { children: React.ReactNode; adminOnly?: boolean; requireOnboarding?: boolean }) {
   const { user, token, loadUser } = useAuth()
@@ -113,6 +114,15 @@ export default function App() {
         element={
           <PrivateRoute adminOnly>
             <ObserveUserPage />
+          </PrivateRoute>
+        }
+      />
+      {/* 🆕 22/07 21:10 — Planos + cupom de desconto (Rafael pediu) */}
+      <Route
+        path="/planos"
+        element={
+          <PrivateRoute>
+            <PlanosPage />
           </PrivateRoute>
         }
       />

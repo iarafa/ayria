@@ -20,7 +20,7 @@ import { ChangePasswordModal } from '../components/ChangePasswordModal'
 import { SpiritualityPicker } from '../components/SpiritualityPicker'
 import { useChat } from '../store/chat'
 import { useAuth } from '../store/auth'
-import { LogOut, Shield, Pencil, UserCircle, Menu, AlignJustify, ChevronsUpDown } from 'lucide-react'
+import { LogOut, Shield, Pencil, UserCircle, Menu, AlignJustify, ChevronsUpDown, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAutoScroll } from '../hooks/useAutoScroll'
 import { useLocalStorage } from '../hooks/useLocalStorage'
@@ -142,6 +142,20 @@ export function ChatPage() {
 
           {/* Direita: avatar + nome do user */}
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
+            {/* 🆕 22/07 21:16 — Botão Planos (todos os users podem ver preços + cupom) */}
+            <button
+              onClick={() => navigate('/planos')}
+              className="flex flex-col items-center sm:flex-row sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg transition-colors hover:bg-[#1a1a1a]"
+              style={{
+                background: 'rgba(212, 175, 55, 0.1)',
+                color: '#D4AF37',
+                border: '1px solid rgba(212, 175, 55, 0.3)',
+              }}
+              title="Ver planos e cupons"
+            >
+              <Sparkles size={16} />
+              <span className="hidden sm:inline text-xs font-medium">Planos</span>
+            </button>
             {(user?.role === 'admin' || user?.role === 'SUPER_ADMIN') && (
               <button
                 onClick={() => navigate('/admin')}

@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     CORS_ORIGINS: str = "http://localhost:5173,http://192.168.3.37:5173"
 
+    # 🆕 22/07 21:10 — URLs externas (coolify, ddns)
+    APP_URL: str = "http://localhost:5173"
+
     # 🆕 22/07 21:11 — Stripe (billing)
     STRIPE_SECRET_KEY: str = ""
     STRIPE_PUBLISHABLE_KEY: str = ""
