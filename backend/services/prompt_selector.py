@@ -276,13 +276,13 @@ def classify(
                 modulos.append(mod_key)
                 reasons[mod_key] = f"mencionou termo de {label} na mensagem"
 
-    # 🆕 22/07 23:08 — Psicologia clínica ativa em paralelo com psicologia/psicanálise
+    # 🆕 22/07 23:08 — Psicologia clínica ativa sozinha quando detectar termos clínicos
     # Trás DSM-5, escalas, psicofármacos, encaminhamento
-    if "psicologia" in modulos or "psicanalise" in modulos:
-        if _matches_any(user_message, KEYWORDS.get("psicologia_clinica", [])):
-            if "psicologia_clinica" not in modulos:
-                modulos.append("psicologia_clinica")
-                reasons["psicologia_clinica"] = "sinais clínicos detectados (sintomas específicos, medicação, escalas)"
+    # Independente de psicologia/psicanálise (porque user pode falar de medicação sem citar "psicologia")
+    if _matches_any(user_message, KEYWORDS.get("psicologia_clinica", [])):
+        if "psicologia_clinica" not in modulos:
+            modulos.append("psicologia_clinica")
+            reasons["psicologia_clinica"] = "sinais clínicos detectados (sintomas, medicação, escalas, encaminhamento)"
 
     # 🆕 22/07 23:08 — Protocolo de crise estruturado
     # Ativado em paralelo com seguranca_crise para forçar estrutura de resposta validada
