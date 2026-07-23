@@ -636,6 +636,18 @@ async def delete_user(
         r = await db.execute(text("UPDATE audit_log SET user_id = NULL WHERE user_id = :uid"), {"uid": str(user_id)})
         deleted_summary["pg"]["audit_log_anonymized"] = r.rowcount
 
+        # 5b. Stripe: apaga invoices + subscriptions ANTES do user (FK CASCADE,
+        # mas SQLAlchemy ORM tenta UPDATE pra NULL por causa do relationship sem cascade —
+        # falha com NotNullViolation. Apaga explícito aqui resolve.)
+        r = await db.execute(text("DELETE FROM stripe_invoices WHERE ayria_user_id = :uid"), {"uid": str(user_id)})
+        deleted_summary["pg"]["stripe_invoices"] = r.rowcount
+        r = await db.execute(text("DELETE FROM stripe_subscriptions WHERE ayria_user_id = :uid"), {"uid": str(user_id)})
+        deleted_summary["pg"]["stripe_subscriptions"] = r.rowcount
+
+        # 5c. Coupon redemptions (FK é SET NULL, mas apaga direto pra ficar limpo)
+        r = await db.execute(text("DELETE FROM coupon_redemptions WHERE user_id = :uid"), {"uid": str(user_id)})
+        deleted_summary["pg"]["coupon_redemptions"] = r.rowcount
+
         # 6. Qdrant: TODAS as memórias do user
         from services.vector_service import vector_service
         deleted_summary["qdrant"] = await vector_service.delete_user_memories(str(user_id))
