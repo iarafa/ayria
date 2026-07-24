@@ -601,6 +601,10 @@ class Partner(Base):
     commission_pct = Column(Numeric(5, 2))   # opcional agora (comissão fica no coupon)
     notes = Column(Text)
     active = Column(Boolean, default=True, nullable=False, index=True)
+    # 🆕 23/07/2026 — autenticação no Portal do Parceiro (separado do AYRIA)
+    password_hash = Column(String(255))
+    last_login_at = Column(DateTime(timezone=True))
+    must_change_password = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
