@@ -149,8 +149,19 @@ async def create_partner(
     db.add(partner)
     await db.commit()
     await db.refresh(partner)
-    logger.info(f"Partner created: {partner.id} email={partner.email}")
-    return _partner_to_response(partner)
+
+    # 🆕 23/07/2026 — gerar senha temporária automaticamente
+    import bcrypt as _bcrypt
+    temp_pwd = _generate_temp_password()
+    partner.password_hash = _bcrypt.hashpw(temp_pwd.encode(), _bcrypt.gensalt()).decode()
+    partner.must_change_password = True
+    await db.commit()
+
+    logger.info(f"Partner created: {partner.id} email={partner.email} (temp password set)")
+    # Retorna com a senha no body pra admin mostrar 1x
+    resp = _partner_to_response(partner)
+    resp["temporary_password"] = temp_pwd
+    return resp
 
 
 @router.patch("/api/admin/partners/{partner_id}", response_model=schemas.PartnerResponse)
@@ -204,6 +215,56 @@ async def delete_partner(
     await db.commit()
     logger.info(f"Partner deactivated: {partner.id}")
     return None
+
+
+# ============================================================
+# ADMIN: PARTNER PASSWORD RESET (23/07/2026)
+# Gera senha temporária de 8 chars (alfanum + 1 especial), seta must_change_password=TRUE.
+# Retorna a senha NO BODY — admin mostra pro parceiro uma única vez.
+# ============================================================
+import secrets as _secrets
+import string as _string
+
+
+def _generate_temp_password() -> str:
+    alphabet = _string.ascii_letters + _string.digits
+    return ''.join(_secrets.choice(alphabet) for _ in range(7)) + '!'
+
+
+@router.post("/api/admin/partners/{partner_id}/reset-password")
+async def reset_partner_password(
+    partner_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin reseta senha do parceiro. Gera senha temporária e força troca no próximo login."""
+    from uuid import UUID
+    try:
+        pid = UUID(partner_id)
+    except ValueError:
+        raise HTTPException(400, "ID inválido")
+
+    partner = await db.get(Partner, pid)
+    if not partner:
+        raise HTTPException(404, "Parceiro não encontrado")
+
+    new_pwd = _generate_temp_password()
+    import bcrypt as _bcrypt
+    partner.password_hash = _bcrypt.hashpw(new_pwd.encode(), _bcrypt.gensalt()).decode()
+    partner.must_change_password = True
+    partner.updated_at = datetime.utcnow()
+    await db.commit()
+
+    logger.info(
+        f"Partner password reset: partner_id={pid} email={partner.email} by admin={admin.email}"
+    )
+    return {
+        "partner_id": str(partner.id),
+        "partner_email": partner.email,
+        "partner_name": partner.name,
+        "temporary_password": new_pwd,
+        "message": "Senha temporária gerada. Anote e envie ao parceiro de forma segura. Ele será obrigado a trocar no próximo login.",
+    }
 
 
 # ============================================================

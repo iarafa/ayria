@@ -3067,6 +3067,9 @@ function PartnersTabInline() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', document_type: 'CPF', document_number: '', pix_key: '', notes: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 🆕 23/07 2026 — modal de senha temporária gerada (admin vê 1x)
+  const [tempPwd, setTempPwd] = useState<{ partner_name: string; partner_email: string; password: string } | null>(null)
+  const [createdTempPwd, setCreatedTempPwd] = useState<string | null>(null)
 
   const reload = async () => {
     setLoading(true)
@@ -3081,13 +3084,32 @@ function PartnersTabInline() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setError(null)
     try {
-      await api.post('/api/admin/partners', form)
+      const resp = await api.post('/api/admin/partners', form)
       setShowCreate(false)
       setForm({ name: '', email: '', phone: '', document_type: 'CPF', document_number: '', pix_key: '', notes: '' })
       await reload()
-      alert('✅ Parceiro criado!')
+      // 🆕 23/07 — backend retorna temporary_password (gerada pelo sistema)
+      if (resp.data?.temporary_password) {
+        setCreatedTempPwd(resp.data.temporary_password)
+      } else {
+        alert('✅ Parceiro criado!')
+      }
     } catch (e: any) { setError(e.response?.data?.detail || e.message) }
     finally { setBusy(false) }
+  }
+
+  const handleResetPassword = async (p: any) => {
+    if (!confirm(`Resetar a senha de ${p.name} (${p.email})?\n\nUma senha temporária será gerada. O parceiro será obrigado a trocar no próximo login.`)) return
+    try {
+      const resp = await api.post(`/api/admin/partners/${p.id}/reset-password`)
+      setTempPwd({
+        partner_name: resp.data.partner_name,
+        partner_email: resp.data.partner_email,
+        password: resp.data.temporary_password,
+      })
+    } catch (e: any) {
+      alert('❌ ' + (e.response?.data?.detail || e.message))
+    }
   }
 
   return (
@@ -3105,6 +3127,7 @@ function PartnersTabInline() {
               <div className="text-xs text-ayria-muted">{p.email} · {p.document_type}: {p.document_number || '-'} · {p.coupons_count} cupom(ns) · R$ {(p.total_commission_cents || 0) / 100}</div>
             </div>
             <div className="flex gap-2">
+              <button onClick={() => handleResetPassword(p)} className="text-yellow-400 hover:text-yellow-300 p-1" title="Resetar senha"><KeyRound size={16} /></button>
               <button onClick={async () => {
                 if (!confirm('Excluir parceiro ' + p.name + '?')) return
                 try { await api.delete(`/api/admin/partners/${p.id}`); await reload() }
@@ -3114,6 +3137,70 @@ function PartnersTabInline() {
           </div>
         )}
       </ListWithControls>
+
+      {/* 🆕 23/07 2026 — Modal: senha temporária gerada no RESET */}
+      {tempPwd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}>
+          <div className="w-full max-w-md rounded-2xl p-6" style={{ background: '#1a1a2e', border: '1px solid #da950b' }}>
+            <div className="flex items-center gap-2 mb-3">
+              <KeyRound size={22} className="text-ayria-gold" />
+              <h3 className="text-xl font-bold text-ayria-text">Senha temporária gerada</h3>
+            </div>
+            <p className="text-sm text-ayria-muted mb-4">
+              Anote e envie ao parceiro de forma segura. Ele será obrigado a trocar no próximo login.
+            </p>
+            <div className="space-y-2 mb-4 p-3 rounded-xl" style={{ background: '#0A0A1A', border: '1px solid #2a2a3e' }}>
+              <div className="text-xs text-ayria-muted">PARCEIRO</div>
+              <div className="text-ayria-text font-medium">{tempPwd.partner_name}</div>
+              <div className="text-xs text-ayria-muted">{tempPwd.partner_email}</div>
+            </div>
+            <div className="space-y-2 mb-5">
+              <div className="text-xs text-ayria-muted uppercase">SENHA TEMPORÁRIA</div>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 px-4 py-3 rounded-lg font-mono text-lg font-bold select-all" style={{ background: '#050505', border: '1px solid #da950b', color: '#f1c961' }}>
+                  {tempPwd.password}
+                </code>
+                <button onClick={() => { navigator.clipboard.writeText(tempPwd.password); alert('✅ Senha copiada!') }}
+                  className="px-3 py-3 rounded-lg text-ayria-text hover:text-ayria-gold" style={{ background: '#1E1E2E', border: '1px solid #2a2a3e' }} title="Copiar">
+                  📋
+                </button>
+              </div>
+            </div>
+            <button onClick={() => setTempPwd(null)}
+              className="w-full py-2.5 rounded-xl text-white font-semibold" style={{ background: '#f1c961' }}>
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 23/07 2026 — Modal: senha temporária gerada no CREATE */}
+      {createdTempPwd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}>
+          <div className="w-full max-w-md rounded-2xl p-6" style={{ background: '#1a1a2e', border: '1px solid #da950b' }}>
+            <div className="flex items-center gap-2 mb-3">
+              <KeyRound size={22} className="text-ayria-gold" />
+              <h3 className="text-xl font-bold text-ayria-text">Parceiro criado!</h3>
+            </div>
+            <p className="text-sm text-ayria-muted mb-4">
+              Senha temporária gerada. O parceiro será obrigado a trocar no primeiro login.
+            </p>
+            <div className="flex items-center gap-2 mb-5">
+              <code className="flex-1 px-4 py-3 rounded-lg font-mono text-lg font-bold select-all" style={{ background: '#050505', border: '1px solid #da950b', color: '#f1c961' }}>
+                {createdTempPwd}
+              </code>
+              <button onClick={() => { navigator.clipboard.writeText(createdTempPwd); alert('✅ Senha copiada!') }}
+                className="px-3 py-3 rounded-lg text-ayria-text hover:text-ayria-gold" style={{ background: '#1E1E2E', border: '1px solid #2a2a3e' }} title="Copiar">
+                📋
+              </button>
+            </div>
+            <button onClick={() => setCreatedTempPwd(null)}
+              className="w-full py-2.5 rounded-xl text-white font-semibold" style={{ background: '#f1c961' }}>
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}>
           <div className="w-full max-w-md rounded-2xl p-6" style={{ background: '#1a1a2e', border: '1px solid #2a2a3e' }}>
