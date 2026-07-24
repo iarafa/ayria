@@ -222,8 +222,10 @@ async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
     # Ativa conta
     user.is_verified = True
     user.verified_at = datetime.now(timezone.utc)
-    user.verification_token = None  # single-use
-    user.verification_token_expires_at = None
+    # NÃO limpa o token: o `if user.is_verified` acima garante que cliques
+    # subsequentes no mesmo link retornem 200 + already_verified=true em vez
+    # de 404. O token permanece no DB (até expires_at em 24h) só pra permitir
+    # essa idempotência. Após 24h, is_verified continua true → 200 também.
     await db.commit()
 
     logger.info(f"✅ Email verificado: {user.email}")
