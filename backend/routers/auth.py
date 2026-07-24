@@ -78,12 +78,9 @@ async def register(payload: schemas.UserRegister, request: Request, db: AsyncSes
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email já cadastrado")
 
-    # Plan_slug é OBRIGATÓRIO para novos usuários (exceto admin criando via /admin/users)
+    # Plan_slug é OPCIONAL — se não vier, default é 'basico' (24/07 17:42 — plano é escolhido no checkup/onboarding depois)
     if not payload.plan_slug:
-        raise HTTPException(
-            status_code=400,
-            detail="Escolha um plano (plan_slug: basico | intermediario | premium)",
-        )
+        payload.plan_slug = 'basico'
 
     # Busca plano
     from services.credit_service import get_plan_by_slug, grant_initial_credits
