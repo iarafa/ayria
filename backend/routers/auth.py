@@ -203,7 +203,7 @@ async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
     if user.is_verified:
         return schemas.VerifyEmailResponse(
             success=True,
-            message="Email já verificado. Você já pode fazer login.",
+            message="Email verificado. Você já pode fazer login.",
             already_verified=True,
         )
 
@@ -269,7 +269,7 @@ async def resend_verification(
     if user.is_verified:
         return schemas.ResendVerificationResponse(
             sent=True,
-            message="Email já verificado. Você já pode fazer login.",
+            message="Email verificado. Você já pode fazer login.",
             already_verified=True,
         )
 
