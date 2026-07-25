@@ -9,7 +9,7 @@ POST /api/auth/me/avatar   (upload de foto)
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 import logging
 
@@ -533,3 +533,106 @@ async def upload_avatar(
     await db.commit()
     await db.refresh(user)
     return await _user_to_response(user, db)
+
+
+# ============================================================
+# POST /api/auth/forgot-password
+# 25/07/2026 — Implementado pra fechar gap de LGPD/UX
+# Envia email com link pra resetar senha
+# ============================================================
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+@router.post("/forgot-password")
+async def forgot_password(payload: ForgotPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """Solicita reset de senha. SEMPRE retorna 200 (não vaza se email existe)."""
+    # Busca user
+    res = await db.execute(select(models.User).where(models.User.email == payload.email.lower()))
+    user = res.scalars().first()
+
+    if user:
+        # Gera token + salva no DB
+        import secrets
+        reset_token = secrets.token_urlsafe(32)
+        user.password_reset_token = reset_token
+        user.password_reset_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        user.password_reset_sent_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(user)
+
+        # Monta URL (HashRouter, com #/ pro frontend)
+        from utils.url_detector import get_public_base_url
+        base = get_public_base_url()
+        reset_url = f"{base}/#/reset-password?token={reset_token}"
+
+        # Envia email
+        try:
+            from utils.email_service import get_email_client, EmailServiceError
+            client = get_email_client()
+            html = f"""
+            <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px">
+              <h2 style="color:#da950b">AYRIA — Recuperação de senha</h2>
+              <p>Oi {user.full_name or ''},</p>
+              <p>Você (ou alguém) solicitou redefinição de senha da sua conta AYRIA.</p>
+              <p>Clique no botão abaixo pra criar uma nova senha (válido por 1 hora):</p>
+              <p style="text-align:center;margin:30px 0">
+                <a href="{reset_url}" style="background:#da950b;color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:bold">Redefinir minha senha</a>
+              </p>
+              <p style="color:#666;font-size:12px">Se você não fez essa solicitação, ignore este email — sua senha continua a mesma.</p>
+              <p style="color:#999;font-size:11px">Link direto: {reset_url}</p>
+            </div>
+            """
+            await client.send_email(
+                to_email=user.email,
+                subject="Recupere sua senha — AYRIA 🔐",
+                body_html=html,
+                body_text=f"AYRIA — Recuperação de senha\n\nAcesse: {reset_url}\n\nVálido por 1 hora."
+            )
+            logger.info(f"Password reset email sent to {user.email}")
+        except Exception as e:
+            logger.error(f"Failed to send password reset email: {e}")
+
+    # SEMPRE retorna a mesma resposta (não vaza se email existe)
+    return {
+        "message": "Se o email estiver cadastrado, você receberá um link de recuperação em alguns minutos."
+    }
+
+
+# ============================================================
+# POST /api/auth/reset-password
+# 25/07/2026 — Aplica nova senha com token válido
+# ============================================================
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+@router.post("/reset-password")
+async def reset_password(payload: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """Reseta senha usando token de /forgot-password. Token de 1 uso."""
+    res = await db.execute(select(models.User).where(models.User.password_reset_token == payload.token))
+    user = res.scalars().first()
+
+    if not user:
+        raise HTTPException(status_code=400, detail="Token inválido ou expirado")
+
+    if not user.password_reset_token_expires_at or user.password_reset_token_expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=410, detail="Token expirado. Solicite um novo.")
+
+    # Aplica nova senha
+    user.password_hash = hash_password(payload.new_password)
+    # Invalida o token (1 uso)
+    user.password_reset_token = None
+    user.password_reset_token_expires_at = None
+    # Limpa qualquer lockout
+    from models import LoginLockout
+    from sqlalchemy import delete
+    await db.execute(
+        delete(LoginLockout).where(LoginLockout.identifier == user.email, LoginLockout.identifier_type == 'email')
+    )
+    await db.commit()
+
+    return {
+        "message": "Senha redefinida com sucesso! Você já pode fazer login."
+    }
