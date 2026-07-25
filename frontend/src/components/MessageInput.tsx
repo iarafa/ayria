@@ -19,14 +19,21 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
   }
 
   return (
-    <div className="w-full max-w-3xl mx-auto px-3 pb-4 sm:px-4 sm:pb-6">
-      <div
-        className="flex items-end gap-1.5 sm:gap-2 rounded-2xl p-1.5 sm:p-2"
-        style={{
-          background: '#111111',
-          border: '1px solid #1E1E2E',
-        }}
-      >
+    <div
+      className="sticky bottom-0 left-0 right-0 z-20 w-full"
+      style={{
+        background: 'linear-gradient(to top, #050505 70%, rgba(5,5,5,0.85) 90%, rgba(5,5,5,0) 100%)',
+        paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0px)',
+      }}
+    >
+      <div className="w-full max-w-3xl mx-auto px-3 pb-4 sm:px-4 sm:pb-6">
+        <div
+          className="flex items-end gap-1.5 sm:gap-2 rounded-2xl p-1.5 sm:p-2"
+          style={{
+            background: '#111111',
+            border: '1px solid #1E1E2E',
+          }}
+        >
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -53,6 +60,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
           <Send size={16} className="sm:hidden" />
           <Send size={18} className="hidden sm:block" />
         </button>
+      </div>
       </div>
     </div>
   )
