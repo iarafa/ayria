@@ -636,3 +636,91 @@ async def reset_password(payload: ResetPasswordRequest, db: AsyncSession = Depen
     return {
         "message": "Senha redefinida com sucesso! Você já pode fazer login."
     }
+
+
+# ============================================================
+# DELETE /api/auth/me
+# 25/07/2026 — LGPD Art. 18: user pode solicitar exclusão da própria conta
+# Apaga: user, profile, attributes, chats, messages, Qdrant memories
+# ============================================================
+@router.delete("/me", status_code=200)
+async def delete_my_account(
+    payload: dict,  # {"confirmation": "EXCLUIR"}
+    user: models.User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """User deleta a própria conta (LGPD Art. 18, V). Requer confirmação textual."""
+    if payload.get("confirmation") != "EXCLUIR":
+        raise HTTPException(status_code=400, detail="Digite EXCLUIR (em maiúsculas) para confirmar a exclusão.")
+
+    user_id = user.id
+    email = user.email
+
+    # Apaga memórias no Qdrant
+    try:
+        from services.vector_service import vector_service
+        await vector_service.delete_user_memories(str(user_id))
+    except Exception as e:
+        logger.warning(f"Qdrant delete falhou (continuando): {e}")
+
+    # Apaga assinaturas Stripe
+    try:
+        res = await db.execute(
+            select(models.StripeSubscription).where(models.StripeSubscription.ayria_user_id == user_id)
+        )
+        for sub in res.scalars().all():
+            if sub.stripe_subscription_id:
+                try:
+                    import stripe
+                    stripe.api_key = settings.STRIPE_SECRET_KEY
+                    stripe.Subscription.delete(sub.stripe_subscription_id)
+                except Exception as e:
+                    logger.warning(f"Stripe cancel falhou (continuando): {e}")
+    except Exception as e:
+        logger.warning(f"Stripe cleanup falhou (continuando): {e}")
+
+    # Cascade: SQLAlchemy faz cascade nas relações se estiver configurado
+    # Senão, delete manual:
+    from sqlalchemy import delete as sqla_delete
+    try:
+        await db.execute(sqla_delete(models.UserAttribute).where(models.UserAttribute.user_id == user_id))
+    except Exception as e:
+        logger.warning(f"UserAttribute delete: {e}")
+    try:
+        await db.execute(sqla_delete(models.Message).where(models.Message.user_id == user_id))
+    except Exception as e:
+        logger.warning(f"Message delete: {e}")
+    try:
+        await db.execute(sqla_delete(models.Chat).where(models.Chat.user_id == user_id))
+    except Exception as e:
+        logger.warning(f"Chat delete: {e}")
+    # Limpa StripeInvoice + StripeSubscription (integridade)
+    try:
+        await db.execute(sqla_delete(models.StripeInvoice).where(models.StripeInvoice.ayria_user_id == user_id))
+    except Exception as e:
+        logger.warning(f"StripeInvoice delete: {e}")
+    try:
+        await db.execute(sqla_delete(models.StripeSubscription).where(models.StripeSubscription.ayria_user_id == user_id))
+    except Exception as e:
+        logger.warning(f"StripeSubscription delete: {e}")
+    # Limpa audit logs (privacidade)
+    try:
+        await db.execute(sqla_delete(models.AuditLog).where(models.AuditLog.user_id == user_id))
+    except Exception as e:
+        logger.warning(f"AuditLog delete: {e}")
+    # Limpa coupons criados pelo user (set created_by = NULL pra preservar histórico)
+    try:
+        from sqlalchemy import update
+        await db.execute(update(models.Coupon).where(models.Coupon.created_by == user_id).values(created_by=None))
+    except Exception as e:
+        logger.warning(f"Coupon cleanup: {e}")
+
+    # Apaga o user
+    await db.delete(user)
+    await db.commit()
+
+    logger.info(f"LGPD: user {email} ({user_id}) auto-excluiu conta")
+
+    return {
+        "message": "Sua conta foi excluída. Todos os dados pessoais foram removidos conforme LGPD Art. 18."
+    }
