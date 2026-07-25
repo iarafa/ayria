@@ -8,7 +8,7 @@ Endpoints:
 from ._base import (
     APIRouter, Depends,
     select,
-    uuid, logging, list,
+    uuid, logging,
     get_db, require_admin,
     models, schemas,
 )

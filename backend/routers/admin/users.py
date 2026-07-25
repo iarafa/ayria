@@ -17,7 +17,7 @@ from ._base import (
     APIRouter, Depends, HTTPException, Request,
     select, func, desc,
     uuid, logging, datetime, timedelta, timezone, Optional,
-    get_db, require_admin, hash_password, get_client_ip, get_user_agent,
+    get_db, require_admin, hash_password,
     credit_service, models, schemas,
 )
 from sqlalchemy import text
