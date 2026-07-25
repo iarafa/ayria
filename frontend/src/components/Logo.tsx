@@ -50,9 +50,9 @@ const ASPECT_WIDE = 1536 / 360
 export function LogoIcon({ size = 40, glow = true, className = '', variant = 'plain' }: LogoIconProps) {
   const [err, setErr] = useState(false)
 
-  // Glow dourado Lovable
+  // Glow branco ATRÁS + dourado no contorno (Rafael 25/07: logo ilegível, precisa esfumaçar branco atrás)
   const goldGlow = glow
-    ? 'drop-shadow(0 0 14px rgba(241,201,97,0.55)) drop-shadow(0 0 28px rgba(218,149,11,0.35))'
+    ? 'drop-shadow(0 0 20px rgba(255,255,255,0.85)) drop-shadow(0 0 40px rgba(255,255,255,0.5)) drop-shadow(0 0 8px rgba(241,201,97,0.9)) drop-shadow(0 0 18px rgba(218,149,11,0.5))'
     : undefined
 
   // Responsivo: limita largura em telas pequenas (mobile)

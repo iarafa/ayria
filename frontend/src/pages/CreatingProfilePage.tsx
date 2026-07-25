@@ -170,8 +170,22 @@ export default function CreatingProfilePage() {
 
         <div className="relative z-10 max-w-md w-full text-center" style={{ animation: 'scaleIn 0.8s ease-out' }}>
           {/* LOGO com glow (filter aplicado direto na img, não no wrapper, pra não desenhar caixa) */}
-          <div className="flex justify-center mb-10">
-            <LogoIcon size={220} variant="circular" />
+          <div
+            className="flex justify-center mb-10 relative"
+            style={{
+              padding: '40px 20px',
+              background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.05) 40%, transparent 70%)',
+              filter: 'blur(0.5px)',
+            }}
+          >
+            <div
+              style={{
+                position: 'relative',
+                filter: 'blur(0px)',
+              }}
+            >
+              <LogoIcon size={220} variant="circular" />
+            </div>
           </div>
 
           {/* TÍTULO */}
