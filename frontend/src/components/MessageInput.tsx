@@ -20,7 +20,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
 
   return (
     <div
-      className="sticky bottom-0 left-0 right-0 z-20 w-full"
+      className="w-full flex-shrink-0"
       style={{
         background: 'linear-gradient(to top, #050505 70%, rgba(5,5,5,0.85) 90%, rgba(5,5,5,0) 100%)',
         paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0px)',

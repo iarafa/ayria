@@ -88,7 +88,7 @@ export function ChatPage() {
   }, [messages.length, scrollToBottomIfAtBottom])
 
   return (
-    <div className="h-screen flex overflow-hidden" style={{ background: '#050505' }}>
+    <div className="h-[100dvh] flex overflow-hidden" style={{ background: '#050505' }}>
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Área principal */}
