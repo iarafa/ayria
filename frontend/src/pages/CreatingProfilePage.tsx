@@ -184,7 +184,7 @@ export default function CreatingProfilePage() {
                 filter: 'blur(0px)',
               }}
             >
-              <LogoIcon size={96} variant="circular" />
+              <LogoIcon size={220} variant="circular" />
             </div>
           </div>
 
@@ -282,7 +282,7 @@ export default function CreatingProfilePage() {
 
         {/* LOGO/ÍCONE (sem wrapper animado — não desenhar caixa) */}
         <div className="flex justify-center mb-8">
-          <LogoIcon size={80} variant="circular" />
+          <LogoIcon size={180} variant="circular" />
         </div>
 
         {/* TÍTULO */}

@@ -17,7 +17,7 @@
  * - observerUser?: { full_name, email, plan?, balance? } — info do user observado (só p/ mode='observer')
  */
 import { useEffect, useRef, useState } from 'react'
-import { Plus, MessageCircle, Shield, Trash2, Zap, Pencil, Check, X } from "lucide-react"
+import { Plus, MessageCircle, Shield, Trash2, Zap, Pencil, Check, X, CreditCard, UserCircle } from "lucide-react"
 import { useAuth } from '../store/auth'
 import { useChat } from '../store/chat'
 import { LogoIcon } from './Logo'
@@ -208,25 +208,19 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
   // ============ CONTEÚDO INTERNO (reutilizado em ambos os modos) ============
   const SidebarContent = (
     <>
-      {/* Header com logo circular (sem texto AYRIA) + botão fechar (X) só em mobile */}
-      {/* 26/07/2026: Rafael pediu pra remover o texto AYRIA e melhorar a visibilidade do logo */}
-      <div className="p-4 border-b border-ayria-border flex items-center justify-center relative">
-        <LogoIcon
-          size={56}
-          variant="circular"
-          className="opacity-90"
-        />
-        {mode === 'observer' && (
-          <span
-            className="absolute bottom-1 right-3 text-[9px] font-bold tracking-[0.25em] text-amber-400/80 bg-amber-400/10 px-1.5 py-0.5 rounded"
-          >
-            OBS
-          </span>
-        )}
+      {/* Header com bolinha + nome AYRIA + botão fechar (X) só em mobile */}
+      <div className="p-4 border-b border-ayria-border flex items-center gap-3">
+        <LogoIcon size={32} variant="circular" />
+        <span
+          className="font-bold tracking-[0.3em] text-ayria-text flex-1"
+          style={{ fontSize: 11.2 }}
+        >
+          {mode === 'observer' ? 'OBSERVADOR' : 'AYRIA'}
+        </span>
         {/* Botão X — só aparece em mobile/tablet (drawer mode) */}
         <button
           onClick={onClose}
-          className="lg:hidden absolute right-3 top-1/2 -translate-y-1/2 text-ayria-muted hover:text-ayria-text p-1"
+          className="lg:hidden text-ayria-muted hover:text-ayria-text p-1"
           title="Fechar menu"
           aria-label="Fechar menu"
         >
@@ -258,10 +252,10 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
       )}
 
       {/* Menu de navegação rápida — links do lado esquerdo (22/07/2026) */}
-      {/* 26/07/2026: Rafael pediu pra remover "Planos" e "Minha Conta" — só fica "Conversas" */}
       {mode === 'user' && (
         <nav className="px-2 py-2 border-b border-ayria-border space-y-1">
           <NavItem href="/chat" icon={<MessageCircle size={16} />} label="Conversas" onClose={onClose} />
+          {/* 26/07/2026: Rafael pediu pra remover Planos e Minha Conta do menu */}
         </nav>
       )}
 

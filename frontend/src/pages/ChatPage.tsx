@@ -88,7 +88,7 @@ export function ChatPage() {
   }, [messages.length, scrollToBottomIfAtBottom])
 
   return (
-    <div className="h-[100dvh] flex overflow-hidden" style={{ background: '#050505' }}>
+    <div className="h-screen flex overflow-hidden" style={{ background: '#050505' }}>
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Área principal */}
@@ -237,7 +237,7 @@ export function ChatPage() {
         {/* Mensagens */}
         <div
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto px-3 sm:px-4 pt-4 pb-32 sm:pb-6"
+          className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6"
         >
           <div className="max-w-5xl mx-auto">
             {messages.length === 0 && (
@@ -268,10 +268,8 @@ export function ChatPage() {
           </div>
         </div>
 
-        {/* Input (sticky pra sempre ficar visível no mobile) */}
-        <div className="flex-shrink-0">
-          <MessageInput onSend={sendMessage} disabled={sending} />
-        </div>
+        {/* Input */}
+        <MessageInput onSend={sendMessage} disabled={sending} />
       </main>
 
       {/* Modal de edição de perfil */}
