@@ -208,19 +208,22 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
   // ============ CONTEÚDO INTERNO (reutilizado em ambos os modos) ============
   const SidebarContent = (
     <>
-      {/* Header com bolinha + nome AYRIA + botão fechar (X) só em mobile */}
-      <div className="p-4 border-b border-ayria-border flex items-center gap-3">
-        <LogoIcon size={32} variant="circular" />
-        <span
-          className="font-bold tracking-[0.3em] text-ayria-text flex-1"
-          style={{ fontSize: 11.2 }}
-        >
-          {mode === 'observer' ? 'OBSERVADOR' : 'AYRIA'}
-        </span>
+      {/* Header com logo (mesmo wide do login, sem span 'AYRIA' duplicado) + botão X só em mobile */}
+      {/* 26/07/2026: Rafael pediu pra usar o MESMO logo do login (wide com texto AYRIA), sem duplicação */}
+      <div className="p-4 border-b border-ayria-border flex items-center justify-center relative">
+        <LogoIcon size={150} variant="circular" />
+        {/* Badge OBS (modo observador) */}
+        {mode === 'observer' && (
+          <span
+            className="absolute bottom-1 right-3 text-[9px] font-bold tracking-[0.25em] text-amber-400/80 bg-amber-400/10 px-1.5 py-0.5 rounded"
+          >
+            OBS
+          </span>
+        )}
         {/* Botão X — só aparece em mobile/tablet (drawer mode) */}
         <button
           onClick={onClose}
-          className="lg:hidden text-ayria-muted hover:text-ayria-text p-1"
+          className="lg:hidden absolute right-3 top-1/2 -translate-y-1/2 text-ayria-muted hover:text-ayria-text p-1"
           title="Fechar menu"
           aria-label="Fechar menu"
         >
