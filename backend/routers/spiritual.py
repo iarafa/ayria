@@ -114,6 +114,16 @@ async def save_spiritual_preference(
     await db.commit()
     await db.refresh(pref)
 
+    # 🆕 26/07/2026 — Invalida cache da SUB-ALMA + cache do user (Rafael pediu pra troca de
+    # religião/tom de voz refletir IMEDIATAMENTE na próxima mensagem).
+    # Sem isso, a AYRIA usa a sub-alma antiga (com tom errado) por até 60s.
+    try:
+        from services.chat import _invalidate_user_caches
+        _invalidate_user_caches(user.id, reason="spiritual_preference_updated")
+    except Exception as _e:
+        import logging
+        logging.getLogger(__name__).warning(f"Falha ao invalidar cache após save spiritual: {_e}")
+
     label, emoji = None, None
     for v, l, e in schemas.RELIGION_OPTIONS:
         if v == pref.religion:

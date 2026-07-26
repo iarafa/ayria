@@ -31,6 +31,9 @@ que vai modular a forma como a AYRIA fala com ESTE usuário específico.
 - Nome: {first_name}
 - Email: {email}
 - Preferência espiritual: {spiritual}
+
+# 🆕 26/07/2026 — Persona fragment por tradição (injetado SOMENTE se houver preferência declarada)
+{persona_fragment}
 - Onboarding completo: {onboarding_done}
 - Numerologia: {numerology_summary}
 - Astrologia: {astrology_summary}
@@ -151,15 +154,36 @@ async def _collect_user_context(db: AsyncSession, user_id: uuid.UUID) -> Dict[st
     else:
         ctx["astrology_summary"] = "não calculada"
 
-    # Preferência espiritual
+    # Preferência espiritual + FRAGMENT DA TRADIÇÃO (26/07/2026 — modula tom de voz)
     try:
         sp_res = await db.execute(
             select(models.SpiritualPreference).where(models.SpiritualPreference.user_id == user.id)
         )
         sp = sp_res.scalar_one_or_none()
         ctx["spiritual"] = sp.religion if sp else "indefinido"
+
+        # 🆕 Injeta PERSONA_FRAGMENT no prompt da sub-alma — peso ALTO pra modular
+        # o tom de voz, vocabulário e referências conforme a tradição escolhida.
+        from services.persona_fragments import get_persona, format_persona_for_prompt, FALLBACK_PERSONA, detect_unknown_persona
+        persona = None
+        if sp:
+            persona = get_persona(sp.religion)
+            if not persona:
+                # Tradição não mapeada no persona_fragments — usa fallback respeitoso
+                if not detect_unknown_persona(sp.religion):
+                    persona = None
+                else:
+                    from copy import deepcopy
+                    persona = deepcopy(FALLBACK_PERSONA)
+                    persona["label"] = f"{sp.custom_label} (definida pelo user)" if sp.custom_label else "tradição não mapeada"
+                    if sp.custom_tags:
+                        persona["vocabulario"] = list(sp.custom_tags)
+                    if sp.notes:
+                        persona["references"] = [sp.notes[:100]]
+        ctx["persona_fragment"] = format_persona_for_prompt(persona) if persona else ""
     except Exception:
         ctx["spiritual"] = "indefinido"
+        ctx["persona_fragment"] = ""
 
     # Perfil (JSONB do onboarding)
     try:
@@ -274,6 +298,7 @@ async def _call_ai_generate_sub_alma(ctx: Dict[str, Any]) -> str:
         manual_lock=ctx["manual_lock"],
         generated_at=ctx["generated_at"],
         messages_count=ctx["messages_count"],
+        persona_fragment=ctx.get("persona_fragment", ""),
     )
 
     resp = await ai_service.chat(

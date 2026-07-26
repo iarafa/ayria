@@ -302,6 +302,31 @@ def _invalidate_prompt_cache():
     # Invalidação fina não é trivial, então cache expira naturalmente em 60s.
 
 
+def _invalidate_user_caches(user_id, reason: str = "manual") -> None:
+    """🆕 26/07/2026 — Invalida caches PER-USER (sub-alma + créditos) por user_id.
+    Chamado por endpoints que mudam estado persistente do user:
+    - save_spiritual_preference (religião/tom de voz mudou)
+    - update_profile (nome/avatar mudou)
+    - admin actions no user
+
+    Sem isso, a AYRIA pode usar persona/nome cacheados por até 60s após a mudança.
+    """
+    prefix = f"_user_sub_alma_cache_{user_id}"
+    keys_cleared = []
+    for k in list(globals().keys()):
+        if k.startswith(prefix) or k == "_user_sub_alma_cache_" + str(user_id):
+            try:
+                del globals()[k]
+                keys_cleared.append(k)
+            except KeyError:
+                pass
+    if keys_cleared:
+        logger.info(
+            f"🗑️ Invalidated caches for user {user_id} (reason={reason}): "
+            f"{len(keys_cleared)} keys"
+        )
+
+
 async def _load_user_sub_alma(db: AsyncSession, user_id) -> str | None:
     """Carrega a sub-alma ATIVA do user. Cache 60s por user.
 
@@ -719,7 +744,25 @@ async def send_message(
         if sp and sp.is_active:
             sp_text = curate_spiritual_preference(sp)
             if sp_text:
-                profile_text += f"\n\nPREFERÊNCIA ESPIRITUAL: {sp_text}\nRespeite essa orientação ao falar sobre espiritualidade, valores e visão de mundo. NÃO force."
+                profile_text += f"\n\nPREFERÊNCIA ESPIRITUAL: {sp_text}\nRespeite essa orientação ao falar sobre espiritualidade, valores e mundo do user. NÃO force."
+
+                # 🆕 26/07/2026 — PERSONA FRAGMENT por tradição (efeito IMEDIATO no system prompt,
+                # sem precisar aguardar regeneração da sub-alma).
+                # Vocabulário + tom + referências canônicas + coisas a evitar — tudo respeitoso.
+                try:
+                    from services.persona_fragments import get_persona, format_persona_for_prompt, FALLBACK_PERSONA, detect_unknown_persona
+                    from copy import deepcopy
+                    persona = get_persona(sp.religion)
+                    if not persona and detect_unknown_persona(sp.religion):
+                        persona = deepcopy(FALLBACK_PERSONA)
+                        if sp.custom_label:
+                            persona["label"] = f"{sp.custom_label} (definida pelo user)"
+                        if sp.custom_tags:
+                            persona["vocabulario"] = list(sp.custom_tags)
+                    if persona:
+                        profile_text += "\n\n" + format_persona_for_prompt(persona) + "\nUse isso como guia principal de tom de voz, vocabulário e referências. NÃO imponha, NÃO converta, apenas adapte o jeito de falar."
+                except Exception as _pe:
+                    logger.warning(f"Falha ao carregar persona fragment: {_pe}")
     except Exception as e:
         logger.warning(f"Falha ao carregar preferência de vida: {e}")
 
