@@ -412,7 +412,7 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
             style={{ background: 'rgba(241, 201, 97, 0.04)' }}
           >
             {/* Cabeçalho com X global — SÓ TEXTO (26/07 17:49: Rafael "remove o icone que tem em conheça a ayria") */}
-            <div className="px-3 pt-2.5 pb-1 flex items-center justify-between gap-1.5">
+            <div className="px-3 pt-3 pb-1.5 flex items-center justify-between gap-1.5">
               <span className="text-[10px] uppercase tracking-wider text-amber-400/90 font-semibold leading-none">
                 Conheça a AYRIA
               </span>
@@ -426,8 +426,8 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
               </button>
             </div>
 
-            {/* CAPABILITIES */}
-            <div className="px-3 pb-3 space-y-1">
+            {/* CAPABILITIES — MESMO padding/spacing do bloco de sugestões */}
+            <div className="px-3 pb-3 space-y-1.5">
               {[
                 { emoji: '✨', label: 'Tarô, Búzios, Cartas, Runas, Cristais' },
                 { emoji: '🌙', label: 'Mapa Astral, Horóscopo, Sinastria' },
@@ -437,17 +437,17 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
               ].map((c) => (
                 <div
                   key={c.label}
-                  className="text-[11px] text-ayria-muted leading-snug flex items-start gap-1.5 px-1"
+                  className="text-[12px] leading-snug flex items-start gap-2 px-2 py-1.5 rounded-lg text-ayria-text"
                 >
-                  <span className="flex-shrink-0">{c.emoji}</span>
+                  <span className="flex-shrink-0 text-[14px]">{c.emoji}</span>
                   <span>{c.label}</span>
                 </div>
               ))}
             </div>
 
             {/* SUGESTÕES — header com MESMA tipografia do 'Conheça a AYRIA' */}
-            <div className="px-3 pb-3 space-y-1.5 border-t border-ayria-border/40 pt-2">
-              <span className="text-[10px] uppercase tracking-wider text-amber-400/90 font-semibold leading-none inline-block mb-1">
+            <div className="px-3 pb-3 space-y-1.5 border-t border-ayria-border/40 pt-3">
+              <span className="text-[10px] uppercase tracking-wider text-amber-400/90 font-semibold leading-none inline-block mb-1.5">
                 Comece por aqui
               </span>
               {[
@@ -462,17 +462,16 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
                     onClose?.()
                     window.dispatchEvent(new CustomEvent('ayria:send-suggestion', { detail: s.text }))
                   }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-ayria-text hover:bg-[#1a1a1a] transition-colors flex items-start gap-1.5"
+                  className="w-full text-left px-2 py-1.5 rounded-lg text-[12px] leading-snug text-ayria-text hover:bg-[#1a1a1a] transition-colors flex items-start gap-2"
                 >
-                  <span className="flex-shrink-0">{s.emoji}</span>
-                  <span className="leading-snug">{s.text}</span>
+                  <span className="flex-shrink-0 text-[14px]">{s.emoji}</span>
+                  <span>{s.text}</span>
                 </button>
               ))}
             </div>
           </div>
         )
       )}
-
       {/* Footer: créditos + ações (só em modo user) */}
       {mode === 'user' && (
         <div className="p-4 border-t border-ayria-border space-y-3">
