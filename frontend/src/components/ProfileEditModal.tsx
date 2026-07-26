@@ -261,7 +261,7 @@ export function ProfileEditModal({ open, onClose }: ProfileEditModalProps) {
         </div>
 
         {/* 🆕 SECURITY: botão de trocar senha (separado pra UX melhor) */}
-        <div className="mt-4 pt-4 border-t border-ayria-border">
+        <div className="mt-4 pt-4 border-t border-ayria-border space-y-2">
           <button
             onClick={() => {
               onClose()
@@ -270,6 +270,18 @@ export function ProfileEditModal({ open, onClose }: ProfileEditModalProps) {
             className="w-full py-2 rounded-xl text-sm text-amber-400 hover:bg-amber-900/20 transition flex items-center justify-center gap-2"
           >
             🔒 Trocar senha
+          </button>
+          {/* 🆕 26/07 18:19 — Botão Planos (movido aqui do header do ChatPage, a pedido do Rafael) */}
+          <button
+            onClick={() => {
+              onClose()
+              // Navega pra página /planos via dispatch de evento (o ChatPage captura)
+              window.dispatchEvent(new CustomEvent('ayria:open-planos'))
+            }}
+            className="w-full py-2 rounded-xl text-sm hover:bg-[#1a1a1a] transition flex items-center justify-center gap-2"
+            style={{ color: '#D4AF37' }}
+          >
+            ✨ Planos
           </button>
         </div>
       </div>
