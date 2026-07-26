@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Sidebar } from '../components/Sidebar'
 import { MessageBubble, TypingIndicator, renderMarkdown } from '../components/MessageBubble'
 import { MessageInput } from '../components/MessageInput'
+import { LogoIcon } from '../components/Logo'
 import { ProfileEditModal } from '../components/ProfileEditModal'
 import { ChangePasswordModal } from '../components/ChangePasswordModal'
 import { SpiritualityPicker } from '../components/SpiritualityPicker'
@@ -253,10 +254,13 @@ export function ChatPage() {
         >
           <div className="max-w-5xl mx-auto">
             {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full text-center py-12 sm:py-20">
+              <div className="flex flex-col items-center justify-center h-full text-center gap-4 px-4 py-12 sm:py-20">
+                {/* 26/07/2026: Rafael pediu pra apresentar o AYRIA visualmente no chat (logo + nome).
+                    Wide logo (mesmo do login) já tem 'AYRIA' escrito — removemos do texto de boas-vindas. */}
+                <LogoIcon size={180} variant="circular" className="max-w-[60vw]" />
                 <p
-                  className="text-ayria-muted max-w-md text-sm sm:text-base px-4"
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown('Olá, eu sou AYRIA — estou aqui pra te ajudar a se conhecer melhor. Pode me contar o que quiser — sobre seus sentimentos, sonhos, dúvidas. A conversa é sua.') }}
+                  className="text-ayria-muted max-w-md text-sm sm:text-base"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown('Estou aqui pra te ajudar a se conhecer melhor. Pode me contar o que quiser — sobre seus sentimentos, sonhos, dúvidas. A conversa é sua.') }}
                 />
               </div>
             )}
