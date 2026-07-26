@@ -245,8 +245,8 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
 
       {/* Nova conversa — botão compacto só com ícone (26/07: Rafael pediu pra tirar poluição visual) */}
       {mode === 'user' && (
-        <div className="px-3 py-2 border-b border-ayria-border flex items-center justify-between gap-2">
-          <span className="text-[10px] uppercase tracking-wider text-ayria-muted">
+        <div className="px-3 py-3 border-b border-ayria-border flex items-center justify-between gap-2">
+          <span className="text-sm font-medium text-ayria-text">
             {chats.length} {chats.length === 1 ? 'conversa' : 'conversas'}
           </span>
           <button
