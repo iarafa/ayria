@@ -17,7 +17,7 @@
  * - observerUser?: { full_name, email, plan?, balance? } — info do user observado (só p/ mode='observer')
  */
 import { useEffect, useRef, useState } from 'react'
-import { Plus, MessageCircle, Shield, Trash2, Zap, Pencil, Check, X, CreditCard, UserCircle } from "lucide-react"
+import { Plus, MessageCircle, Shield, Trash2, Zap, Pencil, Check, X } from "lucide-react"
 import { useAuth } from '../store/auth'
 import { useChat } from '../store/chat'
 import { LogoIcon } from './Logo'
@@ -25,21 +25,8 @@ import { ConfirmModal } from './ConfirmModal'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { api } from '../lib/api'
 
-function NavItem({ href, icon, label, onClose }: { href: string; icon: React.ReactNode; label: string; onClose?: () => void }) {
-  const location = useLocation()
-  const isActive = location.pathname === href || (href === '/chat' && location.pathname === '/')
-  const navigate = useNavigate()
-  return (
-    <button
-      onClick={() => { navigate(href); onClose?.() }}
-      className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${isActive ? 'text-white font-medium' : 'text-ayria-muted hover:bg-[#1a1a1a] hover:text-ayria-text'}`}
-      style={isActive ? { background: 'rgba(99, 102, 241, 0.15)', borderLeft: '2px solid #f1c961' } : undefined}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  )
-}
+// NavItem removida em 26/07/2026 (Rafael: menu poluído, quer minimalista)
+// function NavItem(...) {...}
 
 export interface SidebarProps {
   open: boolean
@@ -254,35 +241,28 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
         </div>
       )}
 
-      {/* Menu de navegação rápida — links do lado esquerdo (22/07/2026) */}
-      {mode === 'user' && (
-        <nav className="px-2 py-2 border-b border-ayria-border space-y-1">
-          <NavItem href="/chat" icon={<MessageCircle size={16} />} label="Conversas" onClose={onClose} />
-          {/* 26/07/2026: Rafael pediu pra remover Planos e Minha Conta do menu */}
-        </nav>
-      )}
+      {/* Menu de navegação rápida — removido em 26/07 (Rafael: poluído, quer minimalista) */}
 
-      {/* Nova conversa — em modo user normal; em observer não cria conversa nova */}
+      {/* Nova conversa — botão compacto só com ícone (26/07: Rafael pediu pra tirar poluição visual) */}
       {mode === 'user' && (
-        <div className="p-4">
+        <div className="px-3 py-2 border-b border-ayria-border flex items-center justify-between gap-2">
+          <span className="text-[10px] uppercase tracking-wider text-ayria-muted">
+            {chats.length} {chats.length === 1 ? 'conversa' : 'conversas'}
+          </span>
           <button
             onClick={handleNewChat}
-            className="w-full py-2 px-3 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-1.5 transition-opacity hover:opacity-90"
-            style={{
-              background: 'linear-gradient(135deg, #f1c961, #da950b)',
-            }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition-opacity hover:opacity-90"
+            style={{ background: 'linear-gradient(135deg, #f1c961, #da950b)' }}
+            title="Novo tema"
+            aria-label="Novo tema"
           >
-            <Plus size={14} />
-            Novo Tema
+            <Plus size={16} />
           </button>
         </div>
       )}
 
-      {/* Lista de conversas */}
+      {/* Lista de conversas — sem subheader (era redundante) */}
       <div className="flex-1 overflow-y-auto px-2">
-        <div className="text-xs text-ayria-muted px-3 py-2 uppercase tracking-wider">
-          {mode === 'observer' ? 'Chats do usuário' : 'Conversas'}
-        </div>
         {chats.length === 0 && (
           <div className="px-3 py-4 text-sm text-ayria-muted">
             Nenhuma conversa ainda.
