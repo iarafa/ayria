@@ -17,7 +17,7 @@
  * - observerUser?: { full_name, email, plan?, balance? } — info do user observado (só p/ mode='observer')
  */
 import { useEffect, useRef, useState } from 'react'
-import { Plus, MessageCircle, Shield, Trash2, Zap, Pencil, Check, X, Sparkles } from "lucide-react"
+import { Plus, MessageCircle, Shield, Trash2, Zap, Pencil, Check, X } from "lucide-react"
 import { useAuth } from '../store/auth'
 import { useChat } from '../store/chat'
 import { LogoIcon } from './Logo'
@@ -394,16 +394,15 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
          + "poderi colcoar um botão de fechar, um x pra se o usuario quiser ele poder ocultar?" (17:45) */}
       {mode === 'user' && (
         helpCollapsed ? (
-          // Colapsado: 1 linha discreta pra reabrir
+          // Colapsado: 1 linha discreta pra reabrir (só texto, sem ícone — 26/07 17:49)
           <div className="border-t border-ayria-border">
             <button
               onClick={() => setHelpCollapsed(false)}
-              className="w-full px-3 py-2 flex items-center justify-center gap-1.5 text-[11px] text-ayria-muted hover:text-ayria-text hover:bg-[#1a1a1a] transition-colors"
+              className="w-full px-3 py-2 text-[10px] uppercase tracking-wider text-ayria-muted hover:text-ayria-text hover:bg-[#1a1a1a] transition-colors"
               title="Reabrir dicas e o que a AYRIA pode fazer"
               aria-label="Reabrir dicas"
             >
-              <Sparkles size={12} className="text-amber-400" />
-              <span>Ver dicas e o que a AYRIA pode fazer</span>
+              Ver dicas e o que a AYRIA pode fazer
             </button>
           </div>
         ) : (
@@ -412,18 +411,15 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
             className="border-t border-ayria-border"
             style={{ background: 'rgba(241, 201, 97, 0.04)' }}
           >
-            {/* Cabeçalho com X global — mesma tipografia em ambos os títulos */}
-            <div className="px-3 pt-3 pb-1.5 flex items-center justify-between gap-1.5">
-              <div className="flex items-center gap-1.5">
-                <Sparkles size={12} className="text-amber-400" />
-                <span className="text-[10px] uppercase tracking-wider text-amber-400/90 font-semibold leading-none">
-                  Conheça a AYRIA
-                </span>
-              </div>
+            {/* Cabeçalho com X global — SÓ TEXTO (26/07 17:49: Rafael "remove o icone que tem em conheça a ayria") */}
+            <div className="px-3 pt-2.5 pb-1 flex items-center justify-between gap-1.5">
+              <span className="text-[10px] uppercase tracking-wider text-amber-400/90 font-semibold leading-none">
+                Conheça a AYRIA
+              </span>
               <button
                 onClick={() => setHelpCollapsed(true)}
                 className="text-ayria-muted hover:text-ayria-text p-0.5 rounded transition-colors"
-                title="Fechar painel (use 'Ver dicas' abaixo para reabrir)"
+                title="Fechar painel (clique em 'Ver dicas' abaixo para reabrir)"
                 aria-label="Fechar painel de ajuda e sugestões"
               >
                 <X size={12} />
