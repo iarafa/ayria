@@ -129,10 +129,10 @@ export function ChatPage() {
           {/* Preferência de Vida — popover com lista de religiões */}
           <SpiritualityPicker />
 
-          {/* TOGGLE: Quebrar/Inteiras — com label + descrição visíveis */}
+          {/* TOGGLE: Quebrar/Inteiras — minimalista (26/07 18:22) */}
           <button
             onClick={() => setCollapseEnabled((v) => !v)}
-            className="flex flex-col items-center sm:flex-row sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg transition-colors hover:bg-[#1a1a1a]"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors hover:bg-[#1a1a1a]"
             style={{
               background: collapseEnabled
                 ? 'rgba(99, 102, 241, 0.15)'
@@ -143,20 +143,13 @@ export function ChatPage() {
                 : '1px solid rgba(148, 163, 184, 0.2)',
             }}
             title={collapseEnabled
-              ? 'Mensagens longas estão sendo quebradas (Ver mais). Clique pra mostrar inteiras.'
-              : 'Mostrando mensagens inteiras. Clique pra quebrar as longas (Ver mais).'}
+              ? 'Mensagens longas são quebradas (Ver mais). Clique pra mostrar inteiras.'
+              : 'Mensagens inteiras. Clique pra quebrar as longas (Ver mais).'}
             aria-pressed={collapseEnabled}
           >
-            <div className="flex items-center gap-1.5">
-              {collapseEnabled ? <AlignJustify size={14} /> : <ChevronsUpDown size={14} />}
-              <span className="text-xs font-medium hidden sm:inline">
-                {collapseEnabled ? 'Quebrar' : 'Inteiras'}
-              </span>
-            </div>
-            <span className="text-[9px] sm:text-[10px] opacity-70 leading-tight mt-0.5 sm:mt-0 max-w-[100px] sm:max-w-none text-center sm:text-left">
-              {collapseEnabled
-                ? 'Respostas longas viram "Ver mais"'
-                : 'Mostra todas as respostas completas'}
+            {collapseEnabled ? <AlignJustify size={14} /> : <ChevronsUpDown size={14} />}
+            <span className="text-xs font-medium">
+              {collapseEnabled ? 'Quebrar' : 'Inteiras'}
             </span>
           </button>
 

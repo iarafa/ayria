@@ -130,7 +130,7 @@ export function SpiritualityPicker() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex flex-col items-center sm:flex-row sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg transition-colors hover:bg-[#1a1a1a]"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors hover:bg-[#1a1a1a]"
         style={{
           background: pref ? 'rgba(245, 158, 11, 0.15)' : 'rgba(245, 158, 11, 0.05)',
           color: pref ? '#FCD34D' : '#D97706',
@@ -142,14 +142,9 @@ export function SpiritualityPicker() {
         aria-label={pref ? `Orientação selecionada: ${currentLabel}` : 'Selecionar preferência de vida'}
         aria-pressed={!!pref}
       >
-        <div className="flex items-center gap-1.5">
-          <span style={{ fontSize: '14px', lineHeight: 1 }}>{currentEmoji}</span>
-          <span className="text-xs font-medium hidden sm:inline">
-            {currentLabel?.split(' ')[0] || 'Orientação de vida'}
-          </span>
-        </div>
-        <span className="text-[9px] sm:text-[10px] opacity-70 leading-tight mt-0.5 sm:mt-0 max-w-[100px] sm:max-w-none text-center sm:text-left">
-          {pref ? currentLabel?.slice(0, 36) || 'selecionada' : 'Escolha o que te representa'}
+        <span style={{ fontSize: '14px', lineHeight: 1 }}>{currentEmoji}</span>
+        <span className="text-xs font-medium">
+          {currentLabel?.split(' ')[0] || 'Orientação'}
         </span>
       </button>
 
