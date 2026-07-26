@@ -87,6 +87,18 @@ export function ChatPage() {
     previousMessagesLengthRef.current = messages.length
   }, [messages.length, scrollToBottomIfAtBottom])
 
+  // 🆕 26/07/2026 — Escuta cliques no painel de sugestões da Sidebar
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<string>
+      if (typeof ce.detail === 'string' && ce.detail.trim()) {
+        sendMessage(ce.detail.trim())
+      }
+    }
+    window.addEventListener('ayria:send-suggestion', handler)
+    return () => window.removeEventListener('ayria:send-suggestion', handler)
+  }, [sendMessage])
+
   return (
     <div className="h-screen flex overflow-hidden" style={{ background: '#050505' }}>
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />

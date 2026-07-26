@@ -17,7 +17,7 @@
  * - observerUser?: { full_name, email, plan?, balance? } — info do user observado (só p/ mode='observer')
  */
 import { useEffect, useRef, useState } from 'react'
-import { Plus, MessageCircle, Shield, Trash2, Zap, Pencil, Check, X } from "lucide-react"
+import { Plus, MessageCircle, Shield, Trash2, Zap, Pencil, Check, X, Sparkles } from "lucide-react"
 import { useAuth } from '../store/auth'
 import { useChat } from '../store/chat'
 import { LogoIcon } from './Logo'
@@ -386,6 +386,41 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
           )
         })}
       </div>
+
+      {/* 🆕 26/07/2026 — Painel de sugestões p/ user novo (≤1 conversa) */}
+      {mode === 'user' && chats.length <= 1 && (
+        <div
+          className="p-3 border-t border-ayria-border space-y-2"
+          style={{ background: 'rgba(241, 201, 97, 0.05)' }}
+        >
+          <div className="flex items-center gap-1.5">
+            <Sparkles size={12} className="text-amber-400" />
+            <span className="text-[10px] uppercase tracking-wider text-amber-400/90 font-semibold">
+              Por onde começar
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {[
+              { emoji: '✨', text: 'Como vai ser meu dia hoje?' },
+              { emoji: '💭', text: 'Quero entender o que tô sentindo' },
+              { emoji: '🌙', text: 'Me ajude a relaxar agora' },
+              { emoji: '🔮', text: 'Me conte um insight rápido' },
+            ].map((s) => (
+              <button
+                key={s.text}
+                onClick={() => {
+                  onClose?.()
+                  window.dispatchEvent(new CustomEvent('ayria:send-suggestion', { detail: s.text }))
+                }}
+                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-ayria-text hover:bg-[#1a1a1a] transition-colors flex items-start gap-1.5"
+              >
+                <span className="flex-shrink-0">{s.emoji}</span>
+                <span className="leading-snug">{s.text}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Footer: créditos + ações (só em modo user) */}
       {mode === 'user' && (
