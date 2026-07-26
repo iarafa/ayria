@@ -412,11 +412,11 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
             className="border-t border-ayria-border"
             style={{ background: 'rgba(241, 201, 97, 0.04)' }}
           >
-            {/* Cabeçalho com X global */}
+            {/* Cabeçalho com X global — mesma tipografia em ambos os títulos */}
             <div className="px-3 pt-3 pb-1.5 flex items-center justify-between gap-1.5">
               <div className="flex items-center gap-1.5">
                 <Sparkles size={12} className="text-amber-400" />
-                <span className="text-[10px] uppercase tracking-wider text-amber-400/90 font-semibold">
+                <span className="text-[10px] uppercase tracking-wider text-amber-400/90 font-semibold leading-none">
                   Conheça a AYRIA
                 </span>
               </div>
@@ -431,7 +431,7 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
             </div>
 
             {/* CAPABILITIES */}
-            <div className="px-3 pb-2 space-y-1">
+            <div className="px-3 pb-3 space-y-1">
               {[
                 { emoji: '✨', label: 'Tarô, Búzios, Cartas, Runas, Cristais' },
                 { emoji: '🌙', label: 'Mapa Astral, Horóscopo, Sinastria' },
@@ -449,9 +449,9 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
               ))}
             </div>
 
-            {/* SUGESTÕES */}
-            <div className="px-3 pb-3 space-y-1.5 border-t border-ayria-border/50 pt-2">
-              <span className="text-[10px] uppercase tracking-wider text-ayria-muted/80 font-semibold">
+            {/* SUGESTÕES — header com MESMA tipografia do 'Conheça a AYRIA' */}
+            <div className="px-3 pb-3 space-y-1.5 border-t border-ayria-border/40 pt-2">
+              <span className="text-[10px] uppercase tracking-wider text-amber-400/90 font-semibold leading-none inline-block mb-1">
                 Comece por aqui
               </span>
               {[
