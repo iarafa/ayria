@@ -213,7 +213,7 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
       <div className="p-4 border-b border-ayria-border flex items-center justify-center relative">
         <LogoIcon
           size={56}
-          variant="symbol"
+          variant="circular"
           className="opacity-90"
         />
         {mode === 'observer' && (

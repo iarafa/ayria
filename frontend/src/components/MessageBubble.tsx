@@ -184,7 +184,7 @@ export function MessageBubble({ role, content, model, tokens, thinking, collapse
         {/* Header: só pra admin */}
         {!isUser && isAdmin && (
           <div className="flex items-center gap-2 mb-2 text-xs text-ayria-muted">
-            <LogoIcon size={12} variant="circular" />
+            <LogoIcon size={20} variant="circular" />
             <span>AYRIA</span>
             {model && <span className="opacity-60">· {model}</span>}
             {tokens && <span className="opacity-60">· {tokens} tokens</span>}
@@ -256,7 +256,7 @@ export function TypingIndicator() {
           border: '1px solid rgba(99, 102, 241, 0.2)',
         }}
       >
-        <LogoIcon size={28} variant="circular" />
+        <LogoIcon size={20} variant="circular" />
         <div className="flex items-center gap-1">
           <div
             className="typing-dot w-2 h-2 rounded-full"
