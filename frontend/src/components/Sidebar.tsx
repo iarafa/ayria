@@ -387,8 +387,9 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
         })}
       </div>
 
-      {/* 🆕 26/07/2026 — Painel de ajuda + sugestões (user novo ≤1 conversa) */}
-      {mode === 'user' && chats.length <= 1 && (
+      {/* 🆕 26/07/2026 — Painel de ajuda + sugestões (SEMPRE visível p/ user) */}
+      {/* Rafael: "essa regra de dicas, num pode ser apenas quando tem 1 conversa, ele deve aparecer sempre!" */}
+      {mode === 'user' && (
         <div
           className="border-t border-ayria-border"
           style={{ background: 'rgba(241, 201, 97, 0.04)' }}
