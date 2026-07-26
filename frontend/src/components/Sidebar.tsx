@@ -144,6 +144,8 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
   // 🆕 Popup in-app pra confirmação (substitui confirm() do navegador)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  // 🆕 26/07/2026 17:45 — Rafael: "poderi colcoar um botão de fechar pra se o usuario quiser ele poder ocultar"
+  const [helpCollapsed, setHelpCollapsed] = useState(false)
   const editInputRef = useRef<HTMLInputElement>(null)
 
   const startEditing = (chatId: string, currentTitle: string | null) => {
@@ -387,65 +389,92 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
         })}
       </div>
 
-      {/* 🆕 26/07/2026 — Painel de ajuda + sugestões (SEMPRE visível p/ user) */}
-      {/* Rafael: "essa regra de dicas, num pode ser apenas quando tem 1 conversa, ele deve aparecer sempre!" */}
+      {/* 🆕 26/07/2026 — Painel de ajuda + sugestões (colapsável, SEMPRE visível p/ user) */}
+      {/* Rafael: "essa regra de dicas, num pode ser apenas quando tem 1 conversa, ele deve aparecer sempre!" (17:43)
+         + "poderi colcoar um botão de fechar, um x pra se o usuario quiser ele poder ocultar?" (17:45) */}
       {mode === 'user' && (
-        <div
-          className="border-t border-ayria-border"
-          style={{ background: 'rgba(241, 201, 97, 0.04)' }}
-        >
-          {/* Cabeçalho */}
-          <div className="px-3 pt-3 pb-1.5 flex items-center gap-1.5">
-            <Sparkles size={12} className="text-amber-400" />
-            <span className="text-[10px] uppercase tracking-wider text-amber-400/90 font-semibold">
-              Conheça a AYRIA
-            </span>
+        helpCollapsed ? (
+          // Colapsado: 1 linha discreta pra reabrir
+          <div className="border-t border-ayria-border">
+            <button
+              onClick={() => setHelpCollapsed(false)}
+              className="w-full px-3 py-2 flex items-center justify-center gap-1.5 text-[11px] text-ayria-muted hover:text-ayria-text hover:bg-[#1a1a1a] transition-colors"
+              title="Reabrir dicas e o que a AYRIA pode fazer"
+              aria-label="Reabrir dicas"
+            >
+              <Sparkles size={12} className="text-amber-400" />
+              <span>Ver dicas e o que a AYRIA pode fazer</span>
+            </button>
           </div>
-
-          {/* CAPABILITIES (info — o que ela pode fazer) */}
-          <div className="px-3 pb-2 space-y-1">
-            {[
-              { emoji: '✨', label: 'Tarô, Búzios, Cartas, Runas, Cristais' },
-              { emoji: '🌙', label: 'Mapa Astral, Horóscopo, Sinastria' },
-              { emoji: '💭', label: 'Autoconhecimento, Coaching, Hábitos' },
-              { emoji: '🕊️', label: 'Anjos, Akáshicos, Mediunidade' },
-              { emoji: '🧠', label: 'Inteligência emocional, Limites, CNV' },
-            ].map((c) => (
-              <div
-                key={c.label}
-                className="text-[11px] text-ayria-muted leading-snug flex items-start gap-1.5 px-1"
-              >
-                <span className="flex-shrink-0">{c.emoji}</span>
-                <span>{c.label}</span>
+        ) : (
+          // Expandido: 2 blocos (Conheça + Sugestões) + X global
+          <div
+            className="border-t border-ayria-border"
+            style={{ background: 'rgba(241, 201, 97, 0.04)' }}
+          >
+            {/* Cabeçalho com X global */}
+            <div className="px-3 pt-3 pb-1.5 flex items-center justify-between gap-1.5">
+              <div className="flex items-center gap-1.5">
+                <Sparkles size={12} className="text-amber-400" />
+                <span className="text-[10px] uppercase tracking-wider text-amber-400/90 font-semibold">
+                  Conheça a AYRIA
+                </span>
               </div>
-            ))}
-          </div>
-
-          {/* SUGESTÕES (clicáveis — começam conversa) */}
-          <div className="px-3 pb-3 space-y-1.5 border-t border-ayria-border/50 pt-2">
-            <span className="text-[10px] uppercase tracking-wider text-ayria-muted/80 font-semibold">
-              Comece por aqui
-            </span>
-            {[
-              { emoji: '🌟', text: 'Como vai ser meu dia hoje?' },
-              { emoji: '🤔', text: 'Quero entender o que tô sentindo' },
-              { emoji: '🌬️', text: 'Me ajuda a relaxar e focar agora' },
-              { emoji: '🃏', text: 'Tire uma carta de tarô pra mim' },
-            ].map((s) => (
               <button
-                key={s.text}
-                onClick={() => {
-                  onClose?.()
-                  window.dispatchEvent(new CustomEvent('ayria:send-suggestion', { detail: s.text }))
-                }}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-ayria-text hover:bg-[#1a1a1a] transition-colors flex items-start gap-1.5"
+                onClick={() => setHelpCollapsed(true)}
+                className="text-ayria-muted hover:text-ayria-text p-0.5 rounded transition-colors"
+                title="Fechar painel (use 'Ver dicas' abaixo para reabrir)"
+                aria-label="Fechar painel de ajuda e sugestões"
               >
-                <span className="flex-shrink-0">{s.emoji}</span>
-                <span className="leading-snug">{s.text}</span>
+                <X size={12} />
               </button>
-            ))}
+            </div>
+
+            {/* CAPABILITIES */}
+            <div className="px-3 pb-2 space-y-1">
+              {[
+                { emoji: '✨', label: 'Tarô, Búzios, Cartas, Runas, Cristais' },
+                { emoji: '🌙', label: 'Mapa Astral, Horóscopo, Sinastria' },
+                { emoji: '💭', label: 'Autoconhecimento, Coaching, Hábitos' },
+                { emoji: '🕊️', label: 'Anjos, Akáshicos, Mediunidade' },
+                { emoji: '🧠', label: 'Inteligência emocional, Limites, CNV' },
+              ].map((c) => (
+                <div
+                  key={c.label}
+                  className="text-[11px] text-ayria-muted leading-snug flex items-start gap-1.5 px-1"
+                >
+                  <span className="flex-shrink-0">{c.emoji}</span>
+                  <span>{c.label}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* SUGESTÕES */}
+            <div className="px-3 pb-3 space-y-1.5 border-t border-ayria-border/50 pt-2">
+              <span className="text-[10px] uppercase tracking-wider text-ayria-muted/80 font-semibold">
+                Comece por aqui
+              </span>
+              {[
+                { emoji: '🌟', text: 'Como vai ser meu dia hoje?' },
+                { emoji: '🤔', text: 'Quero entender o que tô sentindo' },
+                { emoji: '🌬️', text: 'Me ajuda a relaxar e focar agora' },
+                { emoji: '🃏', text: 'Tire uma carta de tarô pra mim' },
+              ].map((s) => (
+                <button
+                  key={s.text}
+                  onClick={() => {
+                    onClose?.()
+                    window.dispatchEvent(new CustomEvent('ayria:send-suggestion', { detail: s.text }))
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-ayria-text hover:bg-[#1a1a1a] transition-colors flex items-start gap-1.5"
+                >
+                  <span className="flex-shrink-0">{s.emoji}</span>
+                  <span className="leading-snug">{s.text}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )
       )}
 
       {/* Footer: créditos + ações (só em modo user) */}
