@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Tag, X, Edit, Trash2, Power, CheckCircle, AlertCircle } from 'lucide-react'
+import { Tag, X, Edit, Trash2, Power, AlertCircle } from 'lucide-react'
 import { ListWithControls } from '../../../components/ListWithControls'
 import { adminApi, api } from '../../../lib/api'
 
@@ -27,7 +27,6 @@ export function CouponsTabInline() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [validating, setValidating] = useState<{ code: string; result: any } | null>(null)
 
   const reload = async () => {
     setLoading(true)
@@ -183,18 +182,10 @@ export function CouponsTabInline() {
 
   const resetForm = () => setForm({ code: '', name: '', discount_type: 'percent', discount_value: 10, applicable_plan_slug: '', duration_months: 1, max_redemptions: 0, partner_id: '', commission_pct: 0, expires_at: '' })
 
-  const handleValidate = async (code: string) => {
-    // 🆕 Valida com o plano aplicável do cupom (se houver) — não com string vazia
-    const coupon = coupons.find((c) => c.code === code)
-    const plan_slug = coupon?.applicable_plan_slug || ''
-    setValidating({ code, result: { loading: true } } as any)
-    try {
-      const r = await api.post('/api/coupons/validate', { code, plan_slug })
-      setValidating({ code, result: r.data })
-    } catch (e: any) {
-      setValidating({ code, result: { error: e.response?.data?.detail || e.message } })
-    }
-  }
+  // 🆕 26/07/2026 22:18 — Botão "Validar" REMOVIDO (Rafael: "que sentido tem isso?")
+  // Validação de cupom só faz sentido pro USER que vai aplicar — não pro admin
+  // que acabou de criar/editar. O admin já tem os dados de validity na tabela visual.
+
 
   const renderForm = (onSubmit: any, submitLabel: string, codeLocked: boolean) => (
     <form onSubmit={onSubmit} className="space-y-3">
@@ -302,19 +293,6 @@ export function CouponsTabInline() {
       {error && <div className="mb-4 p-3 rounded-xl bg-red-900/20 border border-red-500/30 text-red-300 text-sm">{error}</div>}
       {success && <div className="mb-4 p-3 rounded-xl bg-emerald-900/20 border border-emerald-500/30 text-emerald-300 text-sm">{success}</div>}
 
-      {validating && (
-        <div className="mb-4 p-3 rounded-xl text-sm" style={{ background: '#1a1a2e' }}>
-          <div className="font-medium text-ayria-text mb-1 flex items-center gap-2">
-            {validating.result?.loading ? <span>⏳ Validando...</span> :
-             validating.result?.valid ? <CheckCircle size={14} className="text-emerald-400" /> :
-             <AlertCircle size={14} className="text-red-400" />}
-            Validação: {validating.code}
-          </div>
-          <pre className="text-xs text-ayria-muted whitespace-pre-wrap">{JSON.stringify(validating.result, null, 2)}</pre>
-          <button onClick={() => setValidating(null)} className="mt-2 text-xs text-ayria-muted hover:text-ayria-text">Fechar</button>
-        </div>
-      )}
-
       <ListWithControls data={coupons} itemName="cupom" searchPlaceholder="Buscar por código ou nome..." emptyMessage="Nenhum cupom">
         {(c) => {
           const expired = isExpired(c)
@@ -344,11 +322,7 @@ export function CouponsTabInline() {
                   </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
-                  <button onClick={() => handleValidate(c.code)} title="Validar cupom contra plano aplicável"
-                    className="text-xs px-2 py-1 rounded text-indigo-400 hover:bg-indigo-400/10 flex items-center gap-1">
-                    <CheckCircle size={12}/>Validar
-                  </button>
-                  <button onClick={() => openEdit(c)} title="Editar"
+                    <button onClick={() => openEdit(c)} title="Editar"
                     className="text-xs px-2 py-1 rounded text-blue-400 hover:bg-blue-400/10 flex items-center gap-1">
                     <Edit size={12}/>Editar
                   </button>
