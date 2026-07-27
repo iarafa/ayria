@@ -82,8 +82,9 @@ async def register_commission_for_invoice(
     )
     db.add(redemption)
 
-    # Incrementa contador de uso do cupom
-    coupon.current_redemptions = (coupon.current_redemptions or 0) + 1
+    # 🆕 26/07/2026 22:35 — REMOVIDO o `coupon.current_redemptions += 1` manual.
+    # Trigger `trg_maintain_coupon_redemption_count` (migration 0024) já mantém em sync.
+    # Deixar ambos = dobrado. Trigger é a fonte única de verdade agora.
 
     await db.commit()
     await db.refresh(redemption)
