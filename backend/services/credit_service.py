@@ -51,28 +51,33 @@ async def grant_initial_credits(
     reference_id: Optional[str] = None,
 ) -> bool:
     """
-    Concede créditos iniciais do plano. IDEMPOTENTE.
+    Concede créditos iniciais do plano no SIGNUP (cadastro).
 
-    Se o user já tem plan_selected_at e selected_plan_id preenchidos
-    E já existe uma credit_transaction do tipo 'grant_initial_plan' pra ele,
-    retorna False sem fazer nada.
+    IDEMPOTENTE por (user_id, type, reference_type) — se o user já
+    recebeu o grant inicial com este reference_type, retorna False.
 
     Retorna True se concedeu agora, False se já tinha sido concedido.
+
+    ⚠️ 27/07/2026 — Bug fix: webhook Stripe REUSAVA essa função com
+    reference_type='stripe_subscription' (≠ 'user_register'), o que
+    permitia DOUBLE-CREDIT. Agora webhook usa grant_subscription_credits()
+    com tipo de transação diferente ('grant_subscription_plan').
     """
-    # Idempotência: se já tem plano + grant_initial_plan, não faz nada
-    if user.selected_plan_id and user.plan_selected_at:
-        existing = await db.execute(
-            select(models.CreditTransaction)
-            .where(
-                models.CreditTransaction.user_id == user.id,
-                models.CreditTransaction.type == "grant_initial_plan",
-                models.CreditTransaction.reference_type == reference_type,
-            )
-            .limit(1)
+    # Idempotência: se já tem grant_initial_plan com este reference_type, não credita
+    existing = await db.execute(
+        select(models.CreditTransaction)
+        .where(
+            models.CreditTransaction.user_id == user.id,
+            models.CreditTransaction.type == "grant_initial_plan",
+            models.CreditTransaction.reference_type == reference_type,
         )
-        if existing.scalar_one_or_none():
-            logger.info(f"Grant inicial já existente pro user {user.id} — pulando")
-            return False
+        .limit(1)
+    )
+    if existing.scalar_one_or_none():
+        logger.info(
+            f"Grant inicial já existente pro user {user.id} ref={reference_type} — pulando"
+        )
+        return False
 
     # Concede
     balance_before = user.credit_balance or 0
@@ -96,7 +101,102 @@ async def grant_initial_credits(
     )
     db.add(tx)
 
-    logger.info(f"✅ Grant inicial: user={user.id} plano={plan.slug} +{plan.credits} → saldo={user.credit_balance}")
+    logger.info(
+        f"✅ Grant inicial: user={user.id} plano={plan.slug} +{plan.credits} → "
+        f"saldo={user.credit_balance}"
+    )
+    return True
+
+
+async def grant_subscription_credits(
+    db: AsyncSession,
+    user: models.User,
+    plan: models.Plan,
+    description: Optional[str] = None,
+    stripe_invoice_id: str = "",
+    stripe_subscription_id: str = "",
+) -> bool:
+    """
+    Concede créditos por ativação/renovação de assinatura Stripe.
+
+    🆕 27/07/2026 — Bug fix: webhook usava grant_initial_credits (alias) que
+    tinha idempotência falha, causando DOUBLE-CREDIT no signup + assinatura.
+    Agora é função própria com regras claras:
+
+    - IDEMPOTENTE por stripe_invoice_id (não credita 2x a mesma invoice)
+    - Se for mudança de plano (selected_plan_id ≠ plan.id), SUBSTITUI saldo:
+        zera saldo antigo, credita créditos do novo plano
+    - Se for renovação do mesmo plano, SOMA os créditos do plano
+
+    Retorna True se concedeu agora, False se já tinha sido concedido.
+    """
+    if not stripe_invoice_id:
+        raise ValueError("stripe_invoice_id é obrigatório para grant_subscription_credits")
+
+    # Idempotência por invoice_id (cada invoice do Stripe é única)
+    existing = await db.execute(
+        select(models.CreditTransaction)
+        .where(
+            models.CreditTransaction.user_id == user.id,
+            models.CreditTransaction.type == "grant_subscription_plan",
+            models.CreditTransaction.reference_id == stripe_invoice_id,
+        )
+        .limit(1)
+    )
+    if existing.scalar_one_or_none():
+        logger.info(
+            f"Subscription grant já processado pra invoice {stripe_invoice_id} — pulando"
+        )
+        return False
+
+    balance_before = user.credit_balance or 0
+    is_plan_change = user.selected_plan_id != plan.id
+
+    if is_plan_change:
+        # Mudança de plano (signup→assinatura, upgrade, downgrade):
+        # SUBSTITUI saldo (não soma, pra não duplicar)
+        new_balance = plan.credits
+        delta = new_balance - balance_before
+        description_final = description or (
+            f"Mudança de plano → {plan.name}: saldo substituído "
+            f"(anterior={balance_before}, novo={new_balance})"
+        )
+        logger.info(
+            f"🔄 Mudança de plano: user={user.id} plano={plan.slug} "
+            f"saldo {balance_before}→{new_balance} (delta={delta:+d})"
+        )
+    else:
+        # Renovação do mesmo plano: soma créditos do plano
+        new_balance = balance_before + plan.credits
+        delta = plan.credits
+        description_final = description or f"Renovação {plan.name}: +{plan.credits} créditos"
+        logger.info(
+            f"♻️ Renovação: user={user.id} plano={plan.slug} +{plan.credits} → "
+            f"saldo={new_balance}"
+        )
+
+    user.credit_balance = new_balance
+    user.selected_plan_id = plan.id
+    user.credit_status = "active" if new_balance > 0 else "exhausted"
+    user.credits_last_granted_at = datetime.utcnow()
+
+    tx = models.CreditTransaction(
+        id=uuid.uuid4(),
+        user_id=user.id,
+        type="grant_subscription_plan",
+        amount=delta,
+        balance_before=balance_before,
+        balance_after=new_balance,
+        description=description_final,
+        reference_type="stripe_invoice",
+        reference_id=stripe_invoice_id,
+    )
+    db.add(tx)
+
+    logger.info(
+        f"✅ Subscription grant: user={user.id} plano={plan.slug} "
+        f"delta={delta:+d} → saldo={new_balance}"
+    )
     return True
 
 

@@ -523,13 +523,15 @@ async def _handle_subscription_created(event_obj, db):
             plan_db = plan_row.scalars().first()
             if plan_db and plan_cfg["tokens"] > 0:
                 try:
-                    await grant_credits(
-                        db,
-                        user,
-                        plan_db,
-                        f"Assinatura {plan_name} ativada",
-                        reference_type="stripe_subscription",
-                        reference_id=sub_id,
+                    # 🆕 27/07/2026 — usa grant_subscription_credits (idempotente por
+                    # invoice_id e SUBSTITUI saldo em mudança de plano, não soma).
+                    await grant_subscription_credits(
+                        db=db,
+                        user=user,
+                        plan=plan_db,
+                        description=f"Assinatura {plan_name} ativada",
+                        stripe_invoice_id=event_obj.get("latest_invoice", "") or sub_id,
+                        stripe_subscription_id=sub_id,
                     )
                     user.billing_status = event_obj["status"]
                     user.credits_last_granted_at = datetime.now(timezone.utc)
@@ -668,13 +670,15 @@ async def _handle_invoice_paid(event_obj, db):
                 plan_db = plan_row.scalars().first()
                 if plan_db and plan_cfg["tokens"] > 0:
                     try:
-                        await grant_credits(
-                            db,
-                            user,
-                            plan_db,
-                            f"Renovação {plan_cfg.get('name', sub.plan_slug)}",
-                            reference_type="stripe_invoice",
-                            reference_id=inv_id,
+                        # 🆕 27/07/2026 — usa grant_subscription_credits (idempotente por
+                        # invoice_id; em renewal soma créditos do plano)
+                        await grant_subscription_credits(
+                            db=db,
+                            user=user,
+                            plan=plan_db,
+                            description=f"Renovação {plan_cfg.get('name', sub.plan_slug)}",
+                            stripe_invoice_id=inv_id,
+                            stripe_subscription_id=sub_id,
                         )
                         user.credits_last_granted_at = datetime.now(timezone.utc)
                         logger.info(f"Renovação {sub.plan_slug}: +{plan_cfg['tokens']} tokens pra {user.id}")
