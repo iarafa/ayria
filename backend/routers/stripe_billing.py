@@ -513,16 +513,28 @@ async def _handle_subscription_created(event_obj, db):
     if plan_cfg.get("tokens") and event_obj["status"] in ("active", "trialing"):
         user = await db.get(models.User, uuid.UUID(user_id))
         if user:
-            await grant_credits(
-                db,
-                user,
-                plan_cfg["tokens"],
-                f"Assinatura {plan_name} ativada",
-                reference_type="stripe_subscription",
-                reference_id=sub_id,
+            # 🆕 26/07/2026 22:30 — buscar Plan real pelo slug (grant_credits exige
+            # models.Plan, não int). Bug anterior: passava plan_cfg['tokens'] (int)
+            # e crashava em plan.id dentro de credit_service. Sintoma: subscription
+            # criada, cupom aplicado, mas REDEMPTION NÃO computada.
+            plan_row = await db.execute(
+                select(models.Plan).where(models.Plan.slug == plan_slug)
             )
-            user.billing_status = event_obj["status"]
-            user.credits_last_granted_at = datetime.now(timezone.utc)
+            plan_db = plan_row.scalars().first()
+            if plan_db and plan_cfg["tokens"] > 0:
+                try:
+                    await grant_credits(
+                        db,
+                        user,
+                        plan_db,
+                        f"Assinatura {plan_name} ativada",
+                        reference_type="stripe_subscription",
+                        reference_id=sub_id,
+                    )
+                    user.billing_status = event_obj["status"]
+                    user.credits_last_granted_at = datetime.now(timezone.utc)
+                except Exception as _e:
+                    logger.exception(f"⚠️ Falha ao creditar tokens (não bloqueia): {_e}")
 
     logger.info(f"Subscription {sub_id} upserted: status={event_obj['status']} plan={plan_slug}")
 
@@ -648,16 +660,26 @@ async def _handle_invoice_paid(event_obj, db):
         if sub and sub.plan_slug:
             plan_cfg = PLANS.get(sub.plan_slug, {})
             if plan_cfg.get("tokens") and user:
-                await grant_credits(
-                    db,
-                    user,
-                    plan_cfg["tokens"],
-                    f"Renovação {plan_cfg.get('name', sub.plan_slug)}",
-                    reference_type="stripe_invoice",
-                    reference_id=inv_id,
+                # 🆕 26/07/2026 22:30 — mesma correção do grant_credits na criação:
+                # passa Plan real pelo slug, não plan_cfg['tokens'] (int).
+                plan_row = await db.execute(
+                    select(models.Plan).where(models.Plan.slug == sub.plan_slug)
                 )
-                user.credits_last_granted_at = datetime.now(timezone.utc)
-                logger.info(f"Renovação {sub.plan_slug}: +{plan_cfg['tokens']} tokens pra {user.id}")
+                plan_db = plan_row.scalars().first()
+                if plan_db and plan_cfg["tokens"] > 0:
+                    try:
+                        await grant_credits(
+                            db,
+                            user,
+                            plan_db,
+                            f"Renovação {plan_cfg.get('name', sub.plan_slug)}",
+                            reference_type="stripe_invoice",
+                            reference_id=inv_id,
+                        )
+                        user.credits_last_granted_at = datetime.now(timezone.utc)
+                        logger.info(f"Renovação {sub.plan_slug}: +{plan_cfg['tokens']} tokens pra {user.id}")
+                    except Exception as _e:
+                        logger.exception(f"⚠️ Falha ao creditar tokens na renovação: {_e}")
 
     # 🆕 20/07 22:58 — Calcula comissão de parceiro se cupom foi aplicado
     discount = event_obj.get("discount") or {}
