@@ -89,9 +89,20 @@ export function PartnerPortalPage() {
   if (error) {
     return (
       <div className="min-h-screen p-8" style={{ background: '#0A0A1A' }}>
-        <Link to="/admin" className="text-ayria-muted hover:text-ayria-text flex items-center gap-2 mb-4">
-          <ArrowLeft size={16}/>Voltar pro admin
-        </Link>
+        {/*
+         * Mesmo em erro: 'Voltar pro admin' só p/ admin que abriu /partner/:id.
+         * Parceiro logado não vê isso — vê só 'Sair' ou 'Voltar pro login'.
+         */}
+        {!partnerToken ? (
+          <Link to="/admin" className="text-ayria-muted hover:text-ayria-text flex items-center gap-2 mb-4">
+            <ArrowLeft size={16}/>Voltar pro admin
+          </Link>
+        ) : (
+          <button onClick={handleLogout}
+            className="text-ayria-muted hover:text-ayria-text flex items-center gap-2 mb-4">
+            <ArrowLeft size={16}/>Voltar pro login
+          </button>
+        )}
         <div className="p-6 rounded-2xl" style={{ background: '#1a1a2e', border: '1px solid #da3737' }}>
           <div className="text-red-300 mb-2">❌ Erro</div>
           <div className="text-sm text-ayria-muted">{error}</div>
@@ -136,9 +147,17 @@ export function PartnerPortalPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <Link to="/admin" className="text-ayria-muted hover:text-ayria-text flex items-center gap-2 text-sm mb-2">
-              <ArrowLeft size={14}/>Voltar pro admin
-            </Link>
+            {/*
+             * 🆕 26/07/2026 23:35 — 'Voltar pro admin' só aparece
+             * quando o admin abriu o portal via /partner/:id SEM logar
+             * como parceiro. Se o cara tá logado como parceiro, mostrar
+             * 'Sair do portal' (logout) ao lado do botão Atualizar.
+             */}
+            {!partnerToken && (
+              <Link to="/admin" className="text-ayria-muted hover:text-ayria-text flex items-center gap-2 text-sm mb-2">
+                <ArrowLeft size={14}/>Voltar pro admin
+              </Link>
+            )}
             <h1 className="text-2xl sm:text-3xl font-bold text-ayria-text flex items-center gap-2">
               <Users size={24}/>Portal do Parceiro
             </h1>
@@ -150,12 +169,13 @@ export function PartnerPortalPage() {
           </div>
           <div className="flex gap-2">
             {partnerToken && (
-              <button onClick={handleLogout} className="px-3 py-2 rounded-xl text-sm text-red-300 hover:text-red-200 flex items-center gap-1"
-                style={{ background: '#1a1a2e', border: '1px solid #2a2a3e' }} title="Sair">
+              <button onClick={handleLogout}
+                className="px-4 py-2 rounded-xl text-sm text-red-300 hover:text-red-200 flex items-center gap-2"
+                style={{ background: '#1a1a2e', border: '1px solid #2a2a3e' }} title="Sair do portal do parceiro">
                 <LogOut size={14}/>Sair
               </button>
             )}
-            <button onClick={reload} className="px-3 py-2 rounded-xl text-sm text-ayria-muted hover:text-ayria-text flex items-center gap-1"
+            <button onClick={reload} className="px-4 py-2 rounded-xl text-sm text-ayria-muted hover:text-ayria-text flex items-center gap-2"
               style={{ background: '#1a1a2e', border: '1px solid #2a2a3e' }} title="Recarregar">
               <RefreshCw size={14}/>Atualizar
             </button>

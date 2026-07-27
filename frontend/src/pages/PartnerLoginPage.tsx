@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, LogIn, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { ArrowLeft, LogIn, Eye, EyeOff, AlertCircle, LogOut } from 'lucide-react'
 import { api } from '../lib/api'
 import { partnerApi } from '../lib/partnerApi'
 
@@ -59,7 +59,13 @@ export function PartnerLoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0A0A1A' }}>
       <div className="w-full max-w-md">
-        <Link to="/" className="text-ayria-muted hover:text-ayria-text flex items-center gap-2 text-sm mb-6">
+        {/*
+         * 🆕 26/07/2026 23:35 — 'Voltar' mais visível pra quem abriu
+         * por engano ou quer sair sem logar.
+         */}
+        <Link to="/"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-ayria-muted hover:text-ayria-text mb-6"
+          style={{ background: '#1a1a2e', border: '1px solid #2a2a3e' }}>
           <ArrowLeft size={14}/>Voltar
         </Link>
 
@@ -155,6 +161,13 @@ export function PartnerChangePasswordPage() {
     )
   }
 
+  const handleCancel = () => {
+    // Limpa token e volta pro login (parceiro desistiu de trocar)
+    localStorage.removeItem(PARTNER_TOKEN_KEY)
+    localStorage.removeItem(PARTNER_INFO_KEY)
+    navigate('/partner/login')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -189,6 +202,14 @@ export function PartnerChangePasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0A0A1A' }}>
       <div className="w-full max-w-md">
+        {/*
+         * 🆕 26/07/2026 23:35 — Botão 'Voltar pro login' pro parceiro
+         * cancelar a troca e voltar pro login (sem perder a senha temporária).
+         */}
+        <button onClick={handleCancel}
+          className="text-ayria-muted hover:text-ayria-text flex items-center gap-2 text-sm mb-6">
+          <ArrowLeft size={14}/>Voltar pro login
+        </button>
         <div className="p-8 rounded-3xl" style={{ background: '#1a1a2e', border: '1px solid #2a2a3e' }}>
           <h1 className="text-2xl font-bold text-ayria-text mb-1">Trocar senha</h1>
           <p className="text-sm text-ayria-muted mb-6">É sua primeira entrada — defina uma senha nova antes de continuar.</p>
