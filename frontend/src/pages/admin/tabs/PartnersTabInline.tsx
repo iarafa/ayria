@@ -33,28 +33,39 @@ export function PartnersTabInline() {
     e.preventDefault(); setBusy(true); setError(null)
     try {
       const resp = await api.post('/api/admin/partners', form)
+      // Limpa form + FECHA tela ANTES de qualquer coisa (mesmo se reload falhar)
       setShowCreate(false)
       setForm({ name: '', email: '', phone: '', document_type: 'CPF', document_number: '', pix_key: '', notes: '' })
-      await reload()
-      // 🆕 23/07 — backend retorna temporary_password (gerada pelo sistema)
+      // Tenta recarregar lista (best-effort, se falhar não trava o sucesso)
+      reload().catch(() => {})
+      // Modal da senha temporária — só abre se veio no payload
       if (resp.data?.temporary_password) {
         setCreatedTempPwd(resp.data.temporary_password)
       } else {
-        alert('✅ Parceiro criado!')
+        // Fallback: avisa que foi criado
+        alert('✅ Parceiro criado! Senha temporária não gerada — use "Resetar senha" para gerar uma.')
       }
-    } catch (e: any) { setError(e.response?.data?.detail || e.message) }
-    finally { setBusy(false) }
+    } catch (e: any) {
+      setError(e.response?.data?.detail || e.message)
+      // NÃO fecha a tela em caso de erro — deixa usuário corrigir
+    } finally {
+      setBusy(false)
+    }
   }
 
   const handleResetPassword = async (p: any) => {
     if (!confirm(`Resetar a senha de ${p.name} (${p.email})?\n\nUma senha temporária será gerada. O parceiro será obrigado a trocar no próximo login.`)) return
     try {
       const resp = await api.post(`/api/admin/partners/${p.id}/reset-password`)
-      setTempPwd({
-        partner_name: resp.data.partner_name,
-        partner_email: resp.data.partner_email,
-        password: resp.data.temporary_password,
-      })
+      if (resp.data?.temporary_password) {
+        setTempPwd({
+          partner_name: resp.data.partner_name || p.name,
+          partner_email: resp.data.partner_email || p.email,
+          password: resp.data.temporary_password,
+        })
+      } else {
+        alert('❌ Backend não retornou senha temporária')
+      }
     } catch (e: any) {
       alert('❌ ' + (e.response?.data?.detail || e.message))
     }
@@ -77,10 +88,13 @@ export function PartnersTabInline() {
             <div className="flex gap-2">
               <button onClick={() => handleResetPassword(p)} className="text-yellow-400 hover:text-yellow-300 p-1" title="Resetar senha"><KeyRound size={16} /></button>
               <button onClick={async () => {
-                if (!confirm('Excluir parceiro ' + p.name + '?')) return
-                try { await api.delete(`/api/admin/partners/${p.id}`); await reload() }
-                catch (e: any) { alert('❌ ' + (e.response?.data?.detail || e.message)) }
-              }} className="text-red-400 hover:text-red-300 p-1" title="Excluir"><Trash2 size={16} /></button>
+                if (!confirm('Desativar parceiro ' + p.name + '?')) return
+                try {
+                  await api.delete(`/api/admin/partners/${p.id}`)
+                  reload().catch(() => {})
+                  setError(null)
+                } catch (e: any) { alert('❌ ' + (e.response?.data?.detail || e.message)) }
+              }} className="text-red-400 hover:text-red-300 p-1" title="Desativar"><Trash2 size={16} /></button>
             </div>
           </div>
         )}

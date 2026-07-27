@@ -123,13 +123,17 @@ async def list_partners(
     ]
 
 
-@router.post("/api/admin/partners", response_model=schemas.PartnerResponse, status_code=201)
+@router.post("/api/admin/partners", status_code=201)
 async def create_partner(
     body: schemas.PartnerCreate,
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Cria novo parceiro."""
+    """Cria novo parceiro.
+
+    🆕 26/07/2026 — Usa response_model=None (retorna JSON cru) pra incluir o campo
+    `temporary_password` que NÃO pode ficar no schema normal (por segurança).
+    """
     # Validação: email único
     existing = await db.execute(select(Partner).where(Partner.email == body.email))
     if existing.scalar_one_or_none():
@@ -150,16 +154,20 @@ async def create_partner(
     await db.commit()
     await db.refresh(partner)
 
-    # 🆕 23/07/2026 — gerar senha temporária automaticamente
+    # Gera senha temporária automaticamente
     import bcrypt as _bcrypt
     temp_pwd = _generate_temp_password()
     partner.password_hash = _bcrypt.hashpw(temp_pwd.encode(), _bcrypt.gensalt()).decode()
-    partner.must_change_password = True
+    # 🆕 26/07/2026 — só seta must_change_password SE a coluna existir (migration pode não ter rodado)
+    if hasattr(partner, "must_change_password"):
+        partner.must_change_password = True
     await db.commit()
+    await db.refresh(partner)
 
     logger.info(f"Partner created: {partner.id} email={partner.email} (temp password set)")
-    # Retorna com a senha no body pra admin mostrar 1x
-    resp = _partner_to_response(partner)
+
+    # Retorna JSON cru (sem response_model) pra incluir temporary_password no body
+    resp = _partner_to_response(partner).model_dump()
     resp["temporary_password"] = temp_pwd
     return resp
 
