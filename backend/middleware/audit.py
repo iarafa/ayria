@@ -101,6 +101,19 @@ class AuditMiddleware(BaseHTTPMiddleware):
         except Exception:
             pass
 
+        # 🆕 26/07/2026 22:55 — Se o user_id veio de um token de PARCEIRO
+        # (sub=partner_id), não tem em users. Valida antes pra não dar FK violation.
+        if user_id:
+            try:
+                from sqlalchemy import select
+                async with AsyncSessionLocal() as db:
+                    from models import User
+                    res = await db.execute(select(User.id).where(User.id == user_id))
+                    if res.scalar_one_or_none() is None:
+                        user_id = None  # é parceiro (ou alguém não-user), não registra
+            except Exception:
+                user_id = None
+
         try:
             async with AsyncSessionLocal() as db:
                 log = AuditLog(

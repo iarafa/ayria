@@ -58,9 +58,9 @@ oauth2_partner_scheme = OAuth2PasswordBearer(tokenUrl="/api/partner/login", auto
 async def _decode_partner_token(token: str) -> Partner:
     """Decodifica token JWT de parceiro sem tocar no DB."""
     from jose import JWTError, jwt
-    from utils.security import SECRET_KEY, ALGORITHM
+    from database import settings as _s
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, _s.JWT_SECRET, algorithms=[_s.JWT_ALGORITHM])
         if payload.get("type") != "partner":
             raise HTTPException(401, "Token não é de parceiro")
         partner_id = payload.get("sub")
@@ -77,7 +77,7 @@ async def _decode_partner_token(token: str) -> Partner:
 
 
 async def get_current_partner(
-    token: str = Depends(oauth2_partner_scheme),
+    token: Optional[str] = Depends(oauth2_partner_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> Partner:
     """Valida JWT de parceiro e retorna o Partner. (Raises 401 se inválido.)"""
@@ -106,6 +106,8 @@ async def get_current_partner_optional(
             return None
         return partner
     except HTTPException:
+        return None
+    except Exception:
         return None
 
 
@@ -139,9 +141,12 @@ async def partner_login(req: PartnerLoginRequest, db: AsyncSession = Depends(get
     await db.commit()
 
     # Token específico de parceiro (type=partner)
+    # 🆕 26/07/2026 23:08 — Passa type="partner" via token_type (não via data)
+    # senão create_access_token sobrescreve o type com o default "access"
     access_token = create_access_token(
-        data={"sub": str(partner.id), "type": "partner"},
+        data={"sub": str(partner.id)},
         expires_delta=timedelta(days=7),  # 7 dias pra parceiro (não usa o celular toda hora)
+        token_type="partner",
     )
 
     logger.info(f"partner_login OK: {partner.email} (must_change={partner.must_change_password})")

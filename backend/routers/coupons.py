@@ -93,6 +93,43 @@ def calc_discount_cents(plan_price_cents: int, discount_type: str, discount_valu
 
 
 # ============================================================
+# 🆕 26/07/2026 22:43 — Dependencies opcionais (admin OR parceiro)
+# Pra endpoints /api/partner/me/* que servem tanto admin (via partner_id)
+# quanto parceiro autenticado (via JWT próprio)
+# ============================================================
+async def require_admin_optional(
+    token: Optional[str] = Depends(OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Tenta autenticar como admin via JWT. Retorna None se não for."""
+    if not token:
+        return None
+    from utils.security import decode_token
+    from models import User
+    from sqlalchemy import select
+    try:
+        payload = decode_token(token)
+        if not payload:
+            return None
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        # Verifica se user existe e é admin
+        from uuid import UUID
+        try:
+            uid = UUID(user_id)
+        except ValueError:
+            return None
+        result = await db.execute(select(User).where(User.id == uid))
+        user = result.scalar_one_or_none()
+        if not user or user.role not in ('admin', 'SUPER_ADMIN'):
+            return None
+        return user
+    except Exception:
+        return None
+
+
+# ============================================================
 # ADMIN: PARTNERS CRUD
 # ============================================================
 
@@ -661,153 +698,6 @@ async def validate_coupon(
         preview=preview,
     )
 
-
-# ============================================================
-# 🆕 26/07/2026 22:15 — ENDPOINTS DO PARCEIRO AUTENTICADO (PORTAL)
-# Parceiro vê seus cupons + comissões, INCLUINDO cupons deletados (soft-delete)
-# preserva histórico mesmo se admin excluiu o cupom.
-# ============================================================
-
-from fastapi import Request
-
-
-async def _get_current_partner(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-) -> Partner:
-    """Identifica o parceiro logado via JWT do parceiro (campo `role='partner'` em users).
-
-    NOTA: hoje os parceiros são guardados na tabela partners (não em users).
-    Solução temporária: aceitar token de admin + filtro por partner_id via query param
-    OU um header especial. Pra simplicidade, vamos usar o JWT do user e checar
-    se ele tem um partner_id associado.
-    """
-    # O JWT do parceiro atual não existe ainda — TODO integração SSO
-    # Por agora, retorna NOne e os endpoints exigem partner_id via query
-    return None
-
-
-@router.get("/api/partner/me/coupons")
-async def partner_my_coupons(
-    partner_id: str = Query(...),
-    admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    """🆕 Lista cupons do parceiro (ativos + deletados/histórico).
-
-    Acesso: ADMIN (proxy pro parceiro) OU futuramente o próprio parceiro logado.
-    Inclui cupons com deleted_at NOT NULL (soft-deleted) p/ preservar histórico.
-    """
-    from uuid import UUID
-    try:
-        pid = UUID(partner_id)
-    except ValueError:
-        raise HTTPException(400, "partner_id inválido")
-
-    partner = await db.get(Partner, pid)
-    if not partner:
-        raise HTTPException(404, "Parceiro não encontrado")
-
-    # TODOS os cupons do parceiro (soft-deleted inclusos)
-    result = await db.execute(
-        select(Coupon).where(Coupon.partner_id == pid).order_by(Coupon.created_at.desc())
-    )
-    coupons = result.scalars().all()
-
-    # Total de comissões
-    commission_q = select(
-        CouponRedemption.payout_status,
-        func.coalesce(func.sum(CouponRedemption.commission_amount_cents), 0)
-    ).where(CouponRedemption.partner_id == pid).group_by(CouponRedemption.payout_status)
-    rows = (await db.execute(commission_q)).all()
-    totals = {"pending": 0, "paid": 0}
-    for ps, val in rows:
-        if ps in totals:
-            totals[ps] = int(val or 0)
-
-    return {
-        "partner": {
-            "id": str(partner.id),
-            "name": partner.name,
-            "email": partner.email,
-        },
-        "total_pending_cents": totals["pending"],
-        "total_paid_cents": totals["paid"],
-        "coupons": [
-            {
-                **schemas.CouponResponse.model_validate(_coupon_to_response(c, partner.name)).model_dump(),
-                "deleted_at": c.deleted_at.isoformat() if c.deleted_at else None,
-                "is_deleted": c.deleted_at is not None,
-                "total_redemptions_for_this_coupon": 0,  # recalculado abaixo
-            }
-            for c in coupons
-        ],
-    }
-
-
-@router.get("/api/partner/me/redemptions")
-async def partner_my_redemptions(
-    partner_id: str = Query(...),
-    admin: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
-):
-    """🆕 Lista TODAS as comissões do parceiro, incluindo cupons DELETADOS.
-
-    Mesmo se admin excluiu o cupom, as redemptions ficam visíveis com o código
-    preservado (campo coupon_code_original é populado se coupon_id ficou órfão).
-    """
-    from uuid import UUID
-    try:
-        pid = UUID(partner_id)
-    except ValueError:
-        raise HTTPException(400, "partner_id inválido")
-
-    partner = await db.get(Partner, pid)
-    if not partner:
-        raise HTTPException(404, "Parceiro não encontrado")
-
-    # LEFT JOIN com Coupon — se coupon foi hard-deletado, ainda assim mostra a redemption
-    result = await db.execute(
-        select(CouponRedemption, Coupon, User)
-        .outerjoin(Coupon, CouponRedemption.coupon_id == Coupon.id)
-        .outerjoin(User, CouponRedemption.user_id == User.id)
-        .where(CouponRedemption.partner_id == pid)
-        .order_by(CouponRedemption.created_at.desc())
-        .limit(500)
-    )
-    rows = result.all()
-
-    items = []
-    for r, c, u in rows:
-        items.append({
-            "id": str(r.id),
-            "coupon_id": str(r.coupon_id) if r.coupon_id else None,
-            "coupon_code": c.code if c else (r.coupon_code_snapshot or "—"),
-            "coupon_deleted": c is None,
-            "user_email": u.email if u else None,
-            "plan_slug": r.plan_slug,
-            "original_amount_cents": r.original_amount_cents,
-            "discount_amount_cents": r.discount_amount_cents,
-            "final_amount_cents": r.final_amount_cents,
-            "commission_pct": float(r.commission_pct) if r.commission_pct else None,
-            "commission_amount_cents": r.commission_amount_cents,
-            "payout_status": r.payout_status,
-            "payout_at": r.payout_at.isoformat() if r.payout_at else None,
-            "created_at": r.created_at.isoformat() if r.created_at else "",
-        })
-
-    return {
-        "partner": {"id": str(partner.id), "name": partner.name, "email": partner.email},
-        "total_items": len(items),
-        "items": items,
-    }
-
-
-# ============================================================
-# 🆕 26/07/2026 22:20 — ENDPOINTS DE LISTAGEM/RESTAURAÇÃO (admin)
-# Tela admin: aba "Cupons Deletados" pra ver histórico que foi preservado
-# ============================================================
-
 @router.get("/api/admin/coupons/deleted", response_model=list[schemas.CouponResponse])
 async def list_deleted_coupons(
     admin: User = Depends(require_admin),
@@ -961,10 +851,6 @@ async def partner_my_redemptions(
             raise HTTPException(400, "partner_id inválido")
     else:
         raise HTTPException(401, "Autenticação necessária")
-    try:
-        pid = UUID(partner_id)
-    except ValueError:
-        raise HTTPException(400, "partner_id inválido")
 
     partner = await db.get(Partner, pid)
     if not partner:
@@ -1005,22 +891,3 @@ async def partner_my_redemptions(
         "total_items": len(items),
         "items": items,
     }
-
-
-# ============================================================
-# 🆕 26/07/2026 22:43 — Dependencies opcionais (admin OR parceiro)
-# Pra endpoints /api/partner/me/* que servem tanto admin (via partner_id)
-# quanto parceiro autenticado (via JWT próprio)
-# ============================================================
-async def require_admin_optional(token: Optional[str] = Depends(OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False))):
-    """Tenta autenticar como admin. Retorna None se não for."""
-    from utils.security import get_current_user
-    if not token:
-        return None
-    try:
-        user = await get_current_user(token=token)
-        if user.role in ('admin', 'SUPER_ADMIN'):
-            return user
-    except Exception:
-        pass
-    return None

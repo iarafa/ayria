@@ -87,7 +87,7 @@ export function PartnersTabInline() {
               <div className="text-xs text-ayria-muted">{p.email} · {p.document_type}: {p.document_number || '-'} · {p.coupons_count} cupom(ns) · R$ {(p.total_commission_cents || 0) / 100}</div>
             </div>
             <div className="flex gap-2">
-              <Link to={`/partner/${p.id}`} target="_blank" title="Ver portal do parceiro"
+              <Link to={`/partner/login`} target="_blank" title="Abrir tela de login do parceiro"
                 className="text-blue-400 hover:text-blue-300 p-1 inline-flex items-center">
                 <ExternalLink size={16}/>
               </Link>
