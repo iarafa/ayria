@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { KeyRound, Trash2, UserPlus, X } from 'lucide-react'
+import { KeyRound, Trash2, UserPlus, X, ExternalLink } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { ListWithControls } from '../../../components/ListWithControls'
 import { adminApi, api } from '../../../lib/api'
 
@@ -86,6 +87,10 @@ export function PartnersTabInline() {
               <div className="text-xs text-ayria-muted">{p.email} · {p.document_type}: {p.document_number || '-'} · {p.coupons_count} cupom(ns) · R$ {(p.total_commission_cents || 0) / 100}</div>
             </div>
             <div className="flex gap-2">
+              <Link to={`/partner/${p.id}`} target="_blank" title="Ver portal do parceiro"
+                className="text-blue-400 hover:text-blue-300 p-1 inline-flex items-center">
+                <ExternalLink size={16}/>
+              </Link>
               <button onClick={() => handleResetPassword(p)} className="text-yellow-400 hover:text-yellow-300 p-1" title="Resetar senha"><KeyRound size={16} /></button>
               <button onClick={async () => {
                 if (!confirm('Desativar parceiro ' + p.name + '?')) return

@@ -15,6 +15,7 @@ import { ObserveUserPage } from './pages/ObserveUserPage'
 import CreatingProfilePage from './pages/CreatingProfilePage'
 import { PlanosPage } from './pages/PlanosPage'  // 🆕 22/07 21:10 — cupom de desconto
 import { PagamentoSucessoPage } from './pages/PagamentoSucessoPage'  // 🆕 22/07 22:08 — retorno Stripe
+import { PartnerPortalPage } from './pages/PartnerPortalPage'  // 🆕 26/07 22:35 — portal do parceiro
 
 function PrivateRoute({ children, adminOnly = false, requireOnboarding = false }: { children: React.ReactNode; adminOnly?: boolean; requireOnboarding?: boolean }) {
   const { user, token, loadUser } = useAuth()
@@ -133,6 +134,15 @@ export default function App() {
         element={
           <PrivateRoute>
             <PagamentoSucessoPage />
+          </PrivateRoute>
+        }
+      />
+      {/* 🆕 26/07 22:35 — Portal do Parceiro (admin passa link via lista de parceiros) */}
+      <Route
+        path="/partner/:partnerId"
+        element={
+          <PrivateRoute>
+            <PartnerPortalPage />
           </PrivateRoute>
         }
       />
