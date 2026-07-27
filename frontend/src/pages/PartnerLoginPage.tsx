@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, LogIn, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { api } from '../lib/api'
+import { partnerApi } from '../lib/partnerApi'
 
 const PARTNER_TOKEN_KEY = 'ayria_partner_token'
 const PARTNER_INFO_KEY = 'ayria_partner_info'
@@ -32,7 +33,9 @@ export function PartnerLoginPage() {
     setLoading(true)
     setError(null)
     try {
-      const { data } = await api.post('/api/partner/login', { email: email.trim(), password })
+      // 🆕 26/07/2026 23:30 — partnerApi (sem interceptor de user-token) pra não
+      // misturar Authorization do admin com credenciais de parceiro.
+      const { data } = await partnerApi.post('/api/partner/login', { email: email.trim(), password })
       localStorage.setItem(PARTNER_TOKEN_KEY, data.access_token)
       localStorage.setItem(PARTNER_INFO_KEY, JSON.stringify({
         id: data.partner_id,
@@ -165,7 +168,9 @@ export function PartnerChangePasswordPage() {
     }
     setLoading(true)
     try {
-      await api.post('/api/partner/me/change-password',
+      // 🆕 26/07/2026 23:30 — Usar partnerApi (não api) pra não cair no interceptor
+      // de user-token que sobrescreveria o Authorization com ayria_token.
+      await partnerApi.post('/api/partner/me/change-password',
         { current_password: currentPassword, new_password: newPassword },
         { headers: { Authorization: `Bearer ${token}` } }
       )

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { ArrowLeft, DollarSign, Tag, Users, Clock, RefreshCw, ExternalLink, TrendingUp, LogOut } from 'lucide-react'
 import { api } from '../lib/api'
+import { partnerApi } from '../lib/partnerApi'
 
 const PARTNER_TOKEN_KEY = 'ayria_partner_token'
 const PARTNER_INFO_KEY = 'ayria_partner_info'
@@ -48,9 +49,13 @@ export function PartnerPortalPage() {
       const url = partnerToken
         ? '/api/partner/me/coupons'  // token já identifica o parceiro
         : `/api/partner/me/coupons?partner_id=${effectivePartnerId}`
+      // 🆕 26/07/2026 23:30 — partnerApi (sem interceptor user-token) quando há
+      // partnerToken. Quando NÃO há token (admin abriu /partner/:id direto),
+      // mantemos `api` pra que o token de admin seja injetado normalmente.
+      const client = partnerToken ? partnerApi : api
       const [rc, rr] = await Promise.all([
-        api.get(url, { headers }),
-        api.get(partnerToken ? '/api/partner/me/redemptions' : `/api/partner/me/redemptions?partner_id=${effectivePartnerId}`, { headers }),
+        client.get(url, { headers }),
+        client.get(partnerToken ? '/api/partner/me/redemptions' : `/api/partner/me/redemptions?partner_id=${effectivePartnerId}`, { headers }),
       ])
       setCoupons(rc.data?.coupons || [])
       setPartner(rc.data?.partner || null)
