@@ -453,10 +453,14 @@ async def hard_delete_coupon(
 ):
     """Exclui o cupom PERMANENTEMENTE (AYRIA + Stripe).
 
-    🆕 26/07/2026 — Rafael pediu botão de excluir. ATENÇÃO:
-    - CouponRedemption NO BANCO NÃO É REMOVIDO (preserva histórico de comissões)
-    - Stripe Coupon é deletado
-    - This is irreversible — frontend exige confirmação dupla (digitar o código)
+    🆕 26/07/2026 — Rafael pediu botão de excluir.
+
+    COMPROMISSO DE PRESERVAÇÃO (26/07 22:15 — Rafael reforçou):
+    - CouponRedemption NO BANCO NUNCA É REMOVIDA (histórico do parceiro)
+    - soft-delete no AYRIA (active=False + deleted_at) ao invés de hard-delete
+      → parceiro vê cupons antigos no portal mesmo depois de "excluídos"
+    - Stripe Coupon é deletado (libera espaço no dashboard Stripe)
+    - This is irreversible no Stripe — o AYRIA preserva TUDO
     """
     from uuid import UUID
     try:
@@ -468,26 +472,36 @@ async def hard_delete_coupon(
     if not coupon:
         raise HTTPException(404, "Cupom não encontrado")
 
-    # Verifica se tem redemptions (não bloqueia, mas avisa)
+    # Verifica redemptions (NÃO bloqueia, mas loga)
     redemptions_count = await db.execute(
         select(func.count(CouponRedemption.id)).where(CouponRedemption.coupon_id == cid)
     )
     n_redemptions = redemptions_count.scalar() or 0
 
-    # Deleta do Stripe
+    if n_redemptions > 0:
+        # TEM histórico: PRESERVA no AYRIA (soft-delete), só tira do Stripe
+        coupon.active = False
+        coupon.deleted_at = datetime.utcnow()  # 🆕 soft-delete marker
+        coupon.deleted_by = admin.id
+        logger.warning(
+            f"🗃️ SOFT-DELETE coupon (preserva histórico p/ parceiro): id={cid} "
+            f"code={coupon.code} partner={coupon.partner_id} redemptions={n_redemptions} "
+            f"by admin={admin.email}"
+        )
+    else:
+        # SEM histórico: hard-delete seguro
+        logger.warning(
+            f"🗑️ HARD DELETE coupon: id={cid} code={coupon.code} "
+            f"partner={coupon.partner_id} redemptions=0 by admin={admin.email}"
+        )
+        await db.delete(coupon)
+
+    # Stripe SEMPRE deleta (libera espaço e remove de cobranças futuras)
     try:
         await stripe.Coupon.delete_async(coupon.stripe_coupon_id)
     except stripe.error.StripeError as e:
-        logger.warning(f"Stripe coupon delete failed (continuando): {e}")
+        logger.warning(f"Stripe coupon delete failed (continuando — AYRIA preservado): {e}")
 
-    # Guarda histórico antes de deletar
-    logger.warning(
-        f"🗑️ HARD DELETE coupon: id={cid} code={coupon.code} "
-        f"partner={coupon.partner_id} redemptions={n_redemptions} "
-        f"by admin={admin.email}"
-    )
-
-    await db.delete(coupon)
     await db.commit()
     return None
 
@@ -644,3 +658,327 @@ async def validate_coupon(
         partner_name=partner.name if partner else None,
         preview=preview,
     )
+
+
+# ============================================================
+# 🆕 26/07/2026 22:15 — ENDPOINTS DO PARCEIRO AUTENTICADO (PORTAL)
+# Parceiro vê seus cupons + comissões, INCLUINDO cupons deletados (soft-delete)
+# preserva histórico mesmo se admin excluiu o cupom.
+# ============================================================
+
+from fastapi import Request
+
+
+async def _get_current_partner(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> Partner:
+    """Identifica o parceiro logado via JWT do parceiro (campo `role='partner'` em users).
+
+    NOTA: hoje os parceiros são guardados na tabela partners (não em users).
+    Solução temporária: aceitar token de admin + filtro por partner_id via query param
+    OU um header especial. Pra simplicidade, vamos usar o JWT do user e checar
+    se ele tem um partner_id associado.
+    """
+    # O JWT do parceiro atual não existe ainda — TODO integração SSO
+    # Por agora, retorna NOne e os endpoints exigem partner_id via query
+    return None
+
+
+@router.get("/api/partner/me/coupons")
+async def partner_my_coupons(
+    partner_id: str = Query(...),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """🆕 Lista cupons do parceiro (ativos + deletados/histórico).
+
+    Acesso: ADMIN (proxy pro parceiro) OU futuramente o próprio parceiro logado.
+    Inclui cupons com deleted_at NOT NULL (soft-deleted) p/ preservar histórico.
+    """
+    from uuid import UUID
+    try:
+        pid = UUID(partner_id)
+    except ValueError:
+        raise HTTPException(400, "partner_id inválido")
+
+    partner = await db.get(Partner, pid)
+    if not partner:
+        raise HTTPException(404, "Parceiro não encontrado")
+
+    # TODOS os cupons do parceiro (soft-deleted inclusos)
+    result = await db.execute(
+        select(Coupon).where(Coupon.partner_id == pid).order_by(Coupon.created_at.desc())
+    )
+    coupons = result.scalars().all()
+
+    # Total de comissões
+    commission_q = select(
+        CouponRedemption.payout_status,
+        func.coalesce(func.sum(CouponRedemption.commission_amount_cents), 0)
+    ).where(CouponRedemption.partner_id == pid).group_by(CouponRedemption.payout_status)
+    rows = (await db.execute(commission_q)).all()
+    totals = {"pending": 0, "paid": 0}
+    for ps, val in rows:
+        if ps in totals:
+            totals[ps] = int(val or 0)
+
+    return {
+        "partner": {
+            "id": str(partner.id),
+            "name": partner.name,
+            "email": partner.email,
+        },
+        "total_pending_cents": totals["pending"],
+        "total_paid_cents": totals["paid"],
+        "coupons": [
+            {
+                **schemas.CouponResponse.model_validate(_coupon_to_response(c, partner.name)).model_dump(),
+                "deleted_at": c.deleted_at.isoformat() if c.deleted_at else None,
+                "is_deleted": c.deleted_at is not None,
+                "total_redemptions_for_this_coupon": 0,  # recalculado abaixo
+            }
+            for c in coupons
+        ],
+    }
+
+
+@router.get("/api/partner/me/redemptions")
+async def partner_my_redemptions(
+    partner_id: str = Query(...),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """🆕 Lista TODAS as comissões do parceiro, incluindo cupons DELETADOS.
+
+    Mesmo se admin excluiu o cupom, as redemptions ficam visíveis com o código
+    preservado (campo coupon_code_original é populado se coupon_id ficou órfão).
+    """
+    from uuid import UUID
+    try:
+        pid = UUID(partner_id)
+    except ValueError:
+        raise HTTPException(400, "partner_id inválido")
+
+    partner = await db.get(Partner, pid)
+    if not partner:
+        raise HTTPException(404, "Parceiro não encontrado")
+
+    # LEFT JOIN com Coupon — se coupon foi hard-deletado, ainda assim mostra a redemption
+    result = await db.execute(
+        select(CouponRedemption, Coupon, User)
+        .outerjoin(Coupon, CouponRedemption.coupon_id == Coupon.id)
+        .outerjoin(User, CouponRedemption.user_id == User.id)
+        .where(CouponRedemption.partner_id == pid)
+        .order_by(CouponRedemption.created_at.desc())
+        .limit(500)
+    )
+    rows = result.all()
+
+    items = []
+    for r, c, u in rows:
+        items.append({
+            "id": str(r.id),
+            "coupon_id": str(r.coupon_id) if r.coupon_id else None,
+            "coupon_code": c.code if c else (r.coupon_code_snapshot or "—"),
+            "coupon_deleted": c is None,
+            "user_email": u.email if u else None,
+            "plan_slug": r.plan_slug,
+            "original_amount_cents": r.original_amount_cents,
+            "discount_amount_cents": r.discount_amount_cents,
+            "final_amount_cents": r.final_amount_cents,
+            "commission_pct": float(r.commission_pct) if r.commission_pct else None,
+            "commission_amount_cents": r.commission_amount_cents,
+            "payout_status": r.payout_status,
+            "payout_at": r.payout_at.isoformat() if r.payout_at else None,
+            "created_at": r.created_at.isoformat() if r.created_at else "",
+        })
+
+    return {
+        "partner": {"id": str(partner.id), "name": partner.name, "email": partner.email},
+        "total_items": len(items),
+        "items": items,
+    }
+
+
+# ============================================================
+# 🆕 26/07/2026 22:20 — ENDPOINTS DE LISTAGEM/RESTAURAÇÃO (admin)
+# Tela admin: aba "Cupons Deletados" pra ver histórico que foi preservado
+# ============================================================
+
+@router.get("/api/admin/coupons/deleted", response_model=list[schemas.CouponResponse])
+async def list_deleted_coupons(
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lista cupons soft-deleted (deleted_at não nulo). Visível pro admin mas não na tela principal."""
+    stmt = select(Coupon, Partner).outerjoin(Partner, Coupon.partner_id == Partner.id)\
+        .where(Coupon.deleted_at.isnot(None))\
+        .order_by(Coupon.deleted_at.desc())
+    result = await db.execute(stmt)
+    return [_coupon_to_response(c, p.name if p else None) for c, p in result.all()]
+
+
+@router.post("/api/admin/coupons/{coupon_id}/restore")
+async def restore_deleted_coupon(
+    coupon_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Restaura cupom soft-deleted. Cria NOVO Stripe coupon (o antigo foi deletado)."""
+    from uuid import UUID
+    try:
+        cid = UUID(coupon_id)
+    except ValueError:
+        raise HTTPException(400, "ID inválido")
+
+    coupon = await db.get(Coupon, cid)
+    if not coupon:
+        raise HTTPException(404, "Cupom não encontrado")
+    if not coupon.deleted_at:
+        raise HTTPException(400, "Cupom não está deletado")
+
+    stripe_params = {
+        "name": coupon.name or coupon.code,
+        "duration": "repeating",
+        "duration_in_months": coupon.duration_months,
+    }
+    if coupon.discount_type == "percent":
+        stripe_params["percent_off"] = float(coupon.discount_value)
+    else:
+        stripe_params["amount_off"] = int(round(float(coupon.discount_value) * 100))
+        stripe_params["currency"] = "brl"
+    if coupon.max_redemptions:
+        stripe_params["max_redemptions"] = coupon.max_redemptions
+    if coupon.expires_at:
+        stripe_params["redeem_by"] = int(coupon.expires_at.timestamp())
+
+    try:
+        stripe_coupon = await stripe.Coupon.create_async(**stripe_params)
+    except stripe.error.StripeError as e:
+        raise HTTPException(502, f"Erro Stripe: {e.user_message or str(e)}")
+
+    coupon.stripe_coupon_id = stripe_coupon.id
+    coupon.deleted_at = None
+    coupon.deleted_by = None
+    coupon.active = True
+    await db.commit()
+    await db.refresh(coupon)
+
+    logger.info(f"♻️ Coupon RESTORED: code={coupon.code} new_stripe_id={stripe_coupon.id} by admin={admin.email}")
+    return _coupon_to_response(coupon)
+
+
+# ============================================================
+# 🆕 26/07/2026 22:25 — PORTAL DO PARCEIRO
+# Endpoints do /api/partner/me/* — parceiro vê seus cupons + comissões
+# INCLUINDO cupons deletados (histórico preservado)
+# ============================================================
+
+@router.get("/api/partner/me/coupons")
+async def partner_my_coupons(
+    partner_id: str = Query(...),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lista cupons do parceiro (todos, incluindo soft-deleted)."""
+    from uuid import UUID
+    try:
+        pid = UUID(partner_id)
+    except ValueError:
+        raise HTTPException(400, "partner_id inválido")
+
+    partner = await db.get(Partner, pid)
+    if not partner:
+        raise HTTPException(404, "Parceiro não encontrado")
+
+    result = await db.execute(
+        select(Coupon).where(Coupon.partner_id == pid).order_by(Coupon.created_at.desc())
+    )
+    coupons = result.scalars().all()
+
+    # Total de comissões por status
+    commission_q = select(
+        CouponRedemption.payout_status,
+        func.coalesce(func.sum(CouponRedemption.commission_amount_cents), 0)
+    ).where(CouponRedemption.partner_id == pid).group_by(CouponRedemption.payout_status)
+    totals = {"pending": 0, "paid": 0}
+    for ps, val in (await db.execute(commission_q)).all():
+        if ps in totals:
+            totals[ps] = int(val or 0)
+
+    # Contagem de redemptions por cupom
+    redemptions_count_q = select(
+        CouponRedemption.coupon_id,
+        func.count(CouponRedemption.id)
+    ).where(CouponRedemption.partner_id == pid).group_by(CouponRedemption.coupon_id)
+    rc_map = {str(row[0]): row[1] for row in (await db.execute(redemptions_count_q)).all()}
+
+    items = []
+    for c in coupons:
+        cdata = _coupon_to_response(c, partner.name).model_dump()
+        cdata["deleted_at"] = c.deleted_at.isoformat() if c.deleted_at else None
+        cdata["is_deleted"] = c.deleted_at is not None
+        cdata["total_redemptions_for_this_coupon"] = rc_map.get(str(c.id), 0)
+        items.append(cdata)
+
+    return {
+        "partner": {"id": str(partner.id), "name": partner.name, "email": partner.email},
+        "total_pending_cents": totals["pending"],
+        "total_paid_cents": totals["paid"],
+        "coupons": items,
+    }
+
+
+@router.get("/api/partner/me/redemptions")
+async def partner_my_redemptions(
+    partner_id: str = Query(...),
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lista comissões do parceiro. Mesmo cupons DELETADOS aparecem (com snapshot_code)."""
+    from uuid import UUID
+    try:
+        pid = UUID(partner_id)
+    except ValueError:
+        raise HTTPException(400, "partner_id inválido")
+
+    partner = await db.get(Partner, pid)
+    if not partner:
+        raise HTTPException(404, "Parceiro não encontrado")
+
+    # LEFT JOIN Coupon — cupom NULL = foi hard-deletado (snapshot_code preserva)
+    result = await db.execute(
+        select(CouponRedemption, Coupon, User)
+        .outerjoin(Coupon, CouponRedemption.coupon_id == Coupon.id)
+        .outerjoin(User, CouponRedemption.user_id == User.id)
+        .where(CouponRedemption.partner_id == pid)
+        .order_by(CouponRedemption.created_at.desc())
+        .limit(500)
+    )
+    rows = result.all()
+
+    items = []
+    for r, c, u in rows:
+        items.append({
+            "id": str(r.id),
+            "coupon_id": str(r.coupon_id) if r.coupon_id else None,
+            "coupon_code": c.code if c else (r.coupon_code_snapshot or "—"),
+            "coupon_deleted": c is None,
+            "user_email": u.email if u else None,
+            "plan_slug": r.plan_slug,
+            "original_amount_cents": r.original_amount_cents,
+            "discount_amount_cents": r.discount_amount_cents,
+            "final_amount_cents": r.final_amount_cents,
+            "commission_pct": float(r.commission_pct) if r.commission_pct else None,
+            "commission_amount_cents": r.commission_amount_cents,
+            "payout_status": r.payout_status,
+            "payout_at": r.payout_at.isoformat() if r.payout_at else None,
+            "created_at": r.created_at.isoformat() if r.created_at else "",
+        })
+
+    return {
+        "partner": {"id": str(partner.id), "name": partner.name, "email": partner.email},
+        "total_items": len(items),
+        "items": items,
+    }

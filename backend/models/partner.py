@@ -65,6 +65,10 @@ class Coupon(Base):
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    # 🆕 26/07/2026 22:15 — Soft-delete: preserva histórico p/ portal do parceiro
+    deleted_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    deleted_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
     partner = relationship("Partner", back_populates="coupons")
     redemptions = relationship("CouponRedemption", back_populates="coupon")
 
@@ -87,6 +91,9 @@ class CouponRedemption(Base):
     original_amount_cents = Column(Integer, nullable=False)
     discount_amount_cents = Column(Integer, nullable=False)
     final_amount_cents = Column(Integer, nullable=False)
+
+    # 🆕 26/07/2026 22:15 — Snapshot do código p/ preservar histórico se cupom for hard-deletado
+    coupon_code_snapshot = Column(String(50))
 
     commission_pct = Column(Numeric(5, 2))
     commission_amount_cents = Column(Integer)

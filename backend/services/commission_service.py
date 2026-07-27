@@ -77,6 +77,8 @@ async def register_commission_for_invoice(
         commission_pct=coupon.commission_pct,
         commission_amount_cents=commission_cents,
         payout_status="pending",
+        # 🆕 26/07/2026 — Snapshot do código (preserva histórico se cupom for deletado)
+        coupon_code_snapshot=coupon.code,
     )
     db.add(redemption)
 
