@@ -22,6 +22,7 @@ from typing import Optional
 
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -32,6 +33,7 @@ from models import (
 )
 import schemas
 from utils.security import get_current_user, require_admin
+from routers.partner_auth import get_current_partner_optional
 
 logger = logging.getLogger("coupons")
 
@@ -877,16 +879,25 @@ async def restore_deleted_coupon(
 
 @router.get("/api/partner/me/coupons")
 async def partner_my_coupons(
-    partner_id: str = Query(...),
-    admin: User = Depends(require_admin),
+    partner_id: Optional[str] = Query(None),
+    admin: Optional[User] = Depends(require_admin_optional),
+    partner_token: Optional[Partner] = Depends(get_current_partner_optional),
     db: AsyncSession = Depends(get_db),
 ):
     """Lista cupons do parceiro (todos, incluindo soft-deleted)."""
     from uuid import UUID
-    try:
-        pid = UUID(partner_id)
-    except ValueError:
-        raise HTTPException(400, "partner_id inválido")
+    # Se tem token de parceiro, usa ele. Se tem admin, usa partner_id do query.
+    if partner_token:
+        pid = partner_token.id
+    elif admin:
+        if not partner_id:
+            raise HTTPException(400, "partner_id obrigatório quando chamado pelo admin")
+        try:
+            pid = UUID(partner_id)
+        except ValueError:
+            raise HTTPException(400, "partner_id inválido")
+    else:
+        raise HTTPException(401, "Autenticação necessária")
 
     partner = await db.get(Partner, pid)
     if not partner:
@@ -932,12 +943,24 @@ async def partner_my_coupons(
 
 @router.get("/api/partner/me/redemptions")
 async def partner_my_redemptions(
-    partner_id: str = Query(...),
-    admin: User = Depends(require_admin),
+    partner_id: Optional[str] = Query(None),
+    admin: Optional[User] = Depends(require_admin_optional),
+    partner_token: Optional[Partner] = Depends(get_current_partner_optional),
     db: AsyncSession = Depends(get_db),
 ):
     """Lista comissões do parceiro. Mesmo cupons DELETADOS aparecem (com snapshot_code)."""
     from uuid import UUID
+    if partner_token:
+        pid = partner_token.id
+    elif admin:
+        if not partner_id:
+            raise HTTPException(400, "partner_id obrigatório quando chamado pelo admin")
+        try:
+            pid = UUID(partner_id)
+        except ValueError:
+            raise HTTPException(400, "partner_id inválido")
+    else:
+        raise HTTPException(401, "Autenticação necessária")
     try:
         pid = UUID(partner_id)
     except ValueError:
@@ -982,3 +1005,22 @@ async def partner_my_redemptions(
         "total_items": len(items),
         "items": items,
     }
+
+
+# ============================================================
+# 🆕 26/07/2026 22:43 — Dependencies opcionais (admin OR parceiro)
+# Pra endpoints /api/partner/me/* que servem tanto admin (via partner_id)
+# quanto parceiro autenticado (via JWT próprio)
+# ============================================================
+async def require_admin_optional(token: Optional[str] = Depends(OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False))):
+    """Tenta autenticar como admin. Retorna None se não for."""
+    from utils.security import get_current_user
+    if not token:
+        return None
+    try:
+        user = await get_current_user(token=token)
+        if user.role in ('admin', 'SUPER_ADMIN'):
+            return user
+    except Exception:
+        pass
+    return None

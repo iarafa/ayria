@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, DollarSign, Tag, Users, Clock, RefreshCw, ExternalLink, TrendingUp } from 'lucide-react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { ArrowLeft, DollarSign, Tag, Users, Clock, RefreshCw, ExternalLink, TrendingUp, LogOut } from 'lucide-react'
 import { api } from '../lib/api'
+
+const PARTNER_TOKEN_KEY = 'ayria_partner_token'
+const PARTNER_INFO_KEY = 'ayria_partner_info'
 
 /**
  * 🆕 26/07/2026 22:35 — Portal do Parceiro
@@ -22,6 +25,7 @@ import { api } from '../lib/api'
  */
 export function PartnerPortalPage() {
   const { partnerId } = useParams<{ partnerId: string }>()
+  const navigate = useNavigate()
   const [coupons, setCoupons] = useState<any[]>([])
   const [redemptions, setRedemptions] = useState<any[]>([])
   const [partner, setPartner] = useState<any>(null)
@@ -29,13 +33,24 @@ export function PartnerPortalPage() {
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 
+  // 🆕 26/07/2026 22:43 — Usa JWT de parceiro quando logado
+  const partnerToken = localStorage.getItem(PARTNER_TOKEN_KEY)
+  const partnerInfo = JSON.parse(localStorage.getItem(PARTNER_INFO_KEY) || 'null')
+
+  // Se logou como parceiro, ignora partnerId da URL e usa o dele
+  const effectivePartnerId = partnerToken ? partnerInfo?.id : partnerId
+
   const reload = async () => {
     setLoading(true)
     setError(null)
     try {
+      const headers = partnerToken ? { Authorization: `Bearer ${partnerToken}` } : {}
+      const url = partnerToken
+        ? '/api/partner/me/coupons'  // token já identifica o parceiro
+        : `/api/partner/me/coupons?partner_id=${effectivePartnerId}`
       const [rc, rr] = await Promise.all([
-        api.get(`/api/partner/me/coupons?partner_id=${partnerId}`),
-        api.get(`/api/partner/me/redemptions?partner_id=${partnerId}`),
+        api.get(url, { headers }),
+        api.get(partnerToken ? '/api/partner/me/redemptions' : `/api/partner/me/redemptions?partner_id=${effectivePartnerId}`, { headers }),
       ])
       setCoupons(rc.data?.coupons || [])
       setPartner(rc.data?.partner || null)
@@ -49,8 +64,14 @@ export function PartnerPortalPage() {
   }
 
   useEffect(() => {
-    if (partnerId) reload()
-  }, [partnerId])
+    if (effectivePartnerId) reload()
+  }, [effectivePartnerId])
+
+  const handleLogout = () => {
+    localStorage.removeItem(PARTNER_TOKEN_KEY)
+    localStorage.removeItem(PARTNER_INFO_KEY)
+    navigate('/partner/login')
+  }
 
   if (loading && !partner) {
     return (
@@ -123,6 +144,12 @@ export function PartnerPortalPage() {
             )}
           </div>
           <div className="flex gap-2">
+            {partnerToken && (
+              <button onClick={handleLogout} className="px-3 py-2 rounded-xl text-sm text-red-300 hover:text-red-200 flex items-center gap-1"
+                style={{ background: '#1a1a2e', border: '1px solid #2a2a3e' }} title="Sair">
+                <LogOut size={14}/>Sair
+              </button>
+            )}
             <button onClick={reload} className="px-3 py-2 rounded-xl text-sm text-ayria-muted hover:text-ayria-text flex items-center gap-1"
               style={{ background: '#1a1a2e', border: '1px solid #2a2a3e' }} title="Recarregar">
               <RefreshCw size={14}/>Atualizar
