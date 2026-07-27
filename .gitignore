@@ -27,3 +27,6 @@ backend/logs/
 
 graphify-out/
 .graphify_*.json
+
+# Site público AYRIA (~/site/) — clonado de Lovable, regenerável via script
+site/
