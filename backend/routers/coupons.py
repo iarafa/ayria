@@ -437,6 +437,53 @@ async def deactivate_coupon(
     return _coupon_to_response(coupon)
 
 
+@router.delete("/api/admin/coupons/{coupon_id}", status_code=204)
+async def hard_delete_coupon(
+    coupon_id: str,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Exclui o cupom PERMANENTEMENTE (AYRIA + Stripe).
+
+    🆕 26/07/2026 — Rafael pediu botão de excluir. ATENÇÃO:
+    - CouponRedemption NO BANCO NÃO É REMOVIDO (preserva histórico de comissões)
+    - Stripe Coupon é deletado
+    - This is irreversible — frontend exige confirmação dupla (digitar o código)
+    """
+    from uuid import UUID
+    try:
+        cid = UUID(coupon_id)
+    except ValueError:
+        raise HTTPException(400, "ID inválido")
+
+    coupon = await db.get(Coupon, cid)
+    if not coupon:
+        raise HTTPException(404, "Cupom não encontrado")
+
+    # Verifica se tem redemptions (não bloqueia, mas avisa)
+    redemptions_count = await db.execute(
+        select(func.count(CouponRedemption.id)).where(CouponRedemption.coupon_id == cid)
+    )
+    n_redemptions = redemptions_count.scalar() or 0
+
+    # Deleta do Stripe
+    try:
+        await stripe.Coupon.delete_async(coupon.stripe_coupon_id)
+    except stripe.error.StripeError as e:
+        logger.warning(f"Stripe coupon delete failed (continuando): {e}")
+
+    # Guarda histórico antes de deletar
+    logger.warning(
+        f"🗑️ HARD DELETE coupon: id={cid} code={coupon.code} "
+        f"partner={coupon.partner_id} redemptions={n_redemptions} "
+        f"by admin={admin.email}"
+    )
+
+    await db.delete(coupon)
+    await db.commit()
+    return None
+
+
 # ============================================================
 # ADMIN: COMMISSIONS (relatório)
 # ============================================================
