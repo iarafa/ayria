@@ -187,7 +187,10 @@ async def run_pending_migrations(db: AsyncSession) -> dict:
 
             from database import engine
             async with engine.begin() as conn:
-                statements = [s.strip() for s in sql.split(";") if s.strip()]
+                # 🆕 26/07/2026 — split SEMÂNTICO que respeita blocos PL/pgSQL `$$...$$`
+                # O split por `;` quebrava dentro de CREATE FUNCTION. Agora extrai blocos
+                # entre $$ como unidades únicas.
+                statements = _split_sql_statements(sql)
                 for stmt in statements:
                     lines = [l for l in stmt.split("\n") if l.strip() and not l.strip().startswith("--")]
                     if not lines:
@@ -205,3 +208,36 @@ async def run_pending_migrations(db: AsyncSession) -> dict:
             raise
 
     return stats
+
+def _split_sql_statements(sql: str) -> list[str]:
+    """
+    🆕 26/07/2026 — Split SEMÂNTICO de SQL que respeita blocos PL/pgSQL `$$ ... $$`.
+    O split ingênuo por `;` quebra dentro de CREATE FUNCTION/Triggers/sombras PL.
+    """
+    statements = []
+    buf = []
+    in_dollar = False
+    depth = 0
+    i = 0
+    while i < len(sql):
+        # Detecta bloco $$ .. $$
+        if sql[i:i+2] == "$$":
+            in_dollar = not in_dollar
+            buf.append("$$")
+            i += 2
+            continue
+        ch = sql[i]
+        if not in_dollar:
+            if ch == ";":
+                st = "".join(buf).strip()
+                if st:
+                    statements.append(st)
+                buf = []
+                i += 1
+                continue
+        buf.append(ch)
+        i += 1
+    rest = "".join(buf).strip()
+    if rest:
+        statements.append(rest)
+    return statements
