@@ -91,10 +91,18 @@ export function Sidebar({ open, onClose, mode = 'user', observerUser }: SidebarP
     }
     load()
     const onCredit = () => load()
+    // 🆕 15/08/2026 — recarrega credits quando o user volta pra janela.
+    // Corrige bug: plano mudado (Stripe webhook, admin) não atualizava a Sidebar
+    // até logout/login.
+    const onFocus = () => load()
     window.addEventListener('ayria:credits-updated', onCredit)
+    window.addEventListener('ayria:plan-updated', onCredit)
+    window.addEventListener('focus', onFocus)
     return () => {
       mounted = false
       window.removeEventListener('ayria:credits-updated', onCredit)
+      window.removeEventListener('ayria:plan-updated', onCredit)
+      window.removeEventListener('focus', onFocus)
     }
   }, [user?.id, mode, observerUser?.id])
 

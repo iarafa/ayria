@@ -19,7 +19,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8622724474:AAHlnGciMwJYgPCUcl_YBZrxvKv6jFgpzVE")
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 ADMIN_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "779495783")
 
 BR_TZ = timezone(timedelta(hours=-3))

@@ -44,6 +44,9 @@ export function PagamentoSucessoPage() {
     const hasActiveSubscription = !!user.external_subscription_id && user.billing_status === 'active'
     if (hasActiveSubscription) {
       setPhase('ready')
+      // 🆕 15/08/2026 — avisa Sidebar que o plano mudou (Stripe webhook chegou)
+      window.dispatchEvent(new CustomEvent('ayria:plan-updated'))
+      window.dispatchEvent(new CustomEvent('ayria:credits-updated'))
       const t = setTimeout(() => navigate('/chat', { replace: true }), 1500)
       return () => clearTimeout(t)
     }

@@ -16,6 +16,7 @@ SEGURANÇA:
 import json
 import logging
 import os
+import subprocess
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -779,25 +780,12 @@ async def _notify_payment_failed(user: models.User, event_obj: dict) -> None:
         logger.error(f"Erro inesperado no email payment_failed: {e}")
 
     # ② Telegram pro admin (Rafael)
+    # � 15/08/2026 — usa mesma config do telegram_notifier.py (env var única).
+    # Removida leitura de /home/peron/.telegram_bots.env pra consolidar num só lugar.
     try:
-        import subprocess
-        token_file = "/home/peron/.telegram_bots.env"
-        try:
-            with open(token_file) as f:
-                for line in f:
-                    if line.startswith("AVISOS_TOKEN="):
-                        avisos_token = line.split("=", 1)[1].strip().strip('"').strip("'")
-                        break
-                else:
-                    avisos_token = None
-        except Exception:
-            avisos_token = None
+        from services.telegram_notifier import BOT_TOKEN as _avisos_token, ADMIN_CHAT_ID as _chat_id
 
-        if not avisos_token:
-            avisos_token = os.environ.get("AVISOS_TOKEN")
-
-        if avisos_token:
-            chat_id = 779495783  # Rafael
+        if _avisos_token:
             text = (
                 "⚠️ *FALHA DE PAGAMENTO*\n\n"
                 f"User: {user.email}\n"
@@ -809,13 +797,15 @@ async def _notify_payment_failed(user: models.User, event_obj: dict) -> None:
             )
             cmd = [
                 "curl", "-s", "-X", "POST",
-                f"https://api.telegram.org/bot{avisos_token}/sendMessage",
-                "-d", f"chat_id={chat_id}",
+                f"https://api.telegram.org/bot{_avisos_token}/sendMessage",
+                "-d", f"chat_id={_chat_id}",
                 "-d", f"text={text}",
                 "-d", "parse_mode=Markdown",
             ]
             subprocess.run(cmd, timeout=10, check=False, capture_output=True)
-            logger.info(f"Telegram alerta payment_failed enviado pra {chat_id}")
+            logger.info(f"Telegram alerta payment_failed enviado pra {_chat_id}")
+        else:
+            logger.warning("TELEGRAM_BOT_TOKEN não configurado — pulando alerta payment_failed")
     except Exception as e:
         logger.error(f"Erro inesperado no Telegram payment_failed: {e}")
 
