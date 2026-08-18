@@ -686,6 +686,42 @@ async def _handle_invoice_paid(event_obj, db):
                     except Exception as _e:
                         logger.exception(f"⚠️ Falha ao creditar tokens na renovação: {_e}")
 
+    # 🆕 18/08/2026 — Notifica Telegram sobre pagamento OK
+    # Usa função genérica send_telegram_message (não bloqueia se Telegram falhar)
+    try:
+        from services.telegram_notifier import send_telegram_message
+        amount_total = (event_obj.get("amount_paid") or event_obj.get("amount_due") or 0) / 100
+        currency = (event_obj.get("currency") or "brl").upper()
+        # Re-busca plano (sub pode estar em escopo local)
+        plan_label = "?"
+        renew_or_first = "Novo pagamento"
+        if sub_id:
+            _res = await db.execute(
+                select(models.StripeSubscription)
+                .where(models.StripeSubscription.stripe_subscription_id == sub_id)
+            )
+            _sub = _res.scalars().first()
+            if _sub:
+                plan_label = _sub.plan_slug or "?"
+                renew_or_first = "Renovação" if _sub.stripe_subscription_id else "Novo pagamento"
+        msg = (
+            f"✅ Pagamento Stripe confirmado\n"
+            f"👤 User: {user.email if user else 'N/A'}\n"
+            f"💰 Valor: R$ {amount_total:.2f} {currency}\n"
+            f"📋 Plano: {plan_label}\n"
+            f"🔄 Tipo: {renew_or_first}\n"
+            f"🆔 Invoice: {inv_id}\n"
+            f"📄 PDF: {event_obj.get('invoice_pdf') or 'N/A'}"
+        )
+        # fire-and-forget (não bloqueia webhook)
+        import asyncio
+        try:
+            asyncio.create_task(send_telegram_message(text=msg, tag="STRIPE-OK", emoji="💳"))
+        except Exception:
+            pass
+    except Exception as _e:
+        logger.warning(f"Não conseguiu preparar Telegram STRIPE-OK: {_e}")
+
     # 🆕 20/07 22:58 — Calcula comissão de parceiro se cupom foi aplicado
     discount = event_obj.get("discount") or {}
     discount_coupon = discount.get("coupon") or {}

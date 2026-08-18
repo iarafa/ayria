@@ -110,3 +110,45 @@ async def send_supervisor_alert(
                 )
     except Exception as e:
         logger.error(f"Erro ao enviar notificação Telegram (alerta #{alert_id}): {e}", exc_info=True)
+
+
+async def send_telegram_message(
+    *,
+    text: str,
+    tag: str = "AYRIA",
+    emoji: str = "ℹ️",
+) -> bool:
+    """
+    Envia mensagem genérica pro admin via Telegram. Best-effort.
+
+    Parâmetros:
+        text: corpo da mensagem (texto puro, sem markdown)
+        tag: cabeçalho (ex: "STRIPE-OK", "BACKUP-OK")
+        emoji: emoji principal antes da tag
+
+    Returns:
+        True se aceito pelo Telegram (HTTP 200), False caso contrário.
+    """
+    if not BOT_TOKEN:
+        logger.warning("TELEGRAM_BOT_TOKEN não configurado — pulando notificação")
+        return False
+    full_msg = f"{emoji} {tag} AYRIA\n\n{text}"
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        payload = {
+            "chat_id": ADMIN_CHAT_ID,
+            "text": full_msg,
+            "disable_web_page_preview": True,
+        }
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.post(url, json=payload)
+        if r.status_code != 200:
+            logger.warning(
+                f"Telegram não aceitou ({tag}): {r.status_code} {r.text[:200]}"
+            )
+            return False
+        logger.info(f"📨 Telegram notificação enviada ({tag})")
+        return True
+    except Exception as e:
+        logger.error(f"Erro ao enviar Telegram ({tag}): {e}", exc_info=True)
+        return False
