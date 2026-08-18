@@ -50,7 +50,6 @@
 
 ## Pendências
 
-- ❌ Backup automático (cron diário pg_dump)
 - ❌ Monitor de saúde (cron 5min + alerta Telegram)
 - ❌ Rebuild frontend staging com VITE_API_URL=teste
 - ❌ Live Stripe (transações reais)
