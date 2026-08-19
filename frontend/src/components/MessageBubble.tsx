@@ -258,7 +258,7 @@ export function TypingIndicator() {
       >
         {/* Ícone de digitação girando + texto 'AYRIA digitando...' */}
         <Loader2
-          size={18}
+          size={14}
           className="animate-spin flex-shrink-0"
           style={{ color: '#f1c961' }}
         />
@@ -276,7 +276,7 @@ export function TypingIndicator() {
             style={{ background: '#f1c961' }}
           />
         </div>
-        <span className="text-xs text-ayria-muted ml-1">AYRIA digitando...</span>
+        
       </div>
     </div>
   )
