@@ -188,10 +188,15 @@ export function OnboardingPage() {
 
         {/* Botões: Voltar / Pular / Responder Depois / Próximo */}
         <div className="flex justify-between items-center gap-2">
+          {/* Botão Voltar: volta para pergunta anterior */}
           <button
-            onClick={() => setCurrentIdx(Math.max(0, currentIdx - 1))}
+            type="button"
+            onClick={() => {
+              const prev = Math.max(0, currentIdx - 1)
+              setCurrentIdx(prev)
+            }}
             disabled={currentIdx === 0}
-            className="px-4 py-2 rounded-xl text-ayria-muted hover:text-ayria-text disabled:opacity-30 flex items-center gap-2"
+            className="px-4 py-2 rounded-xl text-ayria-muted hover:text-ayria-text disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <ChevronLeft size={16} />
             Voltar
