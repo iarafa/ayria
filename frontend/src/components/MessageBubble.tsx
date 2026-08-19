@@ -276,6 +276,7 @@ export function TypingIndicator() {
             style={{ background: '#f1c961' }}
           />
         </div>
+        <span className="text-xs text-ayria-muted ml-1">AYRIA digitando...</span>
         
       </div>
     </div>
