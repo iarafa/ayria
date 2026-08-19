@@ -12,7 +12,7 @@
  * - Truncamento é no último ESPAÇO antes do threshold (não corta palavra)
  */
 import { useEffect, useRef, useState } from 'react'
-import { Brain, ChevronDown, ChevronUp } from 'lucide-react'
+import { Brain, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import { useAuth } from '../store/auth'
 import { LogoIcon } from './Logo'
 
@@ -256,7 +256,12 @@ export function TypingIndicator() {
           border: '1px solid rgba(99, 102, 241, 0.2)',
         }}
       >
-        <LogoIcon size={28} variant="circular" />
+        {/* Ícone de digitação girando + texto 'AYRIA digitando...' */}
+        <Loader2
+          size={18}
+          className="animate-spin flex-shrink-0"
+          style={{ color: '#f1c961' }}
+        />
         <div className="flex items-center gap-1">
           <div
             className="typing-dot w-2 h-2 rounded-full"
@@ -271,6 +276,7 @@ export function TypingIndicator() {
             style={{ background: '#f1c961' }}
           />
         </div>
+        <span className="text-xs text-ayria-muted ml-1">AYRIA digitando...</span>
       </div>
     </div>
   )
