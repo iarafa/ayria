@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db, settings
 from utils.security import get_current_user
 import models
-from services.credit_service import grant_credits
+from services.credit_service import grant_subscription_credits
 
 logger = logging.getLogger("stripe_billing")
 
