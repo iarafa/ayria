@@ -28,6 +28,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db, settings
 from utils.security import get_current_user
+from utils.rate_limit import limiter
+from fastapi import Request
 import models
 from services.credit_service import grant_subscription_credits
 
@@ -144,7 +146,9 @@ class CheckoutRequest(BaseModel):
 
 
 @router.post("/api/stripe/create-checkout-session")
+@limiter.limit("5/minute")  # anti-abuso: 5 checkouts/min por user
 async def create_checkout_session(
+    request: Request,
     body: CheckoutRequest,
     user: models.User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

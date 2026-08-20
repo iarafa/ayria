@@ -96,18 +96,29 @@ class VectorService:
     ) -> List[Dict]:
         self._ensure_init()
         """
-        Busca semântica.
+        Busca semântica com cache LRU (proteção do Qdrant em pico).
+        Cache key: hash do embedding + filtros. TTL 60s.
         Se user_id fornecido em memoria_episodica, filtra por user.
         """
         if collection not in self.COLLECTIONS:
             raise ValueError(f"Collection inválida: {collection}")
-        
+
+        # Gera chave de cache baseada no embedding (hash pra evitar armazenar vetor)
+        emb_hash = hashlib.md5(str(query_embedding).encode()).hexdigest()[:16]
+        cache_key = f"{emb_hash}|{limit}|{score_threshold}|{user_id or ""}"
+
+        # Try cache
+        cached = await embedding_cache.get(cache_key, collection, user_id, limit)
+        if cached is not None:
+            return cached
+
+        # Cache miss: query Qdrant
         query_filter = None
         if collection == "memoria_episodica" and user_id:
             query_filter = Filter(
                 must=[FieldCondition(key="user_id", match=MatchValue(value=user_id))]
             )
-        
+
         results = self.client.search(
             collection_name=collection,
             query_vector=query_embedding,
@@ -115,11 +126,16 @@ class VectorService:
             limit=limit,
             score_threshold=score_threshold,
         )
-        
-        return [
+
+        out = [
             {"id": r.id, "score": r.score, "text": r.payload.get("text", ""), "payload": r.payload}
             for r in results
         ]
+
+        # Salva no cache
+        await embedding_cache.set(cache_key, collection, user_id, limit, out)
+
+        return out
     
     async def delete(self, collection: str, point_id: str, user_id: Optional[str] = None):
         """Deleta um ponto"""
