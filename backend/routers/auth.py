@@ -569,7 +569,7 @@ async def forgot_password(payload: ForgotPasswordRequest, request: Request, db: 
 
         # Envia email
         try:
-            from utils.email_service import get_email_client, EmailServiceError
+            from services.email_turbo import get_email_client
             client = get_email_client()
             html = f"""
             <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px">
@@ -592,7 +592,7 @@ async def forgot_password(payload: ForgotPasswordRequest, request: Request, db: 
             )
             logger.info(f"Password reset email sent to {user.email}")
         except Exception as e:
-            logger.error(f"Failed to send password reset email: {e}")
+            logger.exception(f"Erro ao enviar email de reset de senha: {e}")
 
     # SEMPRE retorna a mesma resposta (não vaza se email existe)
     return {
