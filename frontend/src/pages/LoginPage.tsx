@@ -10,16 +10,20 @@
  *
  * (Antes: sempre criava chat novo vazio no login. Rafael pediu pra mudar em 08/07/2026
  * — o user já tem conversas, ele quer cair nelas, não em chat em branco.)
+ *
+ * 🆕 20/08/2026 — Botão "Esqueci minha senha" abre ForgotPasswordModal.
  */
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../store/auth'
 import { LogoIcon } from '../components/Logo'
+import { ForgotPasswordModal } from '../components/ForgotPasswordModal'  // 🆕 20/08/2026
 
 export function LoginPage() {
   const { login, loading, error } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [forgotOpen, setForgotOpen] = useState(false)  // 🆕 20/08/2026
   const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,7 +74,17 @@ export function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm text-ayria-muted mb-2">Senha</label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm text-ayria-muted">Senha</label>
+              {/* 🆕 20/08/2026 — Botão "Esqueci minha senha" */}
+              <button
+                type="button"
+                onClick={() => setForgotOpen(true)}
+                className="text-sm text-ayria-primary hover:underline"
+              >
+                Esqueci minha senha
+              </button>
+            </div>
             <input
               type="password"
               value={password}
@@ -114,6 +128,12 @@ export function LoginPage() {
           </Link>
         </p>
       </div>
+
+      {/* 🆕 20/08/2026 — Modal de recuperação de senha */}
+      <ForgotPasswordModal
+        isOpen={forgotOpen}
+        onClose={() => setForgotOpen(false)}
+      />
     </div>
   )
 }
