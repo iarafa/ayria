@@ -76,6 +76,7 @@ async def get_stripe_config(db: AsyncSession = Depends(get_db)):
     """Retorna publishable_key + info dos planos. NÃO expõe secret.
 
     🆕 20/08/2026 — Inclui plano trial (gratis) do banco alem dos planos Stripe pagos.
+    Trial aparece na tela de Planos; PaywallModal filtra pra não mostrar trial.
     """
     if not settings.STRIPE_PUBLISHABLE_KEY:
         raise HTTPException(500, "Stripe não configurado no backend")
@@ -112,7 +113,7 @@ async def get_stripe_config(db: AsyncSession = Depends(get_db)):
             "trial_days": trial.trial_days,
         }
 
-    # Trial sempre primeiro (ordenado por price_brl ASC no frontend, mas garante posição)
+    # Trial sempre primeiro (ordenado por price_brl ASC no frontend)
     plans = ([trial_card] if trial_card else []) + paid_plans
 
     return {
