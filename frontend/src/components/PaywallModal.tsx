@@ -1,11 +1,10 @@
 /**
- * AYRIA - Paywall Modal (20/08/2026 v2)
+ * AYRIA - Paywall Modal (20/08/2026 v3)
  *
  * Aparece quando o user tenta mandar mensagem sem creditos (402).
- * Copy clara explicando por que fechou + UNICO CTA: "Ver os planos".
+ * Copy humana, sem marketing exagerado — pergunta se gostou e oferece planos.
  *
- * Sem cards clicáveis individuais — força user a ir pra /planos
- * e ver os detalhes completos de cada plano.
+ * Sem cards clicáveis individuais — força user a ir pra /planos.
  */
 import { useNavigate } from 'react-router-dom'
 
@@ -50,22 +49,18 @@ export function PaywallModal({ isOpen, onClose }: PaywallModalProps) {
 
         {/* Ícone */}
         <div className="text-center mb-4">
-          <div className="text-5xl mb-3">🔒</div>
+          <div className="text-5xl mb-3">💬</div>
         </div>
 
         {/* Título */}
         <h2 className="text-2xl font-bold text-white text-center mb-3">
-          Suas conversas foram pausadas
+          Gostou do que viu até agora?
         </h2>
 
-        {/* Copy explicativa */}
-        <p className="text-ayria-muted text-center mb-2 leading-relaxed">
-          Seu período de uso gratuito terminou e o chat foi pausado
-          pra você não acumular cobranças inesperadas.
-        </p>
+        {/* Copy */}
         <p className="text-ayria-muted text-center mb-6 leading-relaxed">
-          Escolha um plano pra continuar explorando sua Alma Numerológica
-          sem limites.
+          Você chegou ao limite do seu período gratuito. Escolha um plano
+          pra continuar nossa conversa quando quiser.
         </p>
 
         {/* CTA único */}
@@ -74,7 +69,7 @@ export function PaywallModal({ isOpen, onClose }: PaywallModalProps) {
           className="w-full py-3 rounded-lg font-semibold text-white text-base transition hover:opacity-90 mb-2"
           style={{ background: 'linear-gradient(90deg, #da950b, #f1c961)' }}
         >
-          Ver os planos
+          Escolher um plano
         </button>
         <button
           onClick={onClose}
@@ -84,7 +79,7 @@ export function PaywallModal({ isOpen, onClose }: PaywallModalProps) {
         </button>
 
         <p className="text-center text-xs text-ayria-muted mt-4">
-          💳 Cancele quando quiser. Sem fidelidade.
+          💬 Sua história fica salva. Volta quando quiser.
         </p>
       </div>
     </div>
