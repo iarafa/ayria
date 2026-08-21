@@ -19,6 +19,7 @@ import { LogoIcon } from '../components/Logo'
 import { ProfileEditModal } from '../components/ProfileEditModal'
 import { ChangePasswordModal } from '../components/ChangePasswordModal'
 import { SpiritualityPicker } from '../components/SpiritualityPicker'
+import { PaywallModal } from '../components/PaywallModal'  // 🆕 20/08/2026
 import { useChat } from '../store/chat'
 import { useAuth } from '../store/auth'
 import { LogOut, Shield, Pencil, UserCircle, Menu, AlignJustify, ChevronsUpDown } from 'lucide-react'
@@ -46,6 +47,15 @@ export function ChatPage() {
     window.addEventListener('ayria:open-planos', handler)
     return () => window.removeEventListener('ayria:open-planos', handler)
   }, [navigate])
+
+  // � 20/08/2026 — PaywallModal: abre quando user tenta mandar msg sem crédito (402)
+  const [paywallOpen, setPaywallOpen] = useState(false)
+  useEffect(() => {
+    const handler = () => setPaywallOpen(true)
+    window.addEventListener('ayria:open-paywall', handler)
+    return () => window.removeEventListener('ayria:open-paywall', handler)
+  }, [])
+
   const [sidebarOpen, setSidebarOpen] = useState(false)
   // === Toggle global "Quebrar mensagens longas" (persiste em localStorage) ===
   const [collapseEnabled, setCollapseEnabled] = useLocalStorage<boolean>('ayria:collapse-messages', true)
@@ -289,6 +299,12 @@ export function ChatPage() {
           // Limpa tokens locais (mantém refresh_token pra permitir relogar)
           // Não força logout — user pode continuar usando com mesmo user
         }}
+      />
+
+      {/* 🆕 20/08/2026 — PaywallModal: aparece quando user tenta mandar msg sem crédito */}
+      <PaywallModal
+        isOpen={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
       />
     </div>
   )

@@ -86,7 +86,7 @@ export const useChat = create<ChatState>((set, get) => ({
       // Dispara evento pra Sidebar atualizar saldo
       window.dispatchEvent(new CustomEvent('ayria:credits-updated'))
     } catch (e: any) {
-      // Se 402 (sem saldo), mostra mensagem amigável
+      // Se 402 (sem saldo), dispara evento pra abrir paywall comercial
       if (e?.response?.status === 402) {
         const detail = e.response.data?.detail
         const msg = typeof detail === 'object' ? detail.message : 'Seus créditos acabaram.'
@@ -104,6 +104,8 @@ export const useChat = create<ChatState>((set, get) => ({
         // Remove msg otimista do user (não foi processada)
         set({ messages: get().messages.filter((m) => m.id !== userMsg.id) })
         window.dispatchEvent(new CustomEvent('ayria:credits-updated'))
+        // 🆕 20/08/2026 — dispara evento pra abrir PaywallModal
+        window.dispatchEvent(new CustomEvent('ayria:open-paywall'))
       } else {
         set({ sending: false, messages: get().messages.filter((m) => m.id !== userMsg.id) })
       }

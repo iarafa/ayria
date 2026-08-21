@@ -72,23 +72,53 @@ def _resolve_plan_slug_by_price_id(price_id: str) -> Optional[str]:
 # GET /api/stripe/config — público, frontend usa pra mostrar planos
 # ============================================================
 @router.get("/api/stripe/config")
-async def get_stripe_config():
-    """Retorna publishable_key + info dos planos. NÃO expõe secret."""
+async def get_stripe_config(db: AsyncSession = Depends(get_db)):
+    """Retorna publishable_key + info dos planos. NÃO expõe secret.
+
+    🆕 20/08/2026 — Inclui plano trial (gratis) do banco alem dos planos Stripe pagos.
+    """
     if not settings.STRIPE_PUBLISHABLE_KEY:
         raise HTTPException(500, "Stripe não configurado no backend")
+
+    # Planos pagos do Stripe (hardcoded em PLANS)
+    paid_plans = [
+        {
+            "slug": slug,
+            "name": cfg["name"],
+            "tokens": cfg["tokens"],
+            "price_brl": cfg["price_brl"],
+            "price_id": getattr(settings, cfg["price_env"], ""),
+            "trial_days": None,
+        }
+        for slug, cfg in PLANS.items()
+    ]
+
+    # 🆕 20/08/2026 — Plano trial do banco (se existir e ativo)
+    trial_res = await db.execute(
+        select(models.Plan).where(
+            models.Plan.slug == "trial",
+            models.Plan.active == True,
+        )
+    )
+    trial = trial_res.scalar_one_or_none()
+    trial_card = None
+    if trial:
+        trial_card = {
+            "slug": trial.slug,
+            "name": trial.name,
+            "tokens": trial.credits,
+            "price_brl": float(trial.price_brl),
+            "price_id": "",  # sem Stripe price_id — é grátis
+            "trial_days": trial.trial_days,
+        }
+
+    # Trial sempre primeiro (ordenado por price_brl ASC no frontend, mas garante posição)
+    plans = ([trial_card] if trial_card else []) + paid_plans
+
     return {
         "publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
         "app_url": settings.APP_URL,
-        "plans": [
-            {
-                "slug": slug,
-                "name": cfg["name"],
-                "tokens": cfg["tokens"],
-                "price_brl": cfg["price_brl"],
-                "price_id": getattr(settings, cfg["price_env"], ""),
-            }
-            for slug, cfg in PLANS.items()
-        ],
+        "plans": plans,
     }
 
 
