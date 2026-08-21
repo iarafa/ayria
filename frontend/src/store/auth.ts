@@ -18,6 +18,7 @@ interface AuthState {
   register: (email: string, password: string, fullName?: string, planSlug?: string) => Promise<boolean>
   logout: () => void
   loadUser: () => Promise<void>
+  refreshUser: () => Promise<void>  // 🆕 20/08/2026: reload user do backend (após select-trial, etc)
   updateProfile: (data: { full_name?: string; avatar_url?: string }) => Promise<boolean>
   uploadAvatar: (file: File) => Promise<string | null>
 }
@@ -174,6 +175,16 @@ export const useAuth = create<AuthState>((set) => ({
     } catch {
       localStorage.removeItem('ayria_token')
       set({ user: null, token: null })
+    }
+  },
+
+  // 🆕 20/08/2026 — refreshUser (reload do /api/auth/me sem logout)
+  refreshUser: async () => {
+    try {
+      const { data } = await authApi.me()
+      set({ user: data })
+    } catch {
+      // silencioso — se falhar, mantém o user anterior
     }
   },
 

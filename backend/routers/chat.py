@@ -21,6 +21,8 @@ import logging
 import json
 
 from database import get_db, settings
+from utils.rate_limit import limiter
+from fastapi import Request
 from utils.security import get_current_user
 from services.ai_service import ai_service
 from services.vector_service import vector_service
@@ -497,7 +499,9 @@ async def montar_system_prompt(
 
 
 @router.post("/message", response_model=schemas.MessageResponse)
+@limiter.limit("30/minute")  # 30 mensagens por minuto por user (anti-spam)
 async def send_message(
+    request: Request,  # obrigatório pra slowapi
     payload: schemas.MessageCreate,
     background_tasks: BackgroundTasks,
     user: models.User = Depends(get_current_user),
@@ -524,13 +528,15 @@ async def send_message(
         reference_id=None,  # preenchido depois com o message_id
     )
     if not success:
-        # Saldo insuficiente — bloqueia com mensagem amigável
+        # Saldo zerado OU trial expirado — paywall único
         raise HTTPException(
             status_code=402,  # Payment Required
             detail={
-                "code": "INSUFFICIENT_CREDITS",
-                "message": "Seus créditos acabaram. Em breve você poderá renovar ou mudar seu plano. Enquanto isso, seu perfil e histórico permanecem salvos.",
+                "code": "TRIAL_OR_CREDITS_ENDED",
+                "message": "Seu período de trial acabou. Assine um plano pra continuar.",
                 "credit_balance": user.credit_balance or 0,
+                "credit_status": user.credit_status or "exhausted",
+                "trial_expires_at": user.trial_expires_at.isoformat() if user.trial_expires_at else None,
             },
         )
     

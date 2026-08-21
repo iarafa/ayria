@@ -18,6 +18,7 @@ import models
 import schemas
 from services.credit_service import (
     get_balance, get_transactions, admin_adjust_credits,
+    select_trial_plan, TrialAlreadyUsedError,
 )
 
 router = APIRouter(tags=["credits"])
@@ -44,6 +45,7 @@ async def list_plans(db: AsyncSession = Depends(get_db)):
             slug=p.slug,
             credits=p.credits,
             price_brl=float(p.price_brl),
+            trial_days=p.trial_days,  # � 20/08/2026
             active=p.active,
             created_at=p.created_at,
         )
@@ -94,6 +96,35 @@ async def get_my_credit_transactions(
         page=page,
         page_size=page_size,
     )
+
+
+# ============================================================
+# USER: selecionar plano trial (grátis, 30 créditos / 7 dias)
+# ============================================================
+@router.post("/api/plans/select-trial", response_model=schemas.CreditBalanceResponse)
+async def select_trial(
+    user: models.User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Atribui plano trial (30 créditos, expira em 7 dias).
+
+    - 1 trial por usuário na vida toda (retorna 409 se já usou)
+    - Idempotente via trial_expires_at
+    """
+    try:
+        await select_trial_plan(db, user)
+        await db.commit()
+        await db.refresh(user)
+    except TrialAlreadyUsedError:
+        raise HTTPException(
+            status_code=409,
+            detail="Você já utilizou o período de trial anteriormente."
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return await get_balance(db, user)
 
 
 # ============================================================

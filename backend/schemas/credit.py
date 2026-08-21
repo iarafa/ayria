@@ -18,6 +18,7 @@ class CreditBalanceResponse(BaseModel):
     plan_selected_at: Optional[datetime] = None
     billing_status: str
     credits_last_granted_at: Optional[datetime] = None
+    trial_expires_at: Optional[datetime] = None  # 🆕 20/08/2026: trial
 
 
 class CreditTransactionResponse(BaseModel):

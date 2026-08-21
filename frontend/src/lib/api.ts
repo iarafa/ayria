@@ -390,6 +390,7 @@ export interface StripePlan {
   tokens?: number
   price_brl: number
   price_id?: string
+  trial_days?: number | null  // 🆕 20/08/2026: 7=trial, null=plano normal
 }
 
 export interface StripeConfig {

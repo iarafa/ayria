@@ -1,17 +1,24 @@
 /**
- * AYRIA - Planos Page (20/07/2026 23:00) + Cupom suporte
+ * AYRIA - Planos Page (20/07/2026 23:00) + Cupom suporte + Trial (20/08/2026)
  *
- * Tela de planos Stripe. 3 tiers: Básico R$29,90/100, Intermediário R$59,90/500, Premium R$99,90/1000.
+ * Tela de planos Stripe. 4 tiers: Trial (grátis, 30 cred, 7d), Básico R$29,90/100,
+ * Intermediário R$59,90/500, Premium R$99,90/1000.
  *
  * 🎟️ Cupom de desconto:
  * - Input na parte de cima → busca via /api/coupons/validate
  * - Aplica desconto calculado em tempo real nos cards
  * - Auto-aplica via URL ?cupom=CODE
  * - Passa coupon_code no checkout session
+ *
+ * 🆕 20/08/2026 — Trial:
+ * - Plano trial aparece PRIMEIRO, com badge "Grátis · 7 dias"
+ * - Botão "Começar grátis" chama POST /api/plans/select-trial
+ * - Não vai pro Stripe (é grátis)
+ * - Cupons NÃO aplicam no trial (já é grátis)
  */
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { stripeApi, couponsApi, StripeConfig, CouponValidateResponse } from '../lib/api'
+import { api, stripeApi, couponsApi, StripeConfig, CouponValidateResponse } from '../lib/api'
 import { useAuth } from '../store/auth'
 import { LogoIcon } from '../components/Logo'
 
@@ -35,8 +42,9 @@ export function PlanosPage() {
   const [config, setConfig] = useState<StripeConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [subscribing, setSubscribing] = useState<string | null>(null)
+  const [trialLoading, setTrialLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const deepLinkPlan = params.get('plan')
@@ -99,6 +107,26 @@ export function PlanosPage() {
     setAppliedCoupon(null)
     setCouponInput('')
     setCouponError(null)
+  }
+
+  // 🆕 20/08/2026 — Selecionar trial (grátis, 30 cred, 7 dias)
+  async function handleSelectTrial() {
+    if (!user) {
+      navigate(`/login?next=${encodeURIComponent('/planos')}`)
+      return
+    }
+    setTrialLoading(true)
+    setError(null)
+    try {
+      await api.post('/api/plans/select-trial')
+      // Atualiza user no store pra refletir novo plano/saldo
+      await refreshUser?.()
+      navigate('/chat')
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail || e?.message || 'Erro ao ativar trial'
+      setError(typeof msg === 'string' ? msg : 'Você já utilizou o período de trial anteriormente.')
+      setTrialLoading(false)
+    }
   }
 
   // Deep-link: se voltou do login com ?plan=basico, abre Stripe Checkout direto
@@ -214,15 +242,16 @@ export function PlanosPage() {
         )}
 
         {/* Cards dos planos */}
-        <div className="grid md:grid-cols-3 gap-6 mb-12">
+        <div className="grid md:grid-cols-4 gap-6 mb-12">
           {plans.map((plan) => {
+            const isTrial = plan.slug === 'trial' && plan.trial_days
             const isPremium = plan.slug === 'premium'
-            const isLoading = subscribing === plan.slug
+            const isLoading = subscribing === plan.slug || (isTrial && trialLoading)
             const mismatch = couponMismatch(plan.slug)
-            const finalPrice = appliedCoupon && !mismatch
+            const finalPrice = appliedCoupon && !mismatch && !isTrial
               ? applyCoupon(plan.price_brl, appliedCoupon)
               : plan.price_brl
-            const hasDiscount = appliedCoupon && !mismatch && finalPrice < plan.price_brl
+            const hasDiscount = appliedCoupon && !mismatch && !isTrial && finalPrice < plan.price_brl
 
             return (
               <div
@@ -230,12 +259,21 @@ export function PlanosPage() {
                 data-testid={`plan-card-${plan.slug}`}
                 className="rounded-2xl p-6 flex flex-col relative"
                 style={{
-                  background: isPremium
+                  background: isTrial
+                    ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(99, 102, 241, 0.15))'
+                    : isPremium
                     ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(99, 102, 241, 0.15))'
-                    : 'rgba(255, 255, 255, 0.03)', border: isPremium
+                    : 'rgba(255, 255, 255, 0.03)', border: isTrial
+                    ? '2px solid rgba(34, 197, 94, 0.5)' : isPremium
                     ? '2px solid rgba(168, 85, 247, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)', opacity: mismatch ? 0.5 : 1,
                 }}
               >
+                {isTrial && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-bold text-white"
+                    style={{ background: 'linear-gradient(90deg, #22c55e, #4ade80)' }}>
+                    GRÁTIS · {plan.trial_days} DIAS
+                  </div>
+                )}
                 {isPremium && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-bold text-white"
                     style={{ background: 'linear-gradient(90deg, #da950b, #f1c961)' }}>
@@ -253,7 +291,7 @@ export function PlanosPage() {
                   <span className="text-4xl font-bold text-white">
                     R$ {finalPrice.toFixed(2).replace('.', ',')}
                   </span>
-                  <span className="text-ayria-muted">/mês</span>
+                  {!isTrial && <span className="text-ayria-muted">/mês</span>}
                 </div>
 
                 {hasDiscount && (
@@ -273,7 +311,9 @@ export function PlanosPage() {
                   <div className="text-white text-2xl font-bold">
                     {plan.tokens.toLocaleString('pt-BR')} <span className="text-sm font-normal text-ayria-muted">tokens</span>
                   </div>
-                  <div className="text-ayria-muted text-xs mt-1">por mês</div>
+                  <div className="text-ayria-muted text-xs mt-1">
+                    {isTrial ? `válido por ${plan.trial_days} dias` : 'por mês'}
+                  </div>
                 </div>
 
                 <ul className="text-sm text-ayria-muted space-y-2 mb-6 flex-1">
@@ -284,18 +324,32 @@ export function PlanosPage() {
                   {plan.tokens >= 1000 && <li className="flex gap-2"><span className="text-green-400">✓</span><span>Suporte prioritário</span></li>}
                 </ul>
 
-                <button
-                  onClick={() => handleSubscribe(plan.slug)}
-                  disabled={isLoading || !!subscribing || !!mismatch}
-                  className="w-full py-3 rounded-lg font-semibold text-white transition disabled:opacity-50"
-                  style={{
-                    background: isPremium
-                      ? 'linear-gradient(90deg, #da950b, #f1c961)'
-                      : 'rgba(255, 255, 255, 0.08)', border: isPremium ? 'none' : '1px solid rgba(255, 255, 255, 0.15)' }}
-                  data-testid={`subscribe-${plan.slug}`}
-                >
-                  {mismatch ? 'Cupom não válido' : isLoading ? 'Redirecionando...' : user ? 'Assinar agora' : 'Entrar e assinar'}
-                </button>
+                {isTrial ? (
+                  <button
+                    onClick={handleSelectTrial}
+                    disabled={isLoading || !!subscribing}
+                    className="w-full py-3 rounded-lg font-semibold text-white transition disabled:opacity-50"
+                    style={{
+                      background: 'linear-gradient(90deg, #22c55e, #4ade80)',
+                    }}
+                    data-testid={`subscribe-${plan.slug}`}
+                  >
+                    {isLoading ? 'Ativando...' : user ? 'Começar grátis' : 'Entrar e começar grátis'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleSubscribe(plan.slug)}
+                    disabled={isLoading || !!subscribing || !!mismatch}
+                    className="w-full py-3 rounded-lg font-semibold text-white transition disabled:opacity-50"
+                    style={{
+                      background: isPremium
+                        ? 'linear-gradient(90deg, #da950b, #f1c961)'
+                        : 'rgba(255, 255, 255, 0.08)', border: isPremium ? 'none' : '1px solid rgba(255, 255, 255, 0.15)' }}
+                    data-testid={`subscribe-${plan.slug}`}
+                  >
+                    {mismatch ? 'Cupom não válido' : isLoading ? 'Redirecionando...' : user ? 'Assinar agora' : 'Entrar e assinar'}
+                  </button>
+                )}
               </div>
             )
           })}

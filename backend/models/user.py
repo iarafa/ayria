@@ -51,6 +51,7 @@ class User(Base):
     external_subscription_id = Column(String(255))
     next_renewal_date = Column(DateTime(timezone=True))
     credits_last_granted_at = Column(DateTime(timezone=True))
+    trial_expires_at = Column(DateTime(timezone=True))  # 🆕 20/08/2026: quando o trial expira (cron checa)
 
     # BLOCK (controle de acesso manual pelo admin)
     blocked_until = Column(DateTime(timezone=True))

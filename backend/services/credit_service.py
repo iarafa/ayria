@@ -11,7 +11,7 @@ Regras de negócio:
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Tuple
 import logging
 import uuid
@@ -324,6 +324,7 @@ async def get_balance(db: AsyncSession, user: models.User) -> dict:
         "plan_selected_at": user.plan_selected_at,
         "billing_status": user.billing_status or "billing_not_enabled",
         "credits_last_granted_at": user.credits_last_granted_at,
+        "trial_expires_at": user.trial_expires_at,  # 🆕 20/08/2026
     }
 
 
@@ -357,3 +358,126 @@ async def get_transactions(
 
 # Alias para compatibilidade com stripe_billing.py (22/07 21:10)
 grant_credits = grant_initial_credits
+
+
+# ============================================================
+# 🆕 20/08/2026 — TRIAL PLAN
+# ============================================================
+class TrialAlreadyUsedError(Exception):
+    """Usuário já usou trial alguma vez (1 trial por usuário na vida toda)."""
+    def __init__(self):
+        super().__init__("Você já utilizou o período de trial anteriormente.")
+
+
+async def select_trial_plan(
+    db: AsyncSession,
+    user: models.User,
+) -> models.Plan:
+    """
+    Atribui o plano 'trial' (30 créditos, 7 dias) ao user.
+
+    REGRAS:
+    - 1 trial por usuário na vida toda (idempotente via trial_expires_at)
+    - Só atribui se user NÃO tem trial_expires_at ainda
+    - Se já tem, levanta TrialAlreadyUsedError
+    - ZERA saldo anterior e SUBSTITUI por 30 (não soma) — evita "ganhar" créditos
+      trocando de basico→trial
+    - Define trial_expires_at = now() + 7 dias
+    - Concede 30 créditos via grant_initial_credits (já idempotente)
+    - Marca credit_status = 'active'
+
+    Retorna o Plan trial.
+    """
+    # 1. Idempotência: já usou trial?
+    if user.trial_expires_at is not None:
+        logger.info(f"❌ User {user.id} já usou trial (expires_at={user.trial_expires_at})")
+        raise TrialAlreadyUsedError()
+
+    # 2. Busca plano trial
+    trial_plan = await get_plan_by_slug(db, "trial")
+    if not trial_plan:
+        raise ValueError("Plano 'trial' não encontrado no banco. Rode migration 025.")
+
+    # 3. Concede créditos do trial (manual — não usa grant_initial_credits pra
+    #    evitar somar com saldo anterior)
+    balance_before = user.credit_balance or 0
+    user.selected_plan_id = trial_plan.id
+    user.credit_balance = trial_plan.credits  # SUBSTITUI, não soma
+    user.credit_status = "active" if trial_plan.credits > 0 else "exhausted"
+    user.plan_selected_at = user.plan_selected_at or datetime.utcnow()
+    user.credits_last_granted_at = datetime.utcnow()
+
+    tx = models.CreditTransaction(
+        id=uuid.uuid4(),
+        user_id=user.id,
+        type="grant_initial_plan",
+        amount=trial_plan.credits,
+        balance_before=balance_before,
+        balance_after=trial_plan.credits,
+        description=f"Trial gratuito: 30 creditos por 7 dias (saldo anterior: {balance_before})",
+        reference_type="signup_trial",
+        reference_id=str(user.id),
+    )
+    db.add(tx)
+    granted = True
+
+    # 5. Define trial_expires_at
+    user.trial_expires_at = datetime.utcnow() + timedelta(days=trial_plan.trial_days or 7)
+    user.credit_status = "active"
+
+    if granted:
+        logger.info(
+            f"✅ Trial atribuído: user={user.id} plano=trial +{trial_plan.credits} créditos "
+            f"expires={user.trial_expires_at.isoformat()}"
+        )
+
+    return trial_plan
+
+
+async def expire_overdue_trials(db: AsyncSession) -> int:
+    """
+    Expira trials vencidos. Chamado pelo cron diário.
+
+    - Seleciona users com trial_expires_at < NOW() AND credit_status != 'expired'
+    - Marca credit_status='expired', zera credit_balance
+    - Registra CreditTransaction tipo 'trial_expired'
+    - Retorna quantos foram expirados
+
+    IDEMPOTENTE: só processa trials que ainda não estão 'expired'.
+    """
+    res = await db.execute(
+        select(models.User).where(
+            models.User.trial_expires_at != None,  # noqa: E711
+            models.User.trial_expires_at < datetime.utcnow(),
+            models.User.credit_status != "expired",
+        )
+    )
+    users = res.scalars().all()
+
+    expired_count = 0
+    for user in users:
+        balance_before = user.credit_balance or 0
+        user.credit_balance = 0
+        user.credit_status = "expired"
+
+        tx = models.CreditTransaction(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            type="trial_expired",
+            amount=-balance_before,
+            balance_before=balance_before,
+            balance_after=0,
+            description=f"Trial expirado em {user.trial_expires_at.isoformat()} (cron)",
+            reference_type="cron_expire_trial",
+            reference_id=None,
+        )
+        db.add(tx)
+        expired_count += 1
+        logger.info(
+            f"⏰ Trial expirado: user={user.id} saldo zerado de {balance_before}"
+        )
+
+    if expired_count:
+        await db.commit()
+        logger.info(f"⏰ Cron: {expired_count} trials expirados nesta execução")
+    return expired_count
