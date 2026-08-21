@@ -178,6 +178,12 @@ export function PlanosPage() {
 
   const plans = config?.plans || []
 
+  // 🆕 20/08/2026 — Esconde trial se user já usou (trial_expires_at !== null)
+  const hasUsedTrial = user?.trial_expires_at !== null && user?.trial_expires_at !== undefined
+  const visiblePlans = hasUsedTrial
+    ? plans.filter(p => p.slug !== 'trial')
+    : plans
+
   // Cupom não compatível com este plano?
   const couponMismatch = (planSlug: string) =>
     appliedCoupon && appliedCoupon.applicable_plan_slug !== planSlug
@@ -242,8 +248,8 @@ export function PlanosPage() {
         )}
 
         {/* Cards dos planos */}
-        <div className="grid md:grid-cols-4 gap-6 mb-12">
-          {plans.map((plan) => {
+        <div className={`grid gap-6 mb-12 ${visiblePlans.length === 4 ? 'md:grid-cols-4' : 'md:grid-cols-3'} grid-cols-1`}>
+          {visiblePlans.map((plan) => {
             const isTrial = plan.slug === 'trial' && plan.trial_days
             const isPremium = plan.slug === 'premium'
             const isLoading = subscribing === plan.slug || (isTrial && trialLoading)

@@ -123,6 +123,7 @@ export interface User {
   selected_plan_id?: string | null
   credit_balance?: number
   blocked_until?: string | null
+  trial_expires_at?: string | null  // 🆕 20/08/2026: se !== null, user JÁ usou trial
 }
 
 export interface Chat {

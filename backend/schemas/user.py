@@ -32,6 +32,7 @@ class UserResponse(BaseModel):
     external_subscription_id: Optional[str] = None
     credits_last_granted_at: Optional[datetime] = None
     next_renewal_date: Optional[datetime] = None
+    trial_expires_at: Optional[datetime] = None  # 🆕 20/08/2026
 
     class Config:
         from_attributes = True

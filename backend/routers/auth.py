@@ -58,6 +58,7 @@ async def _user_to_response(user: models.User, db: AsyncSession) -> schemas.User
         "external_subscription_id": user.external_subscription_id,
         "credits_last_granted_at": user.credits_last_granted_at,
         "next_renewal_date": user.next_renewal_date,
+        "trial_expires_at": user.trial_expires_at,  # 🆕 20/08/2026
     }
     return schemas.UserResponse(**data)
 
