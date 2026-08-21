@@ -553,12 +553,20 @@ async def forgot_password(payload: ForgotPasswordRequest, request: Request, db: 
     user = res.scalars().first()
 
     if user:
-        # Gera token + salva no DB
-        import secrets
-        reset_token = secrets.token_urlsafe(32)
-        user.password_reset_token = reset_token
-        user.password_reset_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-        user.password_reset_sent_at = datetime.now(timezone.utc)
+        # 🆕 20/08/2026 — Se já tem token válido (não expirado), REUTILIZA em vez de gerar novo.
+        # Evita que emails atrasados cheguem com token sobrescrito e vire "token inválido".
+        now = datetime.now(timezone.utc)
+        if user.password_reset_token and user.password_reset_token_expires_at and user.password_reset_token_expires_at > now:
+            reset_token = user.password_reset_token
+            logger.info(f"Reutilizando token de reset existente para {user.email}")
+        else:
+            # Gera token novo
+            import secrets
+            reset_token = secrets.token_urlsafe(32)
+            user.password_reset_token = reset_token
+            user.password_reset_token_expires_at = now + timedelta(hours=1)
+
+        user.password_reset_sent_at = now
         await db.commit()
         await db.refresh(user)
 
