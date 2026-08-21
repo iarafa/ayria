@@ -2,23 +2,37 @@
  * AYRIA - Reset Password Page (20/08/2026)
  *
  * Usuário clicou no link do email de "esqueci minha senha".
- * URL: /#/reset-password?token=XXX
+ * URL: /#/reset-password?token=XXX  (HashRouter, ? fica dentro do fragmento!)
+ *
+ * 🆕 21/08/2026 — FIX: token vem DEPOIS do #, não na query string.
+ * URL é tipo: https://ayria.online/#/reset-password?token=XXX
+ *              [scheme]            [fragmento: '/reset-password?token=XXX']
+ *                              ↑ urlparse() não vê o ? como query, vê como parte do fragmento
  *
  * Fluxo:
- * 1. Pega token da URL
- * 2. User digita nova senha (2x pra confirmar)
- * 3. POST /api/auth/reset-password com { token, new_password }
- * 4. Backend valida token (single-use, 1h) + aplica hash
- * 5. Mostra "Senha alterada!" + link pro login
+ * 1. Pega fragmento da URL (depois do #)
+ * 2. Extrai ?token=XXX do fragmento manualmente
+ * 3. User digita nova senha (2x pra confirmar)
+ * 4. POST /api/auth/reset-password com { token, new_password }
+ * 5. Backend valida token (single-use, 1h) + aplica hash
+ * 6. Mostra "Senha alterada!" + link pro login
  */
-import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { LogoIcon } from '../components/Logo'
 
 export function ResetPasswordPage() {
-  const [params] = useSearchParams()
   const navigate = useNavigate()
-  const token = params.get('token')
+
+  // � 21/08/2026 — Extrai token do FRAGMENTO (depois do #) pq HashRouter usa #/path?query
+  const token = useMemo(() => {
+    const hash = window.location.hash  // ex: "#/reset-password?token=XXX"
+    const queryStart = hash.indexOf('?')
+    if (queryStart === -1) return null
+    const queryString = hash.substring(queryStart + 1)  // "token=XXX"
+    const params = new URLSearchParams(queryString)
+    return params.get('token')
+  }, [])
 
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
