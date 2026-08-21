@@ -575,28 +575,16 @@ async def forgot_password(payload: ForgotPasswordRequest, request: Request, db: 
         base = get_public_base_url()
         reset_url = f"{base}/#/reset-password?token={reset_token}"
 
-        # Envia email
+        # Envia email (🆕 21/08/2026 — usa template profissional consistente com verification)
         try:
             from services.email_turbo import get_email_client
+            from services.email_templates import password_reset_email_html, password_reset_email_text
             client = get_email_client()
-            html = f"""
-            <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px">
-              <h2 style="color:#da950b">AYRIA — Recuperação de senha</h2>
-              <p>Oi {user.full_name or ''},</p>
-              <p>Você (ou alguém) solicitou redefinição de senha da sua conta AYRIA.</p>
-              <p>Clique no botão abaixo pra criar uma nova senha (válido por 1 hora):</p>
-              <p style="text-align:center;margin:30px 0">
-                <a href="{reset_url}" style="background:#da950b;color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:bold">Redefinir minha senha</a>
-              </p>
-              <p style="color:#666;font-size:12px">Se você não fez essa solicitação, ignore este email — sua senha continua a mesma.</p>
-              <p style="color:#999;font-size:11px">Link direto: {reset_url}</p>
-            </div>
-            """
             await client.send_email(
                 to_email=user.email,
                 subject="Recupere sua senha — AYRIA 🔐",
-                body_html=html,
-                body_text=f"AYRIA — Recuperação de senha\n\nAcesse: {reset_url}\n\nVálido por 1 hora."
+                body_html=password_reset_email_html(user.full_name, reset_url, expires_hours=1),
+                body_text=password_reset_email_text(user.full_name, reset_url, expires_hours=1),
             )
             logger.info(f"Password reset email sent to {user.email}")
         except Exception as e:

@@ -103,3 +103,105 @@ Se você não criou essa conta, pode ignorar este email com segurança.
 
 — Equipe AYRIA
 """
+
+
+def password_reset_email_html(
+    full_name: Optional[str],
+    reset_url: str,
+    expires_hours: int = 1,
+) -> str:
+    """
+    Email de recuperação de senha.
+    Visual consistente com verification_email_html.
+    """
+    greeting = f"Oi, {full_name}! 👋" if full_name else "Olá! 👋"
+    return f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recupere sua senha - AYRIA</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#0f172a;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width:600px;background-color:#1e293b;border-radius:16px;overflow:hidden;border:1px solid #334155;">
+          <!-- Header -->
+          <tr>
+            <td style="padding:40px 40px 20px 40px;text-align:center;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);">
+              <h1 style="margin:0;color:#ffffff;font-size:32px;font-weight:700;">🔐 AYRIA</h1>
+              <p style="margin:8px 0 0 0;color:#cbd5e1;font-size:14px;">Recuperação de senha</p>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding:40px;">
+              <h2 style="margin:0 0 16px 0;color:#f1f5f9;font-size:22px;font-weight:600;">{greeting}</h2>
+              <p style="margin:0 0 24px 0;color:#cbd5e1;font-size:16px;line-height:1.6;">
+                Recebemos uma solicitação pra redefinir a senha da sua conta AYRIA.
+                Se foi você, clique no botão abaixo pra criar uma nova senha.
+              </p>
+              <!-- CTA Button -->
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:32px 0;">
+                <tr>
+                  <td align="center">
+                    <a href="{reset_url}" target="_blank" style="display:inline-block;padding:16px 40px;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);color:#ffffff;text-decoration:none;font-size:16px;font-weight:600;border-radius:8px;box-shadow:0 4px 14px rgba(99,102,241,0.4);">
+                      🔑 Redefinir minha senha
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:24px 0 8px 0;color:#94a3b8;font-size:13px;line-height:1.5;">
+                Ou copie e cole este link no navegador:
+              </p>
+              <p style="margin:0;padding:12px;background-color:#0f172a;border:1px solid #334155;border-radius:6px;color:#94a3b8;font-size:12px;word-break:break-all;font-family:monospace;">
+                {reset_url}
+              </p>
+              <p style="margin:24px 0 0 0;color:#94a3b8;font-size:13px;line-height:1.5;">
+                ⏰ Este link expira em <strong style="color:#cbd5e1;">{expires_hours} hora</strong>.
+              </p>
+              <hr style="margin:32px 0;border:none;border-top:1px solid #334155;">
+              <p style="margin:0;color:#64748b;font-size:12px;line-height:1.6;">
+                Se você <strong style="color:#94a3b8;">não fez essa solicitação</strong>, ignore este email — sua senha continua a mesma.
+              </p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding:20px 40px;background-color:#0f172a;text-align:center;border-top:1px solid #334155;">
+              <p style="margin:0;color:#64748b;font-size:12px;">
+                © AYRIA · Enviado via TurboSMTP
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+
+def password_reset_email_text(
+    full_name: Optional[str],
+    reset_url: str,
+    expires_hours: int = 1,
+) -> str:
+    """Versão texto plano do email de reset."""
+    greeting = f"Oi, {full_name}!" if full_name else "Olá!"
+    return f"""AYRIA — Recuperação de senha
+
+{greeting}
+
+Recebemos uma solicitação pra redefinir a senha da sua conta AYRIA.
+Se foi você, clique no link abaixo pra criar uma nova senha:
+
+{reset_url}
+
+Este link expira em {expires_hours} hora.
+
+Se você não fez essa solicitação, ignore este email — sua senha continua a mesma.
+
+— Equipe AYRIA
+"""
