@@ -47,10 +47,7 @@ export function PaywallModal({ isOpen, onClose }: PaywallModalProps) {
           ×
         </button>
 
-        {/* Ícone */}
-        <div className="text-center mb-4">
-          <div className="text-5xl mb-3">💬</div>
-        </div>
+        {/* Sem ícone — paywall não precisa de emoji (� 21/08/2026 — Rafael pediu pra remover) */}
 
         {/* Título */}
         <h2 className="text-2xl font-bold text-white text-center mb-3">
@@ -79,7 +76,7 @@ export function PaywallModal({ isOpen, onClose }: PaywallModalProps) {
         </button>
 
         <p className="text-center text-xs text-ayria-muted mt-4">
-          💬 Sua história fica salva. Volta quando quiser.
+          Volte quando quiser.
         </p>
       </div>
     </div>
